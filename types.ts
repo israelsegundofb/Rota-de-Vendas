@@ -3,6 +3,7 @@ export interface RawClient {
   'Nome do Proprietário': string;
   'Contato': string;
   'Endereço': string;
+  'googleMapsLink'?: string;
 }
 
 export interface Product {
