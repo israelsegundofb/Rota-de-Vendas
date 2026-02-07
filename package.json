@@ -1,0 +1,26 @@
+{
+  "name": "rota-de-vendas-inteligente",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "papaparse": "^5.5.3",
+    "react-dom": "^19.2.4",
+    "@google/genai": "^1.40.0",
+    "lucide-react": "^0.563.0",
+    "react": "^19.2.4",
+    "@vis.gl/react-google-maps": "1.1.0",
+    "@googlemaps/markerclusterer": "2.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

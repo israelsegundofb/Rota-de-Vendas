@@ -1,0 +1,5 @@
+{
+  "name": "Rota de Vendas Inteligente",
+  "description": "Visualize clientes de vendedores no mapa, categorizados por IA e filtrados por segmento de produto.",
+  "requestFramePermissions": []
+}
