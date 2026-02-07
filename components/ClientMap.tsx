@@ -236,23 +236,8 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
     return () => {
       (window as any).gm_authFailure = () => { };
 
-      // CRITICAL FIX: Aggressively remove Google Maps scripts from DOM.
-      // This ensures that when the key changes (and this component unmounts/remounts),
-      // the APIProvider will fetch the script again with the NEW key.
-      // Without this, the browser keeps the old script (with the invalid key state) loaded.
-      const scripts = document.getElementsByTagName('script');
-      for (let i = scripts.length - 1; i >= 0; i--) {
-        const script = scripts[i];
-        if (script.src && script.src.includes('maps.googleapis.com/maps/api/js')) {
-          script.parentNode?.removeChild(script);
-        }
-      }
-
-      // Also clear the global google maps object to force re-initialization
-      if (window.google && window.google.maps) {
-        // @ts-ignore
-        window.google.maps = undefined;
-      }
+      // Removed aggressive cleanup to prevent crashes on tab switch.
+      // If key changes, APIProvider should handle it, or we rely on keyVersion in App.tsx.
     };
   }, [apiKey]);
 
