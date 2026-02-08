@@ -242,6 +242,51 @@ const App: React.FC = () => {
     setUsers(users.filter(u => u.id !== userId));
   };
 
+  const handleCleanupDuplicates = () => {
+    const confirmCleanup = window.confirm(
+      '⚠️ Remover Clientes Duplicados?\n\n' +
+      'Esta ação irá:\n' +
+      '• Identificar clientes com mesmo nome e endereço\n' +
+      '• Manter apenas 1 registro de cada\n' +
+      '• Atualizar a contagem total\n\n' +
+      'Deseja continuar?'
+    );
+
+    if (!confirmCleanup) return;
+
+    // Find duplicates based on companyName + address
+    const seen = new Map<string, EnrichedClient>();
+    const unique: EnrichedClient[] = [];
+    let duplicateCount = 0;
+
+    masterClientList.forEach((client) => {
+      const key = `${client.companyName}-${client.address}`.toLowerCase().trim();
+
+      if (seen.has(key)) {
+        duplicateCount++;
+      } else {
+        seen.set(key, client);
+        unique.push(client);
+      }
+    });
+
+    if (duplicateCount === 0) {
+      alert('✅ Nenhum cliente duplicado encontrado!');
+      return;
+    }
+
+    // Update state with cleaned list
+    setMasterClientList(unique);
+
+    alert(
+      `✅ Limpeza Concluída!\n\n` +
+      `${duplicateCount} clientes duplicados removidos\n` +
+      `Total anterior: ${masterClientList.length}\n` +
+      `Total atual: ${unique.length}`
+    );
+  };
+
+
   const handleAddCategory = (newCategory: string) => {
     if (!categories.includes(newCategory)) {
       setCategories([...categories, newCategory]);
@@ -1025,6 +1070,8 @@ const App: React.FC = () => {
                 onAddUser={handleAddUser}
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
+                onCleanupDuplicates={handleCleanupDuplicates}
+                totalClients={masterClientList.length}
               />
             </div>
           ) : activeView === 'admin_categories' && isAdmin ? (

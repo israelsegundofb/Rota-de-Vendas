@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase } from 'lucide-react';
+import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase, AlertCircle } from 'lucide-react';
 import { AppUser, SalesCategory } from '../types';
 
 interface AdminUserManagementProps {
@@ -7,9 +7,18 @@ interface AdminUserManagementProps {
   onAddUser: (user: AppUser) => void;
   onUpdateUser: (user: AppUser) => void;
   onDeleteUser: (userId: string) => void;
+  onCleanupDuplicates: () => void;
+  totalClients: number;
 }
 
-const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddUser, onUpdateUser, onDeleteUser }) => {
+const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
+  users,
+  onAddUser,
+  onUpdateUser,
+  onDeleteUser,
+  onCleanupDuplicates,
+  totalClients
+}) => {
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -169,13 +178,35 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
 
       {/* List Users Section */}
       <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 overflow-hidden">
-        <div className="p-6 border-b border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-xl font-normal text-on-surface flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary" />
-            Usuários Ativos
+        {/* User List - Filtered by Sales Category */}
+        <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 space-y-4">
+          <h2 className="text-xl font-normal flex items-center gap-2 text-on-surface">
+            <User className="w-5 h-5 text-primary" />
+            Usuários Cadastrados ({filteredUsers.length})
           </h2>
 
-          {/* Filters */}
+          {/* Maintenance Tools */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start justify-between">
+            <div className="flex items-start gap-3 flex-1">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-900">Manutenção do Sistema</p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Total de clientes no sistema: <strong>{totalClients}</strong>
+                  {totalClients > 143 && <span className="text-red-600"> • Possíveis duplicatas detectadas</span>}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onCleanupDuplicates}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-full text-sm font-medium hover:bg-yellow-700 transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              <AlertCircle className="w-4 h-4" />
+              Limpar Duplicatas
+            </button>
+          </div>
+
+          {/* Category Filters */}
           <div className="flex bg-surface-container-highest p-1 rounded-full">
             {categoryTabs.map(tab => (
               <button
