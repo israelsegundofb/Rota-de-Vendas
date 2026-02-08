@@ -788,7 +788,7 @@ const App: React.FC = () => {
                   <div className="flex flex-col items-center">
                     <FileUp className="w-5 h-5 text-purple-400 mb-1" />
                     <span className="text-[10px] text-white/70">
-                      {procState.isActive && procState.status === 'processing' ? 'Processando...' : 'Carregar CSV (Excel)'}
+                      {procState.isActive && procState.status === 'processing' ? 'Processando...' : 'Carregar Planilha CSV'}
                     </span>
                   </div>
                   <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={procState.isActive && procState.status === 'processing' || !targetUploadUserId} />
