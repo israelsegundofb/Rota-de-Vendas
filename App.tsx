@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Trash2 } from 'lucide-react';
 import { RawClient, EnrichedClient, CATEGORIES, User, REGIONS, Product } from './types';
 import { parseCSV } from './utils/csvParser';
 import { processClientsWithAI } from './services/geminiService';
@@ -164,6 +164,25 @@ const App: React.FC = () => {
 
   const handleUpdateClient = (updatedClient: EnrichedClient) => {
     setMasterClientList(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+  };
+
+  const handleClearClients = () => {
+    const confirmClear = window.confirm(
+      "⚠️ AVISO CRÍTICO ⚠️\n\n" +
+      "Tem certeza que deseja DELETAR TODOS os clientes do sistema?\n" +
+      "Isso removerá todo o histórico e limpará o cache local.\n\n" +
+      "Esta ação não pode ser desfeita."
+    );
+
+    if (confirmClear) {
+      setMasterClientList([]);
+      localStorage.removeItem('vendas_ai_clients');
+      // Optional: Also clear any processing state
+      setProcState({
+        isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
+      });
+      alert("Base de dados limpa com sucesso!");
+    }
   };
 
   // Simulate Sales Logic
@@ -358,6 +377,20 @@ const App: React.FC = () => {
       ownerName = targetUser?.name || 'Unknown';
     }
 
+    // CONFIRMATION ALERT
+    if (masterClientList.length > 0) {
+      const confirmUpdate = window.confirm(
+        "O sistema já possui dados de clientes carregados.\n\n" +
+        "Deseja ADICIONAR os novos dados à lista existente?\n" +
+        "Clique em OK para continuar ou Cancelar para abortar.\n\n" +
+        "Dica: Para substituir tudo, cancele e use o botão 'Limpar Base de Clientes'."
+      );
+      if (!confirmUpdate) {
+        event.target.value = ''; // Reset file input
+        return;
+      }
+    }
+
     // Initialize Background Process State
     setProcState({
       isActive: true,
@@ -506,19 +539,24 @@ const App: React.FC = () => {
             </p>
 
             {isAdmin ? (
-              <div className="bg-white/5 p-3 rounded-lg border border-white/10">
-                <p className="text-[10px] text-purple-300 font-bold uppercase mb-2">Atribuir Carteira a:</p>
-                <select
-                  className="w-full bg-slate-800 border border-slate-600 rounded text-xs p-2 text-white mb-3 focus:ring-1 focus:ring-purple-500 outline-none"
-                  value={targetUploadUserId}
-                  onChange={(e) => setTargetUploadUserId(e.target.value)}
-                >
-                  <option value="" disabled>Selecione o Vendedor...</option>
-                  {users.filter(u => u.role === 'salesperson').map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+              <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
 
+                {/* Target Salesperson Selector */}
+                <div>
+                  <p className="text-[10px] text-purple-300 font-bold uppercase mb-2">Atribuir Carteira a:</p>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-600 rounded text-xs p-2 text-white mb-2 focus:ring-1 focus:ring-purple-500 outline-none"
+                    value={targetUploadUserId}
+                    onChange={(e) => setTargetUploadUserId(e.target.value)}
+                  >
+                    <option value="" disabled>Selecione o Vendedor...</option>
+                    {users.filter(u => u.role === 'salesperson').map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Upload Button */}
                 <label className={`flex items-center justify-center w-full px-2 py-3 border border-white/20 border-dashed rounded-lg cursor-pointer hover:bg-white/5 transition-colors ${procState.isActive && procState.status === 'processing' ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex flex-col items-center">
                     <FileUp className="w-5 h-5 text-purple-400 mb-1" />
@@ -528,6 +566,17 @@ const App: React.FC = () => {
                   </div>
                   <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={procState.isActive && procState.status === 'processing' || !targetUploadUserId} />
                 </label>
+
+                {/* Clear Data Button */}
+                <button
+                  onClick={handleClearClients}
+                  className="w-full flex items-center justify-center gap-2 px-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 rounded-lg text-[10px] font-medium transition-colors mt-2"
+                  title="Remover todos os clientes do sistema"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Limpar Base de Clientes
+                </button>
+
               </div>
             ) : (
               <div className="px-3 py-4 bg-white/5 rounded-lg border border-white/10 text-center">
