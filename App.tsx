@@ -16,7 +16,9 @@ import EditClientModal from './components/EditClientModal';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminCategoryManagement from './components/AdminCategoryManagement';
 import AdminProductManagement from './components/AdminProductManagement';
+import AdminProductManagement from './components/AdminProductManagement';
 import CloudConfigModal from './components/CloudConfigModal';
+import CookieConsent from './components/CookieConsent';
 
 
 // Initial Mock Data
@@ -865,6 +867,17 @@ const App: React.FC = () => {
       <CloudConfigModal
         isOpen={isCloudConfigOpen}
         onClose={() => setIsCloudConfigOpen(false)}
+      />
+
+      <CookieConsent
+        onAccept={() => {
+          console.log("Cookie consent accepted. Storage enabled.");
+          // We are already using localStorage by default for MVP, but this signals explicit consent.
+          // In a stricter implementation, we would selectively enable the persistence hooks here.
+        }}
+        onDecline={() => {
+          console.warn("Cookie consent declined. Storage should be minimized.");
+        }}
       />
 
 
