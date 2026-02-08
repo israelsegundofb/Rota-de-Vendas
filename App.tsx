@@ -1,15 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2 } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
 import { RawClient, EnrichedClient, CATEGORIES, User, REGIONS, Product, getRegionByUF } from './types';
 import { parseCSV } from './utils/csvParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress } from './services/geocodingService';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from './services/firebaseService';
 import ClientMap from './components/ClientMap';
 import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
+import AddClientModal from './components/AddClientModal';
+import EditClientModal from './components/EditClientModal';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminCategoryManagement from './components/AdminCategoryManagement';
 import AdminProductManagement from './components/AdminProductManagement';
+import CloudConfigModal from './components/CloudConfigModal';
 
 // Initial Mock Data
 const INITIAL_USERS: User[] = [
@@ -41,25 +45,73 @@ const App: React.FC = () => {
   });
 
   const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
-  // Load from LocalStorage on Mount with Migration
+  // Load from LocalStorage
+  // Init Data with Cloud Fallback
   useEffect(() => {
-    const saved = localStorage.getItem('vendas_ai_clients');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // MIGRATION: Ensure category is string[]
-        setMasterClientList(parsed.map((c: any) => ({
-          ...c,
-          category: Array.isArray(c.category)
-            ? c.category
-            : (typeof c.category === 'string' ? [c.category] : ['Outros']),
-          region: getRegionByUF(c.state) // Force update region based on state
-        })));
-      } catch (e) {
-        console.error("Failed to parse saved clients", e);
+    const initData = async () => {
+      // 1. Try to init Firebase
+      const connected = await initializeFirebase();
+      setIsFirebaseConnected(connected);
+
+      // 2. If connected, try to load from cloud
+      if (connected) {
+        console.log("Loading data from Cloud...");
+        const cloudData = await loadFromCloud();
+        if (cloudData) {
+          console.log("Cloud data found.", cloudData);
+          if (cloudData.clients) setMasterClientList(cloudData.clients);
+          if (cloudData.products) setProducts(cloudData.products);
+          if (cloudData.categories) setCategories(cloudData.categories);
+          if (cloudData.users) setUsers(cloudData.users);
+          return; // Stop here, use cloud data
+        }
       }
-    }
+
+      // 3. Fallback to LocalStorage if no Cloud data or not connected
+      console.log("Loading data from LocalStorage...");
+      const savedClients = localStorage.getItem('vendas_ai_clients');
+      if (savedClients) {
+        try {
+          const parsed = JSON.parse(savedClients);
+          // MIGRATION: Ensure category is string[]
+          setMasterClientList(parsed.map((c: any) => ({
+            ...c,
+            category: Array.isArray(c.category)
+              ? c.category
+              : (typeof c.category === 'string' ? [c.category] : ['Outros']),
+            region: getRegionByUF(c.state) // Force update region
+          })));
+        } catch (e) { console.error(e); }
+      }
+
+      const savedUsers = localStorage.getItem('vendas_ai_users');
+      if (savedUsers) setUsers(JSON.parse(savedUsers));
+
+      const savedCategories = localStorage.getItem('vendas_ai_categories');
+      if (savedCategories) setCategories(JSON.parse(savedCategories));
+
+      const savedProducts = localStorage.getItem('vendas_ai_products');
+      if (savedProducts) setProducts(JSON.parse(savedProducts));
+    };
+
+    initData();
   }, []);
+
+  // Save changes to Cloud whenever critical data changes (Debounced ideally, but direct for MVP)
+  useEffect(() => {
+    if (isFirebaseConnected && masterClientList.length > 0) {
+      const timeout = setTimeout(() => {
+        saveToCloud(masterClientList, products, categories, users)
+          .catch(err => console.error("Auto-save failed", err));
+      }, 2000); // 2s debounce
+      return () => clearTimeout(timeout);
+    }
+  }, [masterClientList, products, categories, users, isFirebaseConnected]);
+
+  // Save to LocalStorage (Persist)
+  useEffect(() => {
+    localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
+  }, [masterClientList]);
 
   const [categories, setCategories] = useState<string[]>(() => {
     try {
@@ -101,7 +153,11 @@ const App: React.FC = () => {
 
   // View State
   const [activeView, setActiveView] = useState<'map' | 'table' | 'admin_users' | 'admin_categories' | 'admin_products'>('map');
-
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
   // Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterRegion, setFilterRegion] = useState<string>('Todas');
@@ -725,12 +781,33 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Cloud Sync Status/Button (Admin only) */}
+        {isAdmin && (
+          <div className="px-3 mb-6">
+            <button
+              onClick={() => setIsCloudConfigOpen(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg text-purple-200 bg-purple-900/50 hover:bg-purple-900/70 transition-colors border border-purple-800"
+            >
+              <Cloud className="w-3 h-3" />
+              {isFirebaseConnected ? 'Nuvem Conectada' : 'Configurar Nuvem'}
+              {isFirebaseConnected && <div className="w-1.5 h-1.5 rounded-full bg-green-400 ml-auto"></div>}
+            </button>
+          </div>
+        )}
+
         <div className="mt-auto p-4 border-t border-white/10">
           <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 transition-colors w-full px-2">
             <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>
       </aside >
+
+      {/* MODALS */}
+      <CloudConfigModal
+        isOpen={isCloudConfigOpen}
+        onClose={() => setIsCloudConfigOpen(false)}
+      />
+
 
       {/* MAIN CONTENT */}
       < main className="flex-1 flex flex-col h-full relative overflow-hidden" >
