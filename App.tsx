@@ -111,7 +111,7 @@ const App: React.FC = () => {
 
   // API Key State
   // Default to the provided key if process.env.API_KEY is missing
-  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || "AIzaSyDa-6pfscyrTFV5VpzyRRNxudBrsNVLppM");
+  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || "");
   // Version tracker to force remount of Map component on key update attempts
   const [keyVersion, setKeyVersion] = useState(0);
 
