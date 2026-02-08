@@ -17,6 +17,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
         ownerName: '',
         contact: '',
         address: '',
+        categories: [] as string[],
         category: '',
         salespersonId: ''
     });
@@ -30,6 +31,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
                 ownerName: client.ownerName || '',
                 contact: client.contact || '',
                 address: client.cleanAddress || client.originalAddress || '',
+                categories: client.categories || (client.category ? [client.category] : []),
                 category: client.category || CATEGORIES[1],
                 salespersonId: client.salespersonId || ''
             });
@@ -50,7 +52,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
             ownerName: formData.ownerName,
             contact: formData.contact,
             cleanAddress: formData.address, // For now, we update the display address. Re-geocoding would require async logic similar to Add.
-            category: formData.category,
+            categories: formData.categories,
+            category: formData.categories[0] || formData.category,
             salespersonId: formData.salespersonId
         };
 
