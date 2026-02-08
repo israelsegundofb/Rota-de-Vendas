@@ -109,6 +109,7 @@ const MaintenanceScreen: React.FC<{ onComplete?: () => void }> = ({ onComplete }
                         <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden mb-6">
                             <div
                                 className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300 ease-out"
+                                // eslint-disable-next-line react-dom/no-unsafe-inline-style
                                 style={{ width: `${progress}%` }}
                             />
                         </div>

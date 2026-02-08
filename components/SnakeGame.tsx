@@ -160,7 +160,7 @@ const SnakeGame: React.FC = () => {
 
             <div className="relative">
                 <canvas
-                    style={{ border: '2px solid #333', background: '#000' }}
+                    className="border-2 border-gray-800 bg-black"
                     ref={canvasRef}
                     width={`${CANVAS_SIZE}px`}
                     height={`${CANVAS_SIZE}px`}

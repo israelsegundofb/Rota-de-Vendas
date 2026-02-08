@@ -635,7 +635,7 @@ const App: React.FC = () => {
               <img src="/sales_route_logo.svg" alt="Logo" className="w-8 h-8 object-contain bg-white/10 rounded-lg p-1" />
               Vendas A.I. <span className="text-[10px] bg-red-500 text-white px-1 rounded ml-1">v1.5</span>
             </h1>
-            <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white/70 hover:text-white">
+            <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white/70 hover:text-white" aria-label="Fechar menu">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -708,6 +708,7 @@ const App: React.FC = () => {
                 <div className="bg-white/5 p-3 rounded-lg border border-white/10">
                   <p className="text-[10px] text-purple-300 font-bold uppercase mb-2">Atribuir Carteira a:</p>
                   <select
+                    aria-label="Selecionar vendedor para upload"
                     className="w-full bg-slate-800 border border-slate-600 rounded text-xs p-2 text-white mb-3 focus:ring-1 focus:ring-purple-500 outline-none"
                     value={targetUploadUserId}
                     onChange={(e) => setTargetUploadUserId(e.target.value)}
@@ -848,6 +849,7 @@ const App: React.FC = () => {
                         <div className="relative">
                           <UserIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
                           <select
+                            aria-label="Filtrar por Vendedor"
                             value={filterSalespersonId}
                             onChange={(e) => setFilterSalespersonId(e.target.value)}
                             className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
@@ -862,6 +864,7 @@ const App: React.FC = () => {
                         <div className="relative">
                           <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
                           <select
+                            aria-label="Filtrar por Tipo de Equipe"
                             value={filterSalesCategory}
                             onChange={(e) => setFilterSalesCategory(e.target.value)}
                             className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
@@ -876,6 +879,7 @@ const App: React.FC = () => {
                     )}
 
                     <select
+                      aria-label="Filtrar por Região"
                       value={filterRegion}
                       onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
                       className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5"
@@ -885,6 +889,7 @@ const App: React.FC = () => {
                     </select>
 
                     <select
+                      aria-label="Filtrar por Estado"
                       value={filterState}
                       onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
                       className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5"
@@ -895,6 +900,7 @@ const App: React.FC = () => {
                     </select>
 
                     <select
+                      aria-label="Filtrar por Cidade"
                       value={filterCity}
                       onChange={(e) => setFilterCity(e.target.value)}
                       className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5 min-w-[120px]"
@@ -907,6 +913,7 @@ const App: React.FC = () => {
                     <div className="flex items-center gap-1 relative ml-2">
                       <ShoppingBag className="w-4 h-4 text-gray-400 absolute left-2 pointer-events-none" />
                       <select
+                        aria-label="Filtrar por Categoria"
                         value={filterCategory}
                         onChange={(e) => setFilterCategory(e.target.value)}
                         className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-8 pr-3 py-1.5"
@@ -925,6 +932,7 @@ const App: React.FC = () => {
                     </div>
 
                     <select
+                      aria-label="Filtrar por Produto"
                       value={filterProductCategory}
                       onChange={e => setFilterProductCategory(e.target.value)}
                       className={`text-sm rounded-md px-3 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
@@ -1033,6 +1041,7 @@ const App: React.FC = () => {
                       procState.status === 'error' ? 'bg-red-500 w-full' :
                         'bg-blue-600'
                       }`}
+                    // eslint-disable-next-line react-dom/no-unsafe-inline-style
                     style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
                   />
                 </div>
@@ -1056,6 +1065,7 @@ const App: React.FC = () => {
                     <button
                       onClick={() => setProcState(prev => ({ ...prev, isActive: false }))}
                       className="text-gray-400 hover:text-gray-600"
+                      aria-label="Fechar notificação"
                     >
                       <X className="w-4 h-4" />
                     </button>
