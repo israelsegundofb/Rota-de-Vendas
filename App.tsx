@@ -722,14 +722,18 @@ const App: React.FC = () => {
         : c
     ));
 
-    // Show confirmation
-    if (newSalespersonId === '') {
-      // Unassigned
-      alert('Arquivo desmarcado. Clientes ficaram sem vendedor até que outro seja atribuído.');
+    // Auto-navigate to map and apply filter
+    if (newSalespersonId) {
+      setActiveView('map');
+      setFilterSalespersonId(newSalespersonId);
+      alert(`Arquivo e ${filteredClients.filter(c => c.sourceFileId === fileId).length} clientes reatribuídos para: ${newSalespersonName}\n\nMapa filtrado automaticamente.`);
     } else {
-      alert(`Arquivo e clientes reatribuídos para: ${newSalespersonName}`);
+      // Unassigned - show all
+      setFilterSalespersonId('Todos');
+      alert('Arquivo desmarcado. Clientes ficaram sem vendedor até que outro seja atribuído.');
     }
   };
+
 
 
   const handleProductFileUpload = async (file: File) => {
