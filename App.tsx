@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+// Force Sync: 2026-02-07T23:35:00
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Trash2, RefreshCw, Plus, Menu } from 'lucide-react';
 import { get, set, clear } from 'idb-keyval'; // Import idb-keyval
 import { RawClient, EnrichedClient, CATEGORIES, User, REGIONS, Product } from './types';
