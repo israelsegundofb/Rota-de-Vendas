@@ -7,9 +7,18 @@ import { initializeFirebase } from '../services/firebaseService';
 interface CloudConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSaveToCloud?: () => void;
+    onClearDatabase?: () => void;
+    isFirebaseConnected?: boolean;
 }
 
-const CloudConfigModal: React.FC<CloudConfigModalProps> = ({ isOpen, onClose }) => {
+const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
+    isOpen,
+    onClose,
+    onSaveToCloud,
+    onClearDatabase,
+    isFirebaseConnected = false
+}) => {
     const [formData, setFormData] = useState<FirebaseConfig>({
         apiKey: '',
         authDomain: '',
@@ -129,6 +138,29 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({ isOpen, onClose }) 
                         </div>
                     )}
                 </div>
+
+                {/* Cloud Actions Section */}
+                {isFirebaseConnected && onSaveToCloud && onClearDatabase && (
+                    <div className="p-4 border-t border-gray-200 bg-gray-50">
+                        <p className="text-xs font-semibold text-gray-600 mb-3">Ações da Nuvem</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={onSaveToCloud}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Cloud className="w-4 h-4" />
+                                Salvar na Nuvem
+                            </button>
+                            <button
+                                onClick={onClearDatabase}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Limpar Base
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="p-4 bg-gray-50 border-t flex justify-end gap-2">
                     {status === 'success' && (

@@ -318,6 +318,30 @@ const App: React.FC = () => {
     setMasterClientList(prev => prev.map(c => ({ ...c, purchasedProducts: [] })));
   };
 
+  const handleClearAllClients = () => {
+    if (!window.confirm(
+      '⚠️ ATENÇÃO: Limpar TODOS os Clientes?\n\n' +
+      'Esta ação irá:\n' +
+      '• Remover TODOS os clientes do sistema\n' +
+      '• Limpar a listagem de arquivos\n' +
+      '• Resetar contadores\n\n' +
+      'Os vendedores, produtos e categorias não serão afetados.\n\n' +
+      'Deseja continuar?'
+    )) return;
+
+    // Clear all clients
+    setMasterClientList([]);
+
+    // Clear all uploaded client files
+    setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+
+    alert(
+      '✅ Base de Clientes Limpa!\n\n' +
+      'Você pode agora fazer upload de novas planilhas de clientes.'
+    );
+  };
+
+
   const handleUpdateClient = async (updatedClient: EnrichedClient) => {
     // Check if address changed to re-geocode
     const original = masterClientList.find(c => c.id === updatedClient.id);
@@ -1024,6 +1048,12 @@ const App: React.FC = () => {
         <CloudConfigModal
           isOpen={isCloudConfigOpen}
           onClose={() => setIsCloudConfigOpen(false)}
+          onSaveToCloud={() => {
+            saveToCloud(masterClientList, products, categories, users);
+            alert('✅ Dados salvos na nuvem com sucesso!');
+          }}
+          onClearDatabase={handleClearAllClients}
+          isFirebaseConnected={isFirebaseConnected}
         />
 
         <CookieConsent
