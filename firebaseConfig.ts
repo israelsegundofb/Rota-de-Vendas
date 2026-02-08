@@ -15,7 +15,17 @@ export interface FirebaseConfig {
 
 export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
     const stored = localStorage.getItem('firebase_config');
-    return stored ? JSON.parse(stored) : null;
+    if (stored) return JSON.parse(stored);
+
+    // Default Config provided by User (Auto-connect)
+    return {
+        apiKey: "AIzaSyAenb2sXL1h-y9uChCwjaZoU4I_rHzBd2w",
+        authDomain: "gen-lang-client-0586123917.firebaseapp.com",
+        projectId: "gen-lang-client-0586123917",
+        storageBucket: "gen-lang-client-0586123917.firebasestorage.app",
+        messagingSenderId: "66816750674",
+        appId: "1:66816750674:web:a2ec5f3735ae90f821db8b"
+    };
 };
 
 export const saveFirebaseConfig = (config: FirebaseConfig) => {
