@@ -126,8 +126,9 @@ const ClientMapContent: React.FC<{
   clients: EnrichedClient[],
   onClientSelect: (id: string | null) => void,
   productFilterActive?: boolean,
-  users?: AppUser[]
-}> = ({ clients, onClientSelect, productFilterActive, users }) => {
+  users?: AppUser[],
+  isClusteringEnabled: boolean // Added prop
+}> = ({ clients, onClientSelect, productFilterActive, users, isClusteringEnabled }) => {
   const map = useMap();
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const markersRef = useRef<any[]>([]);
@@ -146,7 +147,6 @@ const ClientMapContent: React.FC<{
     if (!map) return;
 
     // DEFENSIVE CHECK: If the key is invalid, google.maps.marker might not be loaded.
-    // This prevents "Cannot read properties of undefined (reading 'PinElement')" during auth failures.
     if (!google.maps.marker) {
       console.warn("Google Maps Marker library not loaded. Likely an invalid API Key.");
       return;
@@ -157,18 +157,27 @@ const ClientMapContent: React.FC<{
       clustererRef.current.clearMarkers();
       (clustererRef.current as any).setMap(null);
     }
-    markersRef.current.forEach(m => google.maps.event.clearInstanceListeners(m));
+    // Remove markers from map if they were added directly
+    markersRef.current.forEach(m => {
+      m.map = null;
+      google.maps.event.clearInstanceListeners(m);
+    });
     markersRef.current = [];
 
-    // 2. Init Clusterer with Performance Optimizations
-    clustererRef.current = new MarkerClusterer({
-      map,
-      markers: [],
-      algorithm: new SuperClusterAlgorithm({
-        maxZoom: 13,
-        radius: 80,
-      })
-    });
+    // 2. Init Clusterer (Only if enabled)
+    if (isClusteringEnabled) {
+      clustererRef.current = new MarkerClusterer({
+        map,
+        markers: [],
+        algorithm: new SuperClusterAlgorithm({
+          maxZoom: 13,
+          radius: 80,
+        })
+      });
+    } else {
+      // Ensure clusterer is null/inactive
+      clustererRef.current = null;
+    }
 
     // 3. Async Batch Processing (Optimization)
     let isActive = true;
@@ -177,8 +186,6 @@ const ClientMapContent: React.FC<{
 
     const processBatch = () => {
       if (!isActive) return;
-
-      // Double check marker lib inside the loop just in case
       if (!google.maps.marker) return;
 
       const batch = clients.slice(index, index + BATCH_SIZE);
@@ -193,8 +200,6 @@ const ClientMapContent: React.FC<{
           glyphElement.style.color = colors.glyph;
         }
 
-        // Construct options carefully to avoid passing null to glyph property
-        // Passing null to glyph triggers 'parameter 1 is not of type Node' in PinElement
         const pinOptions: any = {
           background: colors.bg,
           borderColor: colors.border,
@@ -211,6 +216,10 @@ const ClientMapContent: React.FC<{
         const marker = new google.maps.marker.AdvancedMarkerElement({
           position: { lat: client.lat, lng: client.lng },
           content: pin.element,
+          // Important: If clustering is disabled, we set the map directly.
+          // If enabled, the clusterer will set it.
+          map: isClusteringEnabled ? null : map,
+          title: client.companyName
         });
 
         marker.addListener('click', () => {
@@ -220,8 +229,10 @@ const ClientMapContent: React.FC<{
         return marker;
       });
 
-      if (clustererRef.current && isActive) {
-        clustererRef.current.addMarkers(newMarkers);
+      if (isActive) {
+        if (isClusteringEnabled && clustererRef.current) {
+          clustererRef.current.addMarkers(newMarkers);
+        }
         markersRef.current.push(...newMarkers);
       }
 
@@ -240,8 +251,11 @@ const ClientMapContent: React.FC<{
         clustererRef.current.clearMarkers();
         (clustererRef.current as any).setMap(null);
       }
+      markersRef.current.forEach(m => {
+        m.map = null;
+      });
     };
-  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, users]);
+  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, users, isClusteringEnabled]); // Added dependency
 
   return <MapBoundsUpdater clients={clients} />;
 };
@@ -356,6 +370,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   }
 
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isClusteringEnabled, setIsClusteringEnabled] = useState(true); // Default to true
 
   const toggleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
@@ -386,18 +401,43 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             onClientSelect={setSelectedClientId}
             productFilterActive={productFilterActive}
             users={users}
+            isClusteringEnabled={isClusteringEnabled} // Pass the state
           />
 
           <MapZoomControls />
 
-          {/* Full Screen Toggle Button */}
-          <button
-            onClick={toggleFullScreen}
-            className="absolute top-4 right-4 z-10 bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
-            title={isFullScreen ? "Sair da Tela Cheia" : "Tela Cheia"}
-          >
-            {isFullScreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-          </button>
+          <div className="absolute top-4 right-16 flex gap-2 z-10">
+            {/* Clustering Toggle */}
+            <button
+              onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
+              className={`p-2 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+              title={isClusteringEnabled ? "Desativar Agrupamento" : "Ativar Agrupamento"}
+            >
+              {isClusteringEnabled ? (
+                <>
+                  <div className="flex -space-x-1">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <div className="w-2 h-2 rounded-full bg-blue-500/50"></div>
+                  </div>
+                  Agrupado
+                </>
+              ) : (
+                <>
+                  <MapPin className="w-3 h-3" />
+                  Solto
+                </>
+              )}
+            </button>
+
+            {/* Full Screen Toggle Button */}
+            <button
+              onClick={toggleFullScreen}
+              className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
+              title={isFullScreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+            >
+              {isFullScreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+          </div>
 
           {selectedClient && (
             <InfoWindow
