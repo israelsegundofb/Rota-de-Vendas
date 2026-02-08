@@ -7,7 +7,7 @@ import { parseCSV } from './utils/csvParser';
 import { parseExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from './services/firebaseService';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges } from './services/firebaseService';
 import ClientMap from './components/ClientMap';
 import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
