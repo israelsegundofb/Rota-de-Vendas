@@ -40,7 +40,7 @@ export interface EnrichedClient {
 export type UserRole = 'admin' | 'salesperson';
 export type SalesCategory = 'Externo' | 'Interno' | 'Mercado Livre' | 'N/A';
 
-export interface User {
+export interface AppUser {
   id: string;
   name: string;
   username: string;

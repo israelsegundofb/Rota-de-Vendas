@@ -2,7 +2,7 @@
 import { initializeApp, FirebaseApp, getApps, getApp, deleteApp } from 'firebase/app';
 import { getFirestore, Firestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
-import { EnrichedClient, Product, User } from '../types';
+import { EnrichedClient, Product, AppUser } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -38,7 +38,7 @@ export const saveToCloud = async (
     clients: EnrichedClient[],
     products: Product[],
     categories: string[],
-    users: User[]
+    users: AppUser[]
 ) => {
     if (!db) return;
 

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, Mail, ArrowLeft, Check, Send } from 'lucide-react';
-import { User as UserType } from '../types';
+import { AppUser } from '../types';
 
 interface LoginScreenProps {
-  users: UserType[];
-  onLogin: (user: UserType) => void;
+  users: AppUser[];
+  onLogin: (user: AppUser) => void;
 }
 
 type LoginView = 'login' | 'forgot_user' | 'forgot_pass';
