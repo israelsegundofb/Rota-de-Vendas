@@ -4,6 +4,11 @@ interface GeocodeResult {
     lng: number;
     formattedAddress?: string;
     locationType?: string;
+    addressComponents?: Array<{
+        long_name: string;
+        short_name: string;
+        types: string[];
+    }>;
 }
 
 export const geocodeAddress = async (
@@ -30,7 +35,8 @@ export const geocodeAddress = async (
                 lat: location.lat,
                 lng: location.lng,
                 formattedAddress: result.formatted_address,
-                locationType: result.geometry.location_type
+                locationType: result.geometry.location_type,
+                addressComponents: result.address_components
             };
         } else {
             console.warn(`Geocoding failed for address "${address}":`, data.status, data.error_message);

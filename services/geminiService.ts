@@ -8,6 +8,41 @@ const BATCH_SIZE = 1;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper to determine Region from State (UF)
+const getRegionFromState = (uf: string): string => {
+  const nordeste = ['MA', 'PI', 'CE', 'RN', 'PB', 'PE', 'AL', 'SE', 'BA'];
+  const norte = ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'];
+  const centroOeste = ['GO', 'MT', 'MS', 'DF'];
+  const sudeste = ['ES', 'MG', 'RJ', 'SP'];
+  const sul = ['PR', 'SC', 'RS'];
+
+  const normalizedUF = uf.toUpperCase().trim();
+  if (nordeste.includes(normalizedUF)) return 'Nordeste';
+  if (norte.includes(normalizedUF)) return 'Norte';
+  if (centroOeste.includes(normalizedUF)) return 'Centro-Oeste';
+  if (sudeste.includes(normalizedUF)) return 'Sudeste';
+  if (sul.includes(normalizedUF)) return 'Sul';
+  return 'Indefinido';
+};
+
+// Helper to extract metadata from Geocoding API components
+const parseAddressComponents = (components: any[]) => {
+  let city = 'Desconhecido';
+  let state = 'BR';
+  let region = 'Indefinido';
+
+  if (Array.isArray(components)) {
+    const stateComp = components.find(c => c.types.includes('administrative_area_level_1'));
+    if (stateComp) state = stateComp.short_name; // UF
+
+    const cityComp = components.find(c => c.types.includes('administrative_area_level_2') || c.types.includes('locality'));
+    if (cityComp) city = cityComp.long_name;
+
+    region = getRegionFromState(state);
+  }
+  return { city, state, region };
+};
+
 export const processClientsWithAI = async (
   rawClients: RawClient[],
   salespersonId: string,
@@ -105,25 +140,44 @@ export const processClientsWithAI = async (
           }
         }
 
+
         // --- GEOCODING ENHANCEMENT ---
         // Prioritize coordinates from CSV (hyperlink), then Geocoding API, then Gemini fallback.
         let finalLat = client['extractedLat'] || (typeof aiData.lat === 'number' ? aiData.lat : 0);
         let finalLng = client['extractedLng'] || (typeof aiData.lng === 'number' ? aiData.lng : 0);
         let finalAddress = aiData.cleanAddress || address;
 
-        // If CSV didn't provide coords, try robust Geocoding API
-        if (!client['extractedLat']) {
+        // Default to AI data, will be refined if Geocoding is used
+        let finalCity = aiData.city || 'Desconhecido';
+        let finalState = aiData.state || 'BR';
+        let finalRegion = aiData.region || 'Indefinido';
+
+        // Check if we need to refine the location data (if AI failed or we need coords)
+        const needsGeocoding = !client['extractedLat'] || finalCity === 'Desconhecido' || finalState === 'BR';
+
+        if (needsGeocoding) {
           // Prefer the address cleaned/verified by Gemini, or fallback to raw
           const addressToGeocode = finalAddress || rawAddress;
 
           // Only geocode if we have a somewhat valid address string
-          if (addressToGeocode && addressToGeocode.length > 5) {
+          if (addressToGeocode && addressToGeocode.length > 5 && apiKey) {
             try {
               const geocodeResult = await geocodeAddress(addressToGeocode, apiKey);
               if (geocodeResult) {
-                finalLat = geocodeResult.lat;
-                finalLng = geocodeResult.lng;
-                // Use the official formatted address from Google Maps if available
+                // Only update coords if we didn't have them
+                if (!client['extractedLat']) {
+                  finalLat = geocodeResult.lat;
+                  finalLng = geocodeResult.lng;
+                }
+
+                // Always update metadata from official API if available
+                if (geocodeResult.addressComponents) {
+                  const parsed = parseAddressComponents(geocodeResult.addressComponents);
+                  finalCity = parsed.city;
+                  finalState = parsed.state;
+                  finalRegion = parsed.region as any;
+                }
+
                 if (geocodeResult.formattedAddress) {
                   finalAddress = geocodeResult.formattedAddress;
                 }
@@ -145,9 +199,9 @@ export const processClientsWithAI = async (
           originalAddress: rawAddress,
           cleanAddress: finalAddress,
           category: aiData.category || 'Outros',
-          region: aiData.region || 'Indefinido',
-          state: aiData.state || 'BR',
-          city: aiData.city || 'Desconhecido',
+          region: finalRegion,
+          state: finalState,
+          city: finalCity,
           lat: finalLat,
           lng: finalLng,
           googleMapsUri: client['GoogleMapsLink'] || googleMapsUri // PRIORITIZE CSV EXACT LINK
@@ -167,9 +221,8 @@ export const processClientsWithAI = async (
           await delay(waitTime);
         } else {
           console.error(`Failed to process client ${i}`, error);
-          // Fallback to avoid breaking the whole list
 
-          // Try to recover with Geocoding API even if Gemini failed
+          // Fallback Strategy
           let fallbackLat = 0;
           let fallbackLng = 0;
           let fallbackAddress = rawAddress;
@@ -179,41 +232,19 @@ export const processClientsWithAI = async (
 
           if (rawAddress && apiKey) {
             try {
-              // We can't await inside this catch block without refactoring, 
-              // but we are in an async function so actually we CAN await.
-              // Note: This adds latency to the error path but saves data quality.
               console.log(`Attempting fallback geocoding for failed client ${i}...`);
-              // Assuming geocodeAddress is imported. It is.
-              // We need to fetch it again if we want to be safe, but it's imported at top.
               const geoResult = await geocodeAddress(rawAddress, apiKey);
               if (geoResult) {
                 fallbackLat = geoResult.lat;
                 fallbackLng = geoResult.lng;
                 if (geoResult.formattedAddress) fallbackAddress = geoResult.formattedAddress;
 
-                // Try to extract city/state from formatted address roughly
-                // "Rua X, Bairro, Cidade - UF, CEP"
-                const parts = fallbackAddress.split('-');
-                if (parts.length > 1) {
-                  const ufPart = parts[parts.length - 1].trim().split(' ')[0]; // UF usually start of last part
-                  if (ufPart.length === 2) fallbackState = ufPart;
-
-                  const cityPart = parts[parts.length - 2]?.trim().split(',').pop()?.trim(); // City usually before UF
-                  if (cityPart) fallbackCity = cityPart;
+                if (geoResult.addressComponents) {
+                  const parsed = parseAddressComponents(geoResult.addressComponents);
+                  fallbackCity = parsed.city;
+                  fallbackState = parsed.state;
+                  fallbackRegion = parsed.region;
                 }
-
-                // Infer region from State
-                const nordeste = ['MA', 'PI', 'CE', 'RN', 'PB', 'PE', 'AL', 'SE', 'BA'];
-                const norte = ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'];
-                const centroOeste = ['GO', 'MT', 'MS', 'DF'];
-                const sudeste = ['ES', 'MG', 'RJ', 'SP'];
-                const sul = ['PR', 'SC', 'RS'];
-
-                if (nordeste.includes(fallbackState)) fallbackRegion = 'Nordeste';
-                else if (norte.includes(fallbackState)) fallbackRegion = 'Norte';
-                else if (centroOeste.includes(fallbackState)) fallbackRegion = 'Centro-Oeste';
-                else if (sudeste.includes(fallbackState)) fallbackRegion = 'Sudeste';
-                else if (sul.includes(fallbackState)) fallbackRegion = 'Sul';
               }
             } catch (e) {
               // Ignore fallback error
