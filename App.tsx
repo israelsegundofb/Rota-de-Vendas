@@ -538,9 +538,13 @@ const App: React.FC = () => {
       let rawData: any[] = [];
       const lowerName = file.name.toLowerCase();
 
+      console.log(`Processing file: ${file.name}, Lower: ${lowerName}`); // DEBUG
+
       if (lowerName.endsWith('.csv')) {
+        console.log('Selected Parser: CSV'); // DEBUG
         rawData = await parseCSV(file);
       } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+        console.log('Selected Parser: Excel'); // DEBUG
         rawData = await parseExcel(file);
       } else {
         throw new Error("Formato não suportado. Use .csv, .xlsx ou .xls");
