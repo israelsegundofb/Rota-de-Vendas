@@ -151,8 +151,12 @@ const ClientMapContent: React.FC<{
 
       if (!google) return;
 
-      const batch = clients.slice(index, index + BATCH_SIZE);
-      if (batch.length === 0) return;
+      const batch = clients.slice(index, index + BATCH_SIZE).filter(c => c.lat && c.lng && !isNaN(c.lat) && !isNaN(c.lng));
+      if (batch.length === 0) {
+        index += BATCH_SIZE;
+        if (index < clients.length) requestAnimationFrame(processBatch);
+        return;
+      }
 
       const newMarkers = batch.map(client => {
         const colors = productFilterActive
@@ -179,9 +183,13 @@ const ClientMapContent: React.FC<{
         return marker;
       });
 
-      if (clustererRef.current && isActive) {
-        clustererRef.current.addMarkers(newMarkers);
-        markersRef.current.push(...newMarkers);
+      if (clustererRef.current && isActive && newMarkers.length > 0) {
+        try {
+          clustererRef.current.addMarkers(newMarkers);
+          markersRef.current.push(...newMarkers);
+        } catch (err) {
+          console.error("Error adding markers to clusterer:", err);
+        }
       }
 
       index += BATCH_SIZE;
@@ -216,21 +224,12 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   useEffect(() => {
-    // Reset error when key changes (optimistic)
     if (apiKey) setAuthError(false);
-
-    // Explicitly define the handler on the window object for global auth failure interception
     (window as any).gm_authFailure = () => {
       console.error("Google Maps Auth Failure detected via gm_authFailure.");
       setAuthError(true);
     };
-
-    return () => {
-      (window as any).gm_authFailure = () => { };
-
-      // Removed aggressive cleanup to prevent crashes on tab switch.
-      // If key changes, APIProvider should handle it, or we rely on keyVersion in App.tsx.
-    };
+    return () => { (window as any).gm_authFailure = () => { }; };
   }, [apiKey]);
 
   const displayedProducts = useMemo(() => {
@@ -247,26 +246,14 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
     return [...selectedClient.purchasedProducts].sort((a, b) => {
       let scoreA = 0;
       let scoreB = 0;
-
-      // Category match logic
       if (hasCat && a.category === cat) scoreA += 2;
       if (hasCat && b.category === cat) scoreB += 2;
-
-      // Search term match logic (Expanded for Brand, Code, SKU, Name)
       if (hasTerm) {
-        const matchA = a.name.toLowerCase().includes(term) ||
-          a.sku.toLowerCase().includes(term) ||
-          a.brand.toLowerCase().includes(term) ||
-          a.factoryCode.toLowerCase().includes(term);
+        const matchA = a.name.toLowerCase().includes(term) || a.sku.toLowerCase().includes(term) || a.brand.toLowerCase().includes(term) || a.factoryCode.toLowerCase().includes(term);
         if (matchA) scoreA += 1;
-
-        const matchB = b.name.toLowerCase().includes(term) ||
-          b.sku.toLowerCase().includes(term) ||
-          b.brand.toLowerCase().includes(term) ||
-          b.factoryCode.toLowerCase().includes(term);
+        const matchB = b.name.toLowerCase().includes(term) || b.sku.toLowerCase().includes(term) || b.brand.toLowerCase().includes(term) || b.factoryCode.toLowerCase().includes(term);
         if (matchB) scoreB += 1;
       }
-
       return scoreB - scoreA;
     });
   }, [selectedClient, highlightProductTerm, activeProductCategory]);
@@ -324,14 +311,14 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           <InfoWindow
             position={{ lat: selectedClient.lat, lng: selectedClient.lng }}
             onCloseClick={() => setSelectedClientId(null)}
-            headerContent={
-              <div className="font-bold text-gray-800 text-sm flex items-center gap-2 pr-4">
+          >
+            <div className="min-w-[200px] max-w-[280px] p-1">
+              {/* Header Moved Inside */}
+              <div className="font-bold text-gray-800 text-sm flex items-center gap-2 mb-2 border-b pb-2">
                 <Store className="w-4 h-4 text-blue-600" />
                 {selectedClient.companyName}
               </div>
-            }
-          >
-            <div className="min-w-[200px] max-w-[280px] p-1">
+
               <div className="space-y-2 text-xs text-gray-600 mt-1">
                 <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-gray-400">
                   <Globe className="w-3 h-3" />

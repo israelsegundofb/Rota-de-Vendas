@@ -633,7 +633,7 @@ const App: React.FC = () => {
           <div className="p-6 border-b border-white/10 flex justify-between items-center">
             <h1 className="text-lg font-bold flex items-center gap-3">
               <img src="/sales_route_logo.svg" alt="Logo" className="w-8 h-8 object-contain bg-white/10 rounded-lg p-1" />
-              Vendas A.I. <span className="text-[10px] bg-red-500 text-white px-1 rounded ml-1">v1.5</span>
+              Vendas A.I. <span className="text-[10px] bg-red-500 text-white px-1 rounded ml-1">v1.6 (Map Fix)</span>
             </h1>
             <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white/70 hover:text-white" aria-label="Fechar menu">
               <X className="w-6 h-6" />
