@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save, User, Store, Phone, MapPin, Tag, Globe } from 'lucide-react';
-import { EnrichedClient, REGIONS, CATEGORIES, getRegionByUF } from '../types';
+import { EnrichedClient } from '../types';
+import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 
 interface EditClientModalProps {
     client: EnrichedClient;

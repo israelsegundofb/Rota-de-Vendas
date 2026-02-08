@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { EnrichedClient, REGIONS, CATEGORIES, getRegionByUF } from '../types';
+import { EnrichedClient } from '../types';
+import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 import { X, Save, MapPin, Store, User, Phone, Tag, AlertCircle, Globe } from 'lucide-react';
 
 interface AddClientModalProps {

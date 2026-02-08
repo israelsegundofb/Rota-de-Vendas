@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { EnrichedClient, REGIONS, CATEGORIES } from '../types';
+import { EnrichedClient } from '../types';
+import { REGIONS, CATEGORIES } from '../utils/constants';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';

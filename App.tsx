@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
-import { RawClient, EnrichedClient, CATEGORIES, REGIONS, Product, getRegionByUF } from './types';
+import { RawClient, EnrichedClient, Product } from './types';
 import type { AppUser } from './types';
+import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
 import { parseCSV } from './utils/csvParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress } from './services/geocodingService';
