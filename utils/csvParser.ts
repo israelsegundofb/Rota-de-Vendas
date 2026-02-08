@@ -142,7 +142,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
             'Nome do Proprietário': map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
             'Contato': map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || '',
             'Endereço': map['endereco'] || map['logradouro'] || map['localizacao'] || '',
-            'googleMapsLink': map['endereco'] || ''
+            'googleMapsLink': map['endereco'] || '' // Store raw address formula as link source potentially
           });
         });
 

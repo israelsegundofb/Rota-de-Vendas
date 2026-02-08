@@ -295,6 +295,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                     >
                       Desc. (%) <SortIcon column="discount" />
                     </th>
+                    <th className="px-4 py-3 text-center w-20">Busca</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -342,6 +343,17 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           value={p.discount || 0}
                           onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
                         />
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <a
+                          href={`https://www.google.com/search?q=${encodeURIComponent(`${p.brand} ${p.name}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg inline-block transition-colors"
+                          title="Pesquisar no Google"
+                        >
+                          <Search className="w-4 h-4" />
+                        </a>
                       </td>
                     </tr>
                   ))}

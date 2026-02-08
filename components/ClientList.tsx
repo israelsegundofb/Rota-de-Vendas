@@ -68,7 +68,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
         client.city,
         client.state,
         client.region,
-        (client.categories || []).join('; '),
+        client.category,
         productsSummary,
         client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`
       ];
@@ -191,8 +191,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
                 <td className="px-6 py-3">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
                     <Tag className="w-3 h-3" />
-                    {(client.categories && client.categories[0]) || 'Outros'}
-                    {client.categories && client.categories.length > 1 && <span className="text-[10px] ml-1 opacity-70">+{client.categories.length - 1}</span>}
+                    {client.category}
                   </span>
                 </td>
                 <td className="px-6 py-3 text-center whitespace-nowrap">
@@ -260,8 +259,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
                   <p className="text-xs text-gray-400 uppercase">Segmento</p>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
                     <Tag className="w-3 h-3" />
-                    {client.categories[0]}
-                    {client.categories.length > 1 && <span className="text-[9px] ml-1">+{client.categories.length - 1}</span>}
+                    {client.category}
                   </span>
                 </div>
                 <div>

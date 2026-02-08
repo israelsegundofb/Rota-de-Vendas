@@ -17,7 +17,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         ownerName: '',
         contact: '',
         address: '',
-        categories: [CATEGORIES[1]], // Default to first actual category
+        category: CATEGORIES[1], // Default to first actual category
     });
 
     const [selectedOwnerId, setSelectedOwnerId] = useState<string>(
@@ -48,7 +48,10 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
             'Nome do Proprietário': formData.ownerName,
             'Contato': formData.contact,
             'Endereço': formData.address,
-            'Categories': formData.categories
+            'Categoria': formData.category // We might need to handle this in enrichment if not in RawClient, 
+            // but geminiService usually detects it. 
+            // For manual, we pass it explicitly if possible or let AI confirm.
+            // Actually, enricher uses 'Categoria' column if present.
         };
 
         // Pass data back to App
@@ -62,7 +65,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
             ownerName: '',
             contact: '',
             address: '',
-            categories: [CATEGORIES[1]],
+            category: CATEGORIES[1],
         });
     };
 
@@ -145,17 +148,13 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
 
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                            <Tag className="w-4 h-4 text-gray-400" /> Categorias (Segure Ctrl para selecionar múltiplas)
+                            <Tag className="w-4 h-4 text-gray-400" /> Categoria Principal
                         </label>
                         <select
-                            multiple
-                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer min-h-[100px]"
-                            value={formData.categories}
-                            onChange={e => {
-                                const selected = Array.from(e.target.selectedOptions).map(opt => (opt as HTMLOptionElement).value);
-                                setFormData({ ...formData, categories: selected });
-                            }}
-                            aria-label="Selecionar Categorias do Cliente"
+                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
+                            value={formData.category}
+                            onChange={e => setFormData({ ...formData, category: e.target.value })}
+                            aria-label="Selecionar Categoria do Cliente"
                         >
                             {CATEGORIES.filter(c => c !== 'Todos').map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
