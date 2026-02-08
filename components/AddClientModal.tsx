@@ -48,7 +48,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
             'Nome do Proprietário': formData.ownerName,
             'Contato': formData.contact,
             'Endereço': formData.address,
-            'Categoria': formData.category // We might need to handle this in enrichment if not in RawClient, 
+            categories: [formData.category], // Start with one category 
             // but geminiService usually detects it. 
             // For manual, we pass it explicitly if possible or let AI confirm.
             // Actually, enricher uses 'Categoria' column if present.

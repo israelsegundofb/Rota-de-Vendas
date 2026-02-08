@@ -189,10 +189,14 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
                   </span>
                 </td>
                 <td className="px-6 py-3">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
-                    <Tag className="w-3 h-3" />
-                    {client.category}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {client.categories.map((cat, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
+                        <Tag className="w-3 h-3" />
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
                 </td>
                 <td className="px-6 py-3 text-center whitespace-nowrap">
                   <a
@@ -257,10 +261,14 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase">Segmento</p>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
-                    <Tag className="w-3 h-3" />
-                    {client.category}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {client.categories.map((cat, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
+                        <Tag className="w-3 h-3" />
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase">Cidade / UF</p>

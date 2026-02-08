@@ -138,18 +138,46 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
 
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                            <Tag className="w-4 h-4 text-gray-400" /> Categoria Principal
+                            <Tag className="w-4 h-4 text-gray-400" /> Categorias / Segmentos
                         </label>
-                        <select
-                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
-                            value={formData.category}
-                            onChange={e => setFormData({ ...formData, category: e.target.value })}
-                            aria-label="Selecionar Categoria"
-                        >
-                            {CATEGORIES.filter(c => c !== 'Todos').map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
+                        <div className="border border-gray-300 rounded-lg p-2.5 bg-white min-h-[42px] flex flex-wrap gap-2 transition-all">
+                            {formData.categories.map(cat => (
+                                <span key={cat} className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
+                                    {cat}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({
+                                            ...formData,
+                                            categories: formData.categories.filter(c => c !== cat)
+                                        })}
+                                        className="hover:text-blue-600 focus:outline-none"
+                                        title={`Remover ${cat}`}
+                                        aria-label={`Remover categoria ${cat}`}
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </span>
                             ))}
-                        </select>
+                            <select
+                                className="text-sm outline-none bg-transparent flex-1 min-w-[120px]"
+                                value=""
+                                onChange={(e) => {
+                                    if (e.target.value && !formData.categories.includes(e.target.value)) {
+                                        setFormData({
+                                            ...formData,
+                                            categories: [...formData.categories, e.target.value]
+                                        });
+                                    }
+                                }}
+                                aria-label="Adicionar Categoria"
+                            >
+                                <option value="" disabled>+ Adicionar</option>
+                                {CATEGORIES.filter(c => c !== 'Todos' && !formData.categories.includes(c)).map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">Selecione múltiplos segmentos.</p>
                     </div>
 
                     <div>
@@ -188,8 +216,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
                     </div>
 
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

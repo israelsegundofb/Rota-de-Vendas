@@ -171,7 +171,7 @@ export const processClientsWithAI = async (
       contact,
       originalAddress: rawAddress,
       cleanAddress: aiResult?.cleanAddress || address,
-      category: aiResult?.category || 'Outros',
+      categories: aiResult?.category ? [aiResult.category] : ['Outros'],
       region: aiResult?.region || 'Indefinido',
       state: aiResult?.state || 'BR',
       city: aiResult?.city || 'Desconhecido',
@@ -185,7 +185,7 @@ export const processClientsWithAI = async (
       try {
         localStorage.setItem(cacheKey, JSON.stringify({
           cleanAddress: enriched.cleanAddress,
-          category: enriched.category,
+          categories: enriched.categories,
           region: enriched.region,
           state: enriched.state,
           city: enriched.city,

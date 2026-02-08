@@ -230,10 +230,9 @@ const App: React.FC = () => {
       // If client already has products, keep them unless we want to refresh
       if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
 
-      // Find products matching client category
+      // Find products matching client categories
       let eligibleProducts = allProducts.filter(p =>
-        p.category.toLowerCase().includes(client.category.toLowerCase()) ||
-        client.category.toLowerCase().includes(p.category.toLowerCase())
+        client.categories.some(cat => p.category.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(p.category.toLowerCase()))
       );
 
       // Fallback if no category match
@@ -294,7 +293,7 @@ const App: React.FC = () => {
       const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
       const matchState = filterState === 'Todos' || c.state === filterState;
       const matchCity = filterCity === 'Todas' || c.city === filterCity;
-      const matchCat = filterCategory === 'Todos' || c.category === filterCategory;
+      const matchCat = filterCategory === 'Todos' || c.categories.includes(filterCategory);
 
       // Sales Category Filter (Admin Only)
       let matchSalesCat = true;
@@ -496,7 +495,7 @@ const App: React.FC = () => {
           // We need to access 'distributeProductsToClients' logic inline because setState is async
           return newClients.map(c => {
             if (c.purchasedProducts && c.purchasedProducts.length > 0) return c;
-            let eligible = products.filter(p => p.category.includes(c.category) || c.category.includes(p.category));
+            let eligible = products.filter(p => c.categories.some(cat => p.category.includes(cat) || cat.includes(p.category)));
             if (eligible.length === 0) eligible = products;
             const count = Math.floor(Math.random() * 5) + 1;
             const selected = [...eligible].sort(() => 0.5 - Math.random()).slice(0, count);
@@ -553,17 +552,23 @@ const App: React.FC = () => {
         }
       );
 
-      // 3. Assign Products (Simulation) from Global Catalog
-      let clientsWithProducts = enrichedData;
+      // 3. Assign Products (Simulation) and Override Category if Manual
+      let clientsWithProducts = enrichedData.map(c => {
+        // Validation: If manual entry had a category, ensure it's preserved/added
+        const manualCat = clientData['categories']?.[0] || clientData['Categoria'] || clientData.category;
+        const finalCategories = manualCat ? [manualCat] : c.categories;
+
+        return { ...c, categories: finalCategories };
+      });
+
       if (products.length > 0) {
-        clientsWithProducts = enrichedData.map(c => {
+        clientsWithProducts = clientsWithProducts.map(c => {
           // If client already has products (unlikely for manual add), keep them
           if (c.purchasedProducts && c.purchasedProducts.length > 0) return c;
 
           // Find products matching client category
           let eligible = products.filter(p =>
-            p.category.toLowerCase().includes(c.category.toLowerCase()) ||
-            c.category.toLowerCase().includes(p.category.toLowerCase())
+            c.categories.some(cat => p.category.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(p.category.toLowerCase()))
           );
 
           // Fallback if no category match
