@@ -197,12 +197,13 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
           });
 
           // Parse hyperlink if present in address column
-          const addressInput = map['endereco'] || map['logradouro'] || map['localizacao'] || '';
+          // Priority: Endereço > Logradouro > Localização > Endereço Cobrança > Link Google Maps (which often contains full address)
+          const addressInput = map['endereco'] || map['logradouro'] || map['localizacao'] || map['endereco cobranca'] || map['link google maps'] || '';
           const { address, link, lat, lng } = parseHyperlink(addressInput);
 
           // Map to strict RawClient Interface using loose matching
           normalizedData.push({
-            'Razão Social': map['razao social'] || map['cliente'] || map['nome fantasia'] || map['empresa'] || '',
+            'Razão Social': map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
             'Nome do Proprietário': map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
             'Contato': map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || '',
             'Endereço': address,
