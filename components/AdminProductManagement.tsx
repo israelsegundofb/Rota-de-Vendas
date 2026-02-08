@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Upload, Trash2, Search, Save, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react';
+import { Package, Upload, Trash2, Search, Save, ArrowUp, ArrowDown, FileSpreadsheet, Sparkles, X } from 'lucide-react';
 import { Product } from '../types';
 import { parseProductCSV } from '../utils/csvParser';
 import { parseProductExcel } from '../utils/excelParser';
+import { categorizeProductsWithAI } from '../services/geminiService';
 
 interface AdminProductManagementProps {
   products: Product[];
   onUploadProducts: (products: Product[]) => void;
   onClearProducts: () => void;
   onSaveProducts?: (products: Product[]) => void;
+  apiKey?: string;
 }
 
 type SortKey = 'sku' | 'brand' | 'factoryCode' | 'name' | 'price' | 'category' | 'discount';
@@ -22,10 +24,13 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
   products,
   onUploadProducts,
   onClearProducts,
-  onSaveProducts
+  onSaveProducts,
+  apiKey
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState('');
+  const [isCategorizingAI, setIsCategorizingAI] = useState(false);
+  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 });
 
   // Local state for editing and sorting
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
@@ -69,6 +74,45 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
       onSaveProducts(localProducts);
       setHasChanges(false);
       alert('Alterações salvas com sucesso!');
+    }
+  };
+
+  const handleAICategorize = async () => {
+    if (!apiKey) {
+      alert('Configure sua API Key do Google Gemini nas configurações de Admin.');
+      return;
+    }
+
+    if (localProducts.length === 0) {
+      alert('Nenhum produto para categorizar.');
+      return;
+    }
+
+    if (!window.confirm(`Deseja usar a IA para categorizar ${localProducts.length} produtos?\n\nIsso pode consumir créditos da API e levar alguns minutos.`)) {
+      return;
+    }
+
+    setIsCategorizingAI(true);
+    setAiProgress({ current: 0, total: localProducts.length });
+
+    try {
+      const categorized = await categorizeProductsWithAI(
+        localProducts,
+        apiKey,
+        (current, total) => {
+          setAiProgress({ current, total });
+        }
+      );
+
+      setLocalProducts(categorized);
+      setHasChanges(true);
+      alert(`✓ ${categorized.length} produtos foram categorizados pela IA!`);
+    } catch (error: any) {
+      console.error('AI Categorization failed', error);
+      alert(`Erro ao categorizar produtos: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsCategorizingAI(false);
+      setAiProgress({ current: 0, total: 0 });
     }
   };
 
@@ -148,6 +192,21 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                 className="px-6 py-2 bg-tertiary-container text-on-tertiary-container hover:bg-tertiary-container/80 rounded-full text-sm font-medium flex items-center gap-2 transition-all shadow-elevation-1 animate-pulse"
               >
                 <Save className="w-4 h-4" /> Salvar Alterações
+              </button>
+            )}
+
+            {products.length > 0 && (
+              <button
+                onClick={handleAICategorize}
+                disabled={isCategorizingAI}
+                className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 rounded-full text-sm font-medium flex items-center gap-2 transition-all shadow-elevation-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCategorizingAI ? (
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {isCategorizingAI ? 'Processando...' : 'IA Classificar'}
               </button>
             )}
 
@@ -353,6 +412,50 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
           </div>
         )}
       </div>
+
+      {/* AI Categorization Progress Modal */}
+      {isCategorizingAI && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-[24px] shadow-elevation-5 p-6 max-w-md w-full animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-500" />
+                Categorizando com IA
+              </h3>
+              <button
+                onClick={() => {
+                  if (window.confirm('Deseja realmente cancelar a categorização?')) {
+                    setIsCategorizingAI(false);
+                  }
+                }}
+                className="text-on-surface-variant hover:text-on-surface"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm text-on-surface-variant">
+                <span>Processando produtos...</span>
+                <span className="font-mono font-bold text-primary">
+                  {aiProgress.current} / {aiProgress.total}
+                </span>
+              </div>
+
+              <div className="h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+                  style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%` }}
+                />
+              </div>
+
+              <p className="text-xs text-on-surface-variant">
+                A IA está analisando cada produto e atribuindo categorias automaticamente.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };

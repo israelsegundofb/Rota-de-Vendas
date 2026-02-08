@@ -1001,6 +1001,7 @@ const App: React.FC = () => {
                 onUploadProducts={handleUploadProducts}
                 onClearProducts={handleClearProducts}
                 onSaveProducts={handleSaveProducts} // Pass save handler
+                apiKey={activeApiKey}
               />
             </div>
           ) : activeView === 'admin_files' && isAdmin ? (

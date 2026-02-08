@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { EnrichedClient, RawClient } from "../types";
+import { EnrichedClient, RawClient, Product } from "../types";
 import { cleanAddress } from "../utils/csvParser";
 import { geocodeAddress } from "./geocodingService";
 
@@ -288,4 +288,82 @@ export const processClientsWithAI = async (
   }
 
   return allEnriched;
+};
+
+export const categorizeProductsWithAI = async (
+  products: Product[],
+  apiKey: string,
+  onProgress?: (processed: number, total: number) => void
+): Promise<Product[]> => {
+  const ai = new GoogleGenAI({ apiKey: apiKey || process.env.API_KEY });
+  // const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" }); // OLD SDK
+
+  const BATCH_SIZE = 10; // Process 10 products at a time for better accuracy
+  const total = products.length;
+  let processed = 0;
+  const updatedProducts = [...products];
+
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    const batch = products.slice(i, i + BATCH_SIZE);
+
+    // Construct prompt - Use 'name' as description
+    const productList = batch.map(p => `- ID: ${p.sku} | Nome: ${p.name} | Marca: ${p.brand}`).join('\n');
+
+    const prompt = `
+      Atue como um especialista em categorização de produtos de varejo.
+      Analise a lista de produtos abaixo e atribua uma Categoria Curta e Padronizada para cada um (Ex: Elétrica, Hidráulica, Ferramentas, Pintura, Automotivo, Utilidades, etc).
+      Se a marca for muito específica (ex: TIGRE, TRAMONTINA), você pode usar a marca como subcategoria se fizer sentido, mas prefira a categoria funcional.
+      
+      Lista de Produtos:
+      ${productList}
+      
+      Retorne APENAS um JSON no formato de lista:
+      [
+        { "sku": "ID do produto", "category": "Categoria Sugerida" }
+      ]
+    `;
+
+    try {
+      // Correct API Usage for this version
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      let text = response.text || "[]";
+      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+      let categories: any[] = [];
+      try {
+        categories = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse AI response", text);
+        // Try to salvage if it's a list inside an object
+        const match = text.match(/\[.*\]/s);
+        if (match) {
+          try { categories = JSON.parse(match[0]); } catch (err) { }
+        }
+      }
+
+      // Update products
+      if (Array.isArray(categories)) {
+        categories.forEach((item: any) => {
+          // Ensure ID is string comparison
+          const index = updatedProducts.findIndex(p => String(p.sku) === String(item.sku));
+          if (index !== -1) {
+            updatedProducts[index] = { ...updatedProducts[index], category: item.category };
+          }
+        });
+      }
+
+    } catch (e) {
+      console.error("Batch classification failed", e);
+    }
+
+    processed += batch.length;
+    if (onProgress) onProgress(processed, total);
+    await delay(1000); // Rate limit protection
+  }
+
+  return updatedProducts;
 };
