@@ -50,72 +50,6 @@ const App: React.FC = () => {
   const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
   // Load from LocalStorage
   // Init Data with Cloud Fallback
-  useEffect(() => {
-    const initData = async () => {
-      // 1. Try to init Firebase
-      const connected = await initializeFirebase();
-      setIsFirebaseConnected(connected);
-
-      // 2. If connected, try to load from cloud
-      if (connected) {
-        console.log("Loading data from Cloud...");
-        const cloudData = await loadFromCloud();
-        if (cloudData) {
-          console.log("Cloud data found.", cloudData);
-          if (cloudData.clients) setMasterClientList(cloudData.clients);
-          if (cloudData.products) setProducts(cloudData.products);
-          if (cloudData.categories) setCategories(cloudData.categories);
-          if (cloudData.users) setUsers(cloudData.users);
-          return; // Stop here, use cloud data
-        }
-      }
-
-      // 3. Fallback to LocalStorage if no Cloud data or not connected
-      console.log("Loading data from LocalStorage...");
-      const savedClients = localStorage.getItem('vendas_ai_clients');
-      if (savedClients) {
-        try {
-          const parsed = JSON.parse(savedClients);
-          // MIGRATION: Ensure category is string[]
-          setMasterClientList(parsed.map((c: any) => ({
-            ...c,
-            category: Array.isArray(c.category)
-              ? c.category
-              : (typeof c.category === 'string' ? [c.category] : ['Outros']),
-            region: getRegionByUF(c.state) // Force update region
-          })));
-        } catch (e) { console.error(e); }
-      }
-
-      const savedUsers = localStorage.getItem('vendas_ai_users');
-      if (savedUsers) setUsers(JSON.parse(savedUsers));
-
-      const savedCategories = localStorage.getItem('vendas_ai_categories');
-      if (savedCategories) setCategories(JSON.parse(savedCategories));
-
-      const savedProducts = localStorage.getItem('vendas_ai_products');
-      if (savedProducts) setProducts(JSON.parse(savedProducts));
-    };
-
-    initData();
-  }, []);
-
-  // Save changes to Cloud whenever critical data changes (Debounced ideally, but direct for MVP)
-  useEffect(() => {
-    if (isFirebaseConnected && masterClientList.length > 0) {
-      const timeout = setTimeout(() => {
-        saveToCloud(masterClientList, products, categories, users)
-          .catch(err => console.error("Auto-save failed", err));
-      }, 2000); // 2s debounce
-      return () => clearTimeout(timeout);
-    }
-  }, [masterClientList, products, categories, users, isFirebaseConnected]);
-
-  // Save to LocalStorage (Persist)
-  useEffect(() => {
-    localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
-  }, [masterClientList]);
-
   const [categories, setCategories] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('vendas_ai_categories');
@@ -176,6 +110,67 @@ const App: React.FC = () => {
 
   // Admin Upload State
   const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
+
+  useEffect(() => {
+    const initData = async () => {
+      // 1. Try to init Firebase
+      const connected = await initializeFirebase();
+      setIsFirebaseConnected(connected);
+
+      // 2. If connected, try to load from cloud
+      if (connected) {
+        console.log("Loading data from Cloud...");
+        const cloudData = await loadFromCloud();
+        if (cloudData) {
+          console.log("Cloud data found.", cloudData);
+          if (cloudData.clients) setMasterClientList(cloudData.clients);
+          if (cloudData.products) setProducts(cloudData.products);
+          if (cloudData.categories) setCategories(cloudData.categories);
+          if (cloudData.users) setUsers(cloudData.users);
+          return; // Stop here, use cloud data
+        }
+      }
+
+      // 3. Fallback to LocalStorage if no Cloud data or not connected
+      console.log("Loading data from LocalStorage...");
+      const savedClients = localStorage.getItem('vendas_ai_clients');
+      if (savedClients) {
+        try {
+          const parsed = JSON.parse(savedClients);
+          // MIGRATION: Ensure category is string[]
+          setMasterClientList(parsed.map((c: any) => ({
+            ...c,
+            category: Array.isArray(c.category)
+              ? c.category
+              : (typeof c.category === 'string' ? [c.category] : ['Outros']),
+            region: getRegionByUF(c.state) // Force update region
+          })));
+        } catch (e) { console.error(e); }
+      }
+
+      const savedUsers = localStorage.getItem('vendas_ai_users');
+      if (savedUsers) setUsers(JSON.parse(savedUsers));
+
+      const savedCategories = localStorage.getItem('vendas_ai_categories');
+      if (savedCategories) setCategories(JSON.parse(savedCategories));
+
+      const savedProducts = localStorage.getItem('vendas_ai_products');
+      if (savedProducts) setProducts(JSON.parse(savedProducts));
+    };
+
+    initData();
+  }, []);
+
+  // Save changes to Cloud whenever critical data changes (Debounced ideally, but direct for MVP)
+  useEffect(() => {
+    if (isFirebaseConnected && masterClientList.length > 0) {
+      const timeout = setTimeout(() => {
+        saveToCloud(masterClientList, products, categories, users)
+          .catch(err => console.error("Auto-save failed", err));
+      }, 2000); // 2s debounce
+      return () => clearTimeout(timeout);
+    }
+  }, [masterClientList, products, categories, users, isFirebaseConnected]);
 
   useEffect(() => {
     // If env var exists, it takes precedence
