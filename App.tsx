@@ -60,7 +60,14 @@ const App: React.FC = () => {
           get<string[]>(DB_CATEGORIES_KEY)
         ]);
 
-        if (savedClients) setMasterClientList(savedClients);
+        if (savedClients) {
+          // Migration: Ensure all clients have 'categories' array
+          const migratedClients = savedClients.map((c: any) => ({
+            ...c,
+            categories: Array.isArray(c.categories) ? c.categories : (c.category ? [c.category] : [])
+          }));
+          setMasterClientList(migratedClients);
+        }
         if (savedProducts) setProducts(savedProducts);
         if (savedCategories) setCategories(savedCategories);
 
