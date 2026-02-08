@@ -31,7 +31,10 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
         client.ownerName.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesRegion = regionFilter === 'Todos' || client.region === regionFilter;
-      const matchesCategory = categoryFilter === 'Todos' || client.category.includes(categoryFilter);
+      const matchesCategory = categoryFilter === 'Todos' || (
+        Array.isArray(client.category) &&
+        client.category.some(cat => cat.trim() === categoryFilter.trim())
+      );
 
       return matchesSearch && matchesRegion && matchesCategory;
     });

@@ -383,7 +383,11 @@ const App: React.FC = () => {
       const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
       const matchState = filterState === 'Todos' || c.state === filterState;
       const matchCity = filterCity === 'Todas' || c.city === filterCity;
-      const matchCat = filterCategory === 'Todos' || c.category === filterCategory;
+
+      // DEBUG LOGGING
+      // if (filterCategory !== 'Todos') console.log(`Checking ${c.companyName}`, c.category, filterCategory, c.category.includes(filterCategory));
+
+      const matchCat = filterCategory === 'Todos' || (Array.isArray(c.category) && c.category.includes(filterCategory));
 
       // Sales Category Filter (Admin Only)
       let matchSalesCat = true;
@@ -559,7 +563,7 @@ const App: React.FC = () => {
           // We need to access 'distributeProductsToClients' logic inline because setState is async
           return newClients.map(c => {
             if (c.purchasedProducts && c.purchasedProducts.length > 0) return c;
-            let eligible = products.filter(p => p.category.includes(c.category) || c.category.includes(p.category));
+            let eligible = products.filter(p => c.category.includes(p.category));
             if (eligible.length === 0) eligible = products;
             const count = Math.floor(Math.random() * 5) + 1;
             const selected = [...eligible].sort(() => 0.5 - Math.random()).slice(0, count);
