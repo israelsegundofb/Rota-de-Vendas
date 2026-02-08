@@ -199,7 +199,14 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
           // Parse hyperlink if present in address column
           // Priority: Endereço > Logradouro > Localização > Endereço Cobrança > Link Google Maps (which often contains full address)
           const addressInput = map['endereco'] || map['logradouro'] || map['localizacao'] || map['endereco cobranca'] || map['link google maps'] || '';
-          const { address, link, lat, lng } = parseHyperlink(addressInput);
+          let { address, link, lat, lng } = parseHyperlink(addressInput);
+
+          // Force CEP inclusion if present in a separate column
+          const cep = map['cep'] || map['zip'] || map['codigo postal'] || '';
+          if (cep && address && !address.toLowerCase().includes(cep.toLowerCase())) {
+            // Append CEP to address to ensure Google Maps uses it for precision
+            address = `${address}, ${cep}`;
+          }
 
           // Map to strict RawClient Interface using loose matching
           normalizedData.push({
