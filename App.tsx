@@ -29,7 +29,15 @@ interface ProcessingState {
 
 const App: React.FC = () => {
   // Global App State (Simulating DB with LocalStorage Persistence)
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>(() => {
+    try {
+      const saved = localStorage.getItem('vendas_ai_users');
+      return saved ? JSON.parse(saved) : INITIAL_USERS;
+    } catch (e) {
+      console.error("Failed to load users from storage", e);
+      return INITIAL_USERS;
+    }
+  });
 
   const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>(() => {
     try {
@@ -118,6 +126,10 @@ const App: React.FC = () => {
     localStorage.setItem('vendas_ai_products', JSON.stringify(products));
   }, [products]);
 
+  useEffect(() => {
+    localStorage.setItem('vendas_ai_users', JSON.stringify(users));
+  }, [users]);
+
   // --- Handlers ---
   const handleAddUser = (newUser: User) => {
     setUsers([...users, newUser]);
@@ -164,6 +176,50 @@ const App: React.FC = () => {
 
   const handleUpdateClient = (updatedClient: EnrichedClient) => {
     setMasterClientList(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+  };
+
+  const handleAddClient = async (newClientData: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => {
+    try {
+      const fullAddress = `${newClientData.originalAddress}, ${newClientData.city} - ${newClientData.state}, Brasil`;
+
+      // Geocoding Fallback/Approximation logic
+      let lat = -3.71722; // Fortaleza default
+      let lng = -38.5434;
+      let cleanAddress = fullAddress;
+
+      try {
+        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${activeApiKey}`);
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+          const location = data.results[0].geometry.location;
+          lat = location.lat;
+          lng = location.lng;
+          cleanAddress = data.results[0].formatted_address;
+        }
+      } catch (err) {
+        console.error("Geocoding failed for new client", err);
+      }
+
+      const newClient: EnrichedClient = {
+        ...newClientData,
+        id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        lat,
+        lng,
+        cleanAddress,
+        // originalRow removed as it's not in interface
+      };
+
+      setMasterClientList(prev => [...prev, newClient]); // Add to END of list
+
+      // Auto-switch to map view to show the new pin? or just stay on list? 
+      // Requirement says "show pin on map", effectively implying we might want to highlight it or ensure it's there.
+      // For now, adding to the data ensures it appears on the map.
+
+    } catch (error) {
+      console.error("Error adding client", error);
+      alert("Erro ao adicionar cliente. Tente novamente.");
+    }
   };
 
   const handleClearClients = () => {
@@ -834,12 +890,14 @@ const App: React.FC = () => {
                       activeProductCategory={filterProductCategory}
                     />
                   ) : (
-                    <div className="h-full overflow-y-auto">
-                      <ClientList
-                        clients={filteredClients}
-                        onUpdateClient={handleUpdateClient}
-                      />
-                    </div>
+                    <ClientList
+                      clients={filteredClients}
+                      onUpdateClient={handleUpdateClient}
+                      onAddClient={handleAddClient}
+                      currentUserRole={currentUser?.role}
+                      currentUserId={currentUser?.id}
+                      currentUserName={currentUser?.name}
+                    />
                   )}
                 </div>
               )}
