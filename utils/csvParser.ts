@@ -19,6 +19,30 @@ const extractCoordsFromUrl = (url: string): { lat?: number; lng?: number } | nul
 };
 
 /**
+ * Extracts address from a Google Maps URL query parameter if present.
+ * Example: ...?query=Avenida+Paulista... -> Avenida Paulista
+ */
+const extractAddressFromUrl = (url: string): string | null => {
+  if (!url) return null;
+
+  try {
+    const urlObj = new URL(url);
+    const query = urlObj.searchParams.get('query') || urlObj.searchParams.get('q');
+    if (query && !query.match(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/)) {
+      // If query is NOT coordinates, it's likely an address
+      return query;
+    }
+  } catch (e) {
+    // Fallback for partial URLs or invalid formats
+    const match = url.match(/[?&]query=([^&]+)/) || url.match(/[?&]q=([^&]+)/);
+    if (match) {
+      return decodeURIComponent(match[1].replace(/\+/g, ' '));
+    }
+  }
+  return null;
+};
+
+/**
  * Parses an Excel HYPERLINK formula to extract both the URL and the display address.
  * Formula format in CSV (raw): =HYPERLINK("url"; "ADDRESS") or =HYPERLINK("url", "ADDRESS")
  */
@@ -39,7 +63,23 @@ export const parseHyperlink = (input: any): { address: string; link?: string; la
   }
 
   // Fallback for simple address formulas or plain text
-  return { address: cleanAddress(raw) };
+  const cleaned = cleanAddress(raw);
+
+  // Check if the cleaned text itself is a Google Maps URL
+  if (cleaned.includes('google.com/maps') || cleaned.includes('maps.app.goo.gl')) {
+    const extractedAddress = extractAddressFromUrl(cleaned);
+    const coords = extractCoordsFromUrl(cleaned);
+
+    // If we extracted a valid address from the URL, use it as the display address
+    // Otherwise keep the URL string (less ideal, but correct behavior if no query param)
+    return {
+      link: cleaned,
+      address: extractedAddress || cleaned,
+      ...coords
+    };
+  }
+
+  return { address: cleaned };
 };
 
 /**
