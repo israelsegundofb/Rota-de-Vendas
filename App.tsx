@@ -1076,6 +1076,7 @@ const App: React.FC = () => {
                         productFilterActive={isProductFilterActive}
                         highlightProductTerm={searchProductQuery}
                         activeProductCategory={filterProductCategory}
+                        users={users} // Pass users for color coding
                       />
                     ) : (
                       <ClientList

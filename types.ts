@@ -48,5 +48,6 @@ export interface AppUser {
   role: UserRole;
   password?: string; // For mock auth management
   salesCategory?: SalesCategory;
+  color?: string; // Color for map pins and UI identification
 }
 

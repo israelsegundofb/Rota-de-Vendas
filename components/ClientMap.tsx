@@ -6,7 +6,7 @@ import {
   useMap
 } from '@vis.gl/react-google-maps';
 import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer';
-import { EnrichedClient } from '../types';
+import { EnrichedClient, AppUser } from '../types';
 import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2 } from 'lucide-react';
 
 declare var google: any;
@@ -18,6 +18,7 @@ interface ClientMapProps {
   productFilterActive?: boolean;
   highlightProductTerm?: string;
   activeProductCategory?: string;
+  users?: AppUser[]; // Added users prop
 }
 
 const MapBoundsUpdater: React.FC<{ clients: EnrichedClient[] }> = ({ clients }) => {
@@ -81,7 +82,7 @@ const MapZoomControls: React.FC = () => {
   );
 };
 
-// Colors by Region (Brazil)
+// Colors by Region (Fallback)
 const getRegionColor = (region: string) => {
   switch (region) {
     case 'Norte': return { bg: '#10B981', border: '#047857', glyph: '#fff' }; // Green
@@ -92,6 +93,22 @@ const getRegionColor = (region: string) => {
     default: return { bg: '#6B7280', border: '#374151', glyph: '#fff' }; // Gray
   }
 };
+
+// Helper determines color based on Salesperson
+const getPinColor = (client: EnrichedClient, users: AppUser[] = [], productFilterActive: boolean) => {
+  if (productFilterActive) {
+    return { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
+  }
+
+  const seller = users.find(u => u.id === client.salespersonId);
+  if (seller && seller.color) {
+    // Darken color for border approx
+    return { bg: seller.color, border: 'black', glyph: '#fff' };
+  }
+
+  return getRegionColor(client.region);
+};
+
 
 const shoppingBagSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -104,8 +121,9 @@ const shoppingBagSvg = `
 const ClientMapContent: React.FC<{
   clients: EnrichedClient[],
   onClientSelect: (id: string | null) => void,
-  productFilterActive?: boolean
-}> = ({ clients, onClientSelect, productFilterActive }) => {
+  productFilterActive?: boolean,
+  users?: AppUser[]
+}> = ({ clients, onClientSelect, productFilterActive, users }) => {
   const map = useMap();
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const markersRef = useRef<any[]>([]);
@@ -163,9 +181,7 @@ const ClientMapContent: React.FC<{
       if (batch.length === 0) return;
 
       const newMarkers = batch.map(client => {
-        const colors = productFilterActive
-          ? { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' }
-          : getRegionColor(client.region);
+        const colors = getPinColor(client, users, !!productFilterActive);
 
         let glyphElement: HTMLElement | null = null;
         if (productFilterActive) {
@@ -221,12 +237,12 @@ const ClientMapContent: React.FC<{
         (clustererRef.current as any).setMap(null);
       }
     };
-  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement]);
+  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, users]);
 
   return <MapBoundsUpdater clients={clients} />;
 };
 
-const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, activeProductCategory }) => {
+const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, activeProductCategory, users }) => {
   const defaultCenter = { lat: -14.235, lng: -51.9253 };
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
@@ -365,6 +381,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             clients={clients}
             onClientSelect={setSelectedClientId}
             productFilterActive={productFilterActive}
+            users={users}
           />
 
           <MapZoomControls />

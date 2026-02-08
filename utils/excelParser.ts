@@ -42,30 +42,32 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                 const normalizedData: RawClient[] = [];
 
                 jsonData.forEach((row: any) => {
-                    // Normalize row keys
-                    const map: Record<string, any> = {};
+                    const normalizedRow: Record<string, any> = {};
                     Object.keys(row).forEach(key => {
-                        map[normalizeHeader(key)] = row[key];
+                        normalizedRow[normalizeHeader(key)] = row[key];
                     });
 
                     // Parse hyperlink if present in address col
-                    // Excel parser might return raw text, or if formula export is enabled it might return formula. 
-                    // sheet_to_json defaults to values.
-                    // If we want formulas we need specific options, but for simplicity we'll try to parse the text
-                    // or if the cell has a hyperlink object (not standard sheet_to_json output without opts).
-                    // For now, assuming address is plain text or needs standard parsing.
+                    const addressInput = normalizedRow['endereco'] || normalizedRow['logradouro'] || normalizedRow['localizacao'] ||
+                        normalizedRow['endereco completo'] || normalizedRow['rua'] || normalizedRow['end'] || '';
 
-                    const addressInput = map['endereco'] || map['logradouro'] || map['localizacao'] || '';
-
-                    // If the cell was a hyperlink in Excel, sheet_to_json usually gives the label.
-                    // We can't easily get the URL unless we parse with { cellHTML: true } or iterate cells directly.
-                    // For MVP, we'll try to use the text. if user puts URL in text, parseHyperlink handles it.
                     const { address, link, lat, lng } = parseHyperlink(addressInput);
 
+                    // Robust Header Finding
+                    const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['nome fantasia'] ||
+                        normalizedRow['empresa'] || normalizedRow['nome'] || normalizedRow['nome cliente'] ||
+                        normalizedRow['parceiro'] || normalizedRow['loja'] || '';
+
+                    const ownerName = normalizedRow['nome do proprietario'] || normalizedRow['proprietario'] || normalizedRow['dono'] ||
+                        normalizedRow['contato principal'] || normalizedRow['responsavel'] || normalizedRow['socio'] || '';
+
+                    const contact = String(normalizedRow['contato'] || normalizedRow['telefone'] || normalizedRow['celular'] ||
+                        normalizedRow['whatsapp'] || normalizedRow['tel'] || normalizedRow['fone'] || '');
+
                     normalizedData.push({
-                        'Razão Social': map['razao social'] || map['cliente'] || map['nome fantasia'] || map['empresa'] || '',
-                        'Nome do Proprietário': map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
-                        'Contato': String(map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || ''),
+                        'Razão Social': companyName,
+                        'Nome do Proprietário': ownerName,
+                        'Contato': contact,
                         'Endereço': address,
                         'GoogleMapsLink': link,
                         'extractedLat': lat,
