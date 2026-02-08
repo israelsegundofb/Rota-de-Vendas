@@ -7,7 +7,7 @@ import {
 } from '@vis.gl/react-google-maps';
 import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer';
 import { EnrichedClient } from '../types';
-import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2 } from 'lucide-react';
 
 declare var google: any;
 
@@ -335,8 +335,18 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
     );
   }
 
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+
+  const containerClass = isFullScreen
+    ? "fixed inset-0 z-50 bg-white h-screen w-screen"
+    : "h-full w-full rounded-xl overflow-hidden shadow-sm border border-gray-200 relative z-0";
+
   return (
-    <div className="h-full w-full rounded-xl overflow-hidden shadow-sm border border-gray-200 relative z-0">
+    <div className={containerClass}>
       <APIProvider
         apiKey={apiKey}
         libraries={['marker']}
@@ -358,6 +368,15 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           />
 
           <MapZoomControls />
+
+          {/* Full Screen Toggle Button */}
+          <button
+            onClick={toggleFullScreen}
+            className="absolute top-4 right-4 z-10 bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
+            title={isFullScreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+          >
+            {isFullScreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          </button>
 
           {selectedClient && (
             <InfoWindow
