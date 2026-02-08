@@ -3,7 +3,6 @@ export interface RawClient {
   'Nome do Proprietário': string;
   'Contato': string;
   'Endereço': string;
-  'googleMapsLink'?: string;
 }
 
 export interface Product {
@@ -25,7 +24,7 @@ export interface EnrichedClient {
   contact: string;
   originalAddress: string;
   cleanAddress: string;
-  categories: string[]; // Changed from single string to array for Multi-Segment support
+  category: string;
   region: 'Norte' | 'Nordeste' | 'Centro-Oeste' | 'Sudeste' | 'Sul' | 'Indefinido';
   state: string;
   city: string;
