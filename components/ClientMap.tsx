@@ -303,15 +303,10 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   }
 
   return (
-    <div className="h-full w-full rounded-xl overflow-hidden shadow-sm border border-gray-200 relative z-0">      <APIProvider
-      apiKey={apiKey}
-      // libraries={['marker']} // Not needed for standard markers
-      onLoad={() => console.log('Maps API loaded')}
-    >
+    <div className="h-full w-full rounded-xl overflow-hidden shadow-sm border border-gray-200 relative z-0">
       <Map
         defaultCenter={defaultCenter}
         defaultZoom={4}
-        // mapId="DEMO_MAP_ID" // Remove mapId to allow standard map w/o config
         style={{ width: '100%', height: '100%' }}
         gestureHandling={'greedy'}
         disableDefaultUI={true}
@@ -409,7 +404,6 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           </InfoWindow>
         )}
       </Map>
-    </APIProvider>
     </div>
   );
 };
