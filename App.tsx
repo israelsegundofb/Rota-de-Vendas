@@ -574,7 +574,7 @@ const App: React.FC = () => {
                   title="Remover todos os clientes do sistema"
                 >
                   <Trash2 className="w-3 h-3" />
-                  Limpar Base de Clientes
+                  Limpar Base (Reset Total)
                 </button>
 
               </div>
