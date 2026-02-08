@@ -568,30 +568,17 @@ const App: React.FC = () => {
       );
 
       // Update Master List
+      // Update Master List - APPEND mode (Fixed based on user feedback)
       setMasterClientList(prev => {
-        // Remove old data for this salesperson if needed? No, usually append or merge.
-        // For simplicity here, we append.
-        const others = prev.filter(c => c.salespersonId !== ownerId);
-        const newClients = [...others, ...enrichedData];
-
-        // Re-run distribution if products exist
-        if (products.length > 0) {
-          // This is a bit recursive but OK for this mock structure
-          // We need to access 'distributeProductsToClients' logic inline because setState is async
-          return newClients.map(c => {
-            if (c.purchasedProducts && c.purchasedProducts.length > 0) return c;
-            let eligible = products.filter(p => c.category.includes(p.category));
-            if (eligible.length === 0) eligible = products;
-            const count = Math.floor(Math.random() * 5) + 1;
-            const selected = [...eligible].sort(() => 0.5 - Math.random()).slice(0, count);
-            return { ...c, purchasedProducts: selected };
-          });
-        }
-        return newClients;
+        // We simply append the new enriched data to the existing list
+        // If we wanted to avoid duplicates based on ID or Name, we'd add logic here.
+        // For now, "juntar-se" implies simple addition.
+        return [...prev, ...enrichedData];
       });
 
       if (currentUser.role === 'admin') {
-        setFilterSalespersonId(ownerId);
+        // We do NOT change the filter automatically to avoid confusion if multiple uploaded
+        // setFilterSalespersonId(ownerId); 
       }
 
       setProcState(prev => ({ ...prev, status: 'completed' }));
