@@ -30,7 +30,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
         client.ownerName.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesRegion = regionFilter === 'Todos' || client.region === regionFilter;
-      const matchesCategory = categoryFilter === 'Todos' || client.category === categoryFilter;
+      const matchesCategory = categoryFilter === 'Todos' || client.category.includes(categoryFilter);
 
       return matchesSearch && matchesRegion && matchesCategory;
     });
@@ -50,7 +50,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
       client.city,
       client.state,
       client.region,
-      client.category,
+      client.category.join('; '), // Join array for CSV
       client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`
     ]);
 
@@ -212,10 +212,13 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">
-                      <Tag className="w-3 h-3" />
-                      {client.category}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {client.category.map((cat, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold border border-slate-200">
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">

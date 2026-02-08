@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Trash2 } from 'lucide-react';
-import { RawClient, EnrichedClient, CATEGORIES, User, REGIONS, Product } from './types';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2 } from 'lucide-react';
+import { RawClient, EnrichedClient, CATEGORIES, User, REGIONS, Product, getRegionByUF } from './types';
 import { parseCSV } from './utils/csvParser';
 import { processClientsWithAI } from './services/geminiService';
+import { geocodeAddress } from './services/geocodingService';
 import ClientMap from './components/ClientMap';
 import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
@@ -39,15 +40,26 @@ const App: React.FC = () => {
     }
   });
 
-  const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_clients');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load clients from storage", e);
-      return [];
+  const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
+  // Load from LocalStorage on Mount with Migration
+  useEffect(() => {
+    const saved = localStorage.getItem('vendas_ai_clients');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // MIGRATION: Ensure category is string[]
+        setMasterClientList(parsed.map((c: any) => ({
+          ...c,
+          category: Array.isArray(c.category)
+            ? c.category
+            : (typeof c.category === 'string' ? [c.category] : ['Outros']),
+          region: getRegionByUF(c.state) // Force update region based on state
+        })));
+      } catch (e) {
+        console.error("Failed to parse saved clients", e);
+      }
     }
-  });
+  }, []);
 
   const [categories, setCategories] = useState<string[]>(() => {
     try {
@@ -174,515 +186,591 @@ const App: React.FC = () => {
     setMasterClientList(prev => prev.map(c => ({ ...c, purchasedProducts: [] })));
   };
 
-  const handleUpdateClient = (updatedClient: EnrichedClient) => {
-    setMasterClientList(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
-  };
+  const handleUpdateClient = async (updatedClient: EnrichedClient) => {
+    // Check if address changed to re-geocode
+    const original = masterClientList.find(c => c.id === updatedClient.id);
+    let finalClient = { ...updatedClient };
 
-  const handleAddClient = async (newClientData: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => {
-    try {
-      const fullAddress = `${newClientData.originalAddress}, ${newClientData.city} - ${newClientData.state}, Brasil`;
-
-      // Geocoding Fallback/Approximation logic
-      let lat = -3.71722; // Fortaleza default
-      let lng = -38.5434;
-      let cleanAddress = fullAddress;
-
+    if (original && original.cleanAddress !== updatedClient.cleanAddress) {
       try {
-        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${activeApiKey}`);
-        const data = await response.json();
-
-        if (data.status === 'OK' && data.results && data.results.length > 0) {
-          const location = data.results[0].geometry.location;
-          lat = location.lat;
-          lng = location.lng;
-          cleanAddress = data.results[0].formatted_address;
+        const geoResult = await geocodeAddress(updatedClient.cleanAddress, activeApiKey || '');
+        if (geoResult) {
+          finalClient.lat = geoResult.lat;
+          finalClient.lng = geoResult.lng;
+          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
         }
-      } catch (err) {
-        console.error("Geocoding failed for new client", err);
+      } catch (e) {
+        console.error("Failed to re-geocode updated client:", e);
       }
-
-      const newClient: EnrichedClient = {
-        ...newClientData,
-        id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        lat,
-        lng,
-        cleanAddress,
-        // originalRow removed as it's not in interface
-      };
-
-      setMasterClientList(prev => [...prev, newClient]); // Add to END of list
-
-      // Auto-switch to map view to show the new pin? or just stay on list? 
-      // Requirement says "show pin on map", effectively implying we might want to highlight it or ensure it's there.
-      // For now, adding to the data ensures it appears on the map.
-
-    } catch (error) {
-      console.error("Error adding client", error);
-      alert("Erro ao adicionar cliente. Tente novamente.");
     }
+
+    setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
   };
 
-  const handleClearClients = () => {
-    const confirmClear = window.confirm(
-      "⚠️ AVISO CRÍTICO ⚠️\n\n" +
-      "Tem certeza que deseja DELETAR TODOS os clientes do sistema?\n" +
-      "Isso removerá todo o histórico e limpará o cache local.\n\n" +
-      "Esta ação não pode ser desfeita."
-    );
 
-    if (confirmClear) {
-      setMasterClientList([]);
-      localStorage.removeItem('vendas_ai_clients');
-      // Optional: Also clear any processing state
-      setProcState({
-        isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
-      });
-      alert("Base de dados limpa com sucesso!");
+  try {
+    const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${activeApiKey}`);
+    const data = await response.json();
+
+    if (data.status === 'OK' && data.results && data.results.length > 0) {
+      const location = data.results[0].geometry.location;
+      lat = location.lat;
+      lng = location.lng;
+      cleanAddress = data.results[0].formatted_address;
     }
-  };
-
-  // Simulate Sales Logic
-  const distributeProductsToClients = (clients: EnrichedClient[], allProducts: Product[]) => {
-    if (allProducts.length === 0) return;
-
-    const updatedClients = clients.map(client => {
-      // If client already has products, keep them unless we want to refresh
-      if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
-
-      // Find products matching client category
-      let eligibleProducts = allProducts.filter(p =>
-        p.category.toLowerCase().includes(client.category.toLowerCase()) ||
-        client.category.toLowerCase().includes(p.category.toLowerCase())
-      );
-
-      // Fallback if no category match
-      if (eligibleProducts.length === 0) {
-        eligibleProducts = allProducts;
-      }
-
-      // Randomly assign 1-5 products
-      const numProducts = Math.floor(Math.random() * 5) + 1;
-      const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, numProducts);
-
-      return { ...client, purchasedProducts: selected };
-    });
-
-    setMasterClientList(updatedClients);
-  };
-
-  const handleInvalidKey = async () => {
-    if ((window as any).aistudio) {
-      try {
-        await (window as any).aistudio.openSelectKey();
-        // Update key from env after selection
-        const newKey = process.env.API_KEY;
-        if (newKey) {
-          setActiveApiKey(newKey);
-        } else {
-          // If process.env not updated immediately, try to read it again or use current
-          if (process.env.API_KEY) setActiveApiKey(process.env.API_KEY);
-        }
-        // Increment version to force remount of map even if key string is identical
-        setKeyVersion(v => v + 1);
-      } catch (e) { console.error(e); }
-    } else {
-      console.error("AI Studio environment not detected.");
-    }
-  };
-
-  // --- Derived Data ---
-  const visibleClients = useMemo(() => {
-    if (!currentUser) return [];
-    let baseList = [];
-    if (currentUser.role === 'admin') {
-      if (filterSalespersonId !== 'Todos') {
-        baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
-      } else {
-        baseList = masterClientList;
-      }
-    } else {
-      baseList = masterClientList.filter(c => c.salespersonId === currentUser.id);
-    }
-    return baseList;
-  }, [currentUser, masterClientList, filterSalespersonId]);
-
-  const filteredClients = useMemo(() => {
-    return visibleClients.filter(c => {
-      // General Filters
-      const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
-      const matchState = filterState === 'Todos' || c.state === filterState;
-      const matchCity = filterCity === 'Todas' || c.city === filterCity;
-      const matchCat = filterCategory === 'Todos' || c.category === filterCategory;
-
-      // Sales Category Filter (Admin Only)
-      let matchSalesCat = true;
-      if (currentUser?.role === 'admin' && filterSalesCategory !== 'Todos') {
-        const seller = users.find(u => u.id === c.salespersonId);
-        if (!seller || seller.salesCategory !== filterSalesCategory) {
-          matchSalesCat = false;
-        }
-      }
-
-      // Text Search
-      const query = searchQuery.toLowerCase();
-      const matchSearch = searchQuery === '' ||
-        c.companyName.toLowerCase().includes(query) ||
-        (c.ownerName && c.ownerName.toLowerCase().includes(query));
-
-      // Product Filters (Where items were sold)
-      let matchProduct = true;
-      const prodQuery = searchProductQuery.toLowerCase();
-
-      if (filterProductCategory !== 'Todos' || prodQuery !== '') {
-        // If filtering by product, client MUST have purchase history
-        if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
-          matchProduct = false;
-        } else {
-          // Check Category (Brand often used as category in this context)
-          const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => p.category === filterProductCategory);
-
-          // Check SKU, Brand, Factory Code, Description (Name), or Price
-          const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
-            p.name.toLowerCase().includes(prodQuery) ||
-            p.sku.toLowerCase().includes(prodQuery) ||
-            p.brand.toLowerCase().includes(prodQuery) ||
-            p.factoryCode.toLowerCase().includes(prodQuery) ||
-            p.price.toString().includes(prodQuery)
-          );
-
-          matchProduct = hasCat && hasMatch;
-        }
-      }
-
-      return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat;
-    });
-  }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, searchProductQuery, filterSalesCategory, users, currentUser]);
-
-  const productCategories = useMemo(() => {
-    // Create unique list of categories (or brands if category absent)
-    const cats = new Set(products.map(p => p.category));
-    return Array.from(cats).sort();
-  }, [products]);
-
-  // Derived Geographic Filters - Drill Down Logic
-  const availableStates = useMemo(() => {
-    let base = visibleClients;
-    // Strict filter: If region is selected, show states only in that region.
-    if (filterRegion !== 'Todas') {
-      base = base.filter(c => c.region === filterRegion);
-    }
-    const states = new Set(base.map(c => c.state).filter(Boolean));
-    return Array.from(states).sort();
-  }, [visibleClients, filterRegion]);
-
-  const availableCities = useMemo(() => {
-    let base = visibleClients;
-    // Drill down: Filter by Region first (if selected)
-    if (filterRegion !== 'Todas') {
-      base = base.filter(c => c.region === filterRegion);
-    }
-    // Drill down: Filter by State (Must be selected to show cities effectively)
-    if (filterState !== 'Todos') {
-      base = base.filter(c => c.state === filterState);
-    } else {
-      // Optional: If no state selected, return empty or all cities? 
-      // Returning empty encourages drill-down flow.
-      return [];
-    }
-    const cities = new Set(base.map(c => c.city).filter(Boolean));
-    return Array.from(cities).sort();
-  }, [visibleClients, filterRegion, filterState]);
-
-  // --- Actions ---
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    setSearchQuery('');
-    setFilterRegion('Todas');
-    setFilterState('Todos');
-    setFilterCity('Todas');
-    setFilterSalespersonId('Todos');
-    setFilterSalesCategory('Todos');
-    setActiveView('map');
-    if (user.role === 'admin') {
-      const firstSeller = users.find(u => u.role === 'salesperson');
-      if (firstSeller) setTargetUploadUserId(firstSeller.id);
-    }
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setFilterSalespersonId('Todos');
-    setFilterSalesCategory('Todos');
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !currentUser) return;
-
-    let ownerId = currentUser.id;
-    let ownerName = currentUser.name;
-
-    if (currentUser.role === 'admin') {
-      if (!targetUploadUserId) {
-        alert("Selecione um vendedor para atribuir esta planilha.");
-        return;
-      }
-      ownerId = targetUploadUserId;
-      const targetUser = users.find(u => u.id === targetUploadUserId);
-      ownerName = targetUser?.name || 'Unknown';
-    }
-
-    // CONFIRMATION ALERT
-    if (masterClientList.length > 0) {
-      const confirmUpdate = window.confirm(
-        "O sistema já possui dados de clientes carregados.\n\n" +
-        "Deseja ADICIONAR os novos dados à lista existente?\n" +
-        "Clique em OK para continuar ou Cancelar para abortar.\n\n" +
-        "Dica: Para substituir tudo, cancele e use o botão 'Limpar Base de Clientes'."
-      );
-      if (!confirmUpdate) {
-        event.target.value = ''; // Reset file input
-        return;
-      }
-    }
-
-    // Initialize Background Process State
-    setProcState({
-      isActive: true,
-      total: 0,
-      current: 0,
-      fileName: file.name,
-      ownerName: ownerName,
-      status: 'reading'
-    });
-
-    event.target.value = '';
-
-    try {
-      const rawData = await parseCSV(file);
-
-      if (rawData.length === 0) throw new Error("Arquivo vazio.");
-
-      setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
-
-      const enrichedData = await processClientsWithAI(
-        rawData,
-        ownerId,
-        activeApiKey,
-        categories,
-        (processed, total) => {
-          setProcState(prev => ({ ...prev, current: processed, total: total }));
-        }
-      );
-
-      // Update Master List
-      setMasterClientList(prev => {
-        // Remove old data for this salesperson if needed? No, usually append or merge.
-        // For simplicity here, we append.
-        const others = prev.filter(c => c.salespersonId !== ownerId);
-        const newClients = [...others, ...enrichedData];
-
-        // Re-run distribution if products exist
-        if (products.length > 0) {
-          // This is a bit recursive but OK for this mock structure
-          // We need to access 'distributeProductsToClients' logic inline because setState is async
-          return newClients.map(c => {
-            if (c.purchasedProducts && c.purchasedProducts.length > 0) return c;
-            let eligible = products.filter(p => p.category.includes(c.category) || c.category.includes(p.category));
-            if (eligible.length === 0) eligible = products;
-            const count = Math.floor(Math.random() * 5) + 1;
-            const selected = [...eligible].sort(() => 0.5 - Math.random()).slice(0, count);
-            return { ...c, purchasedProducts: selected };
-          });
-        }
-        return newClients;
-      });
-
-      if (currentUser.role === 'admin') {
-        setFilterSalespersonId(ownerId);
-      }
-
-      setProcState(prev => ({ ...prev, status: 'completed' }));
-
-      setTimeout(() => {
-        setProcState(prev => prev.status === 'completed' ? { ...prev, isActive: false } : prev);
-      }, 5000);
-
-    } catch (err: any) {
-      console.error(err);
-      setProcState(prev => ({ ...prev, status: 'error', errorMessage: err.message || "Erro desconhecido" }));
-    }
-  };
-
-  if (!currentUser) {
-    return <LoginScreen users={users} onLogin={handleLogin} />;
+  } catch (err) {
+    console.error("Geocoding failed for new client", err);
   }
 
-  const isAdmin = currentUser.role === 'admin';
-  const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
+  const newClient: EnrichedClient = {
+    ...newClientData,
+    id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    lat,
+    lng,
+    cleanAddress,
+    // originalRow removed as it's not in interface
+  };
 
-  return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
+  setMasterClientList(prev => [...prev, newClient]); // Add to END of list
 
-      {/* SIDEBAR */}
-      <aside className={`w-72 ${isAdmin ? 'bg-slate-900' : 'bg-blue-900'} text-white flex flex-col shadow-xl z-20 transition-colors duration-500`}>
-        <div className="p-6 border-b border-white/10">
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 text-blue-400" />
-            Vendas A.I.
-          </h1>
-          <p className="text-xs text-white/50 mt-1">
-            {isAdmin ? 'Painel Administrativo' : 'Portal do Vendedor'}
-          </p>
+  // Auto-switch to map view to show the new pin? or just stay on list? 
+  // Requirement says "show pin on map", effectively implying we might want to highlight it or ensure it's there.
+  // For now, adding to the data ensures it appears on the map.
+
+} catch (error) {
+  console.error("Error adding client", error);
+  alert("Erro ao adicionar cliente. Tente novamente.");
+}
+  };
+
+const handleClearClients = () => {
+  const confirmClear = window.confirm(
+    "⚠️ AVISO CRÍTICO ⚠️\n\n" +
+    "Tem certeza que deseja DELETAR TODOS os clientes do sistema?\n" +
+    "Isso removerá todo o histórico e limpará o cache local.\n\n" +
+    "Esta ação não pode ser desfeita."
+  );
+
+  if (confirmClear) {
+    setMasterClientList([]);
+    localStorage.removeItem('vendas_ai_clients');
+    // Optional: Also clear any processing state
+    setProcState({
+      isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
+    });
+    alert("Base de dados limpa com sucesso!");
+  }
+};
+
+// Simulate Sales Logic
+const distributeProductsToClients = (clients: EnrichedClient[], allProducts: Product[]) => {
+  if (allProducts.length === 0) return;
+
+  const updatedClients = clients.map(client => {
+    // If client already has products, keep them unless we want to refresh
+    if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
+
+    // Find products matching client category
+    let eligibleProducts = allProducts.filter(p =>
+      client.category.some(cat =>
+        p.category.toLowerCase().includes(cat.toLowerCase()) ||
+        cat.toLowerCase().includes(p.category.toLowerCase())
+      )
+    );
+
+    // Fallback if no category match
+    if (eligibleProducts.length === 0) {
+      eligibleProducts = allProducts;
+    }
+
+    // Randomly assign 1-5 products
+    const numProducts = Math.floor(Math.random() * 5) + 1;
+    const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, numProducts);
+
+    return { ...client, purchasedProducts: selected };
+  });
+
+  setMasterClientList(updatedClients);
+};
+
+const handleInvalidKey = async () => {
+  if ((window as any).aistudio) {
+    try {
+      await (window as any).aistudio.openSelectKey();
+      // Update key from env after selection
+      const newKey = process.env.API_KEY;
+      if (newKey) {
+        setActiveApiKey(newKey);
+      } else {
+        // If process.env not updated immediately, try to read it again or use current
+        if (process.env.API_KEY) setActiveApiKey(process.env.API_KEY);
+      }
+      // Increment version to force remount of map even if key string is identical
+      setKeyVersion(v => v + 1);
+    } catch (e) { console.error(e); }
+  } else {
+    console.error("AI Studio environment not detected.");
+  }
+};
+
+// --- Derived Data ---
+const visibleClients = useMemo(() => {
+  if (!currentUser) return [];
+  let baseList = [];
+  if (currentUser.role === 'admin') {
+    if (filterSalespersonId !== 'Todos') {
+      baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
+    } else {
+      baseList = masterClientList;
+    }
+  } else {
+    baseList = masterClientList.filter(c => c.salespersonId === currentUser.id);
+  }
+  return baseList;
+}, [currentUser, masterClientList, filterSalespersonId]);
+
+const filteredClients = useMemo(() => {
+  return visibleClients.filter(c => {
+    // General Filters
+    const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
+    const matchState = filterState === 'Todos' || c.state === filterState;
+    const matchCity = filterCity === 'Todas' || c.city === filterCity;
+    const matchCat = filterCategory === 'Todos' || c.category === filterCategory;
+
+    // Sales Category Filter (Admin Only)
+    let matchSalesCat = true;
+    if (currentUser?.role === 'admin' && filterSalesCategory !== 'Todos') {
+      const seller = users.find(u => u.id === c.salespersonId);
+      if (!seller || seller.salesCategory !== filterSalesCategory) {
+        matchSalesCat = false;
+      }
+    }
+
+    // Text Search
+    const query = searchQuery.toLowerCase();
+    const matchSearch = searchQuery === '' ||
+      c.companyName.toLowerCase().includes(query) ||
+      (c.ownerName && c.ownerName.toLowerCase().includes(query));
+
+    // Product Filters (Where items were sold)
+    let matchProduct = true;
+    const prodQuery = searchProductQuery.toLowerCase();
+
+    if (filterProductCategory !== 'Todos' || prodQuery !== '') {
+      // If filtering by product, client MUST have purchase history
+      if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
+        matchProduct = false;
+      } else {
+        // Check Category (Brand often used as category in this context)
+        const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => p.category === filterProductCategory);
+
+        // Check SKU, Brand, Factory Code, Description (Name), or Price
+        const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
+          p.name.toLowerCase().includes(prodQuery) ||
+          p.sku.toLowerCase().includes(prodQuery) ||
+          p.brand.toLowerCase().includes(prodQuery) ||
+          p.factoryCode.toLowerCase().includes(prodQuery) ||
+          p.price.toString().includes(prodQuery)
+        );
+
+        matchProduct = hasCat && hasMatch;
+      }
+    }
+
+    return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat;
+  });
+}, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, searchProductQuery, filterSalesCategory, users, currentUser]);
+
+const productCategories = useMemo(() => {
+  // Create unique list of categories (or brands if category absent)
+  const cats = new Set(products.map(p => p.category));
+  return Array.from(cats).sort();
+}, [products]);
+
+// Derived Geographic Filters - Drill Down Logic
+const availableStates = useMemo(() => {
+  let base = visibleClients;
+  // Strict filter: If region is selected, show states only in that region.
+  if (filterRegion !== 'Todas') {
+    base = base.filter(c => c.region === filterRegion);
+  }
+  const states = new Set(base.map(c => c.state).filter(Boolean));
+  return Array.from(states).sort();
+}, [visibleClients, filterRegion]);
+
+const availableCities = useMemo(() => {
+  let base = visibleClients;
+  // Drill down: Filter by Region first (if selected)
+  if (filterRegion !== 'Todas') {
+    base = base.filter(c => c.region === filterRegion);
+  }
+  // Drill down: Filter by State (Must be selected to show cities effectively)
+  if (filterState !== 'Todos') {
+    base = base.filter(c => c.state === filterState);
+  } else {
+    // Optional: If no state selected, return empty or all cities? 
+    // Returning empty encourages drill-down flow.
+    return [];
+  }
+  const cities = new Set(base.map(c => c.city).filter(Boolean));
+  return Array.from(cities).sort();
+}, [visibleClients, filterRegion, filterState]);
+
+// --- Actions ---
+const handleLogin = (user: User) => {
+  setCurrentUser(user);
+  setSearchQuery('');
+  setFilterRegion('Todas');
+  setFilterState('Todos');
+  setFilterCity('Todas');
+  setFilterSalespersonId('Todos');
+  setFilterSalesCategory('Todos');
+  setActiveView('map');
+  if (user.role === 'admin') {
+    const firstSeller = users.find(u => u.role === 'salesperson');
+    if (firstSeller) setTargetUploadUserId(firstSeller.id);
+  }
+};
+
+const handleLogout = () => {
+  setCurrentUser(null);
+  setFilterSalespersonId('Todos');
+  setFilterSalesCategory('Todos');
+};
+
+const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file || !currentUser) return;
+
+  let ownerId = currentUser.id;
+  let ownerName = currentUser.name;
+
+  if (currentUser.role === 'admin') {
+    if (!targetUploadUserId) {
+      alert("Selecione um vendedor para atribuir esta planilha.");
+      return;
+    }
+    ownerId = targetUploadUserId;
+    const targetUser = users.find(u => u.id === targetUploadUserId);
+    ownerName = targetUser?.name || 'Unknown';
+  }
+
+  // CONFIRMATION ALERT
+  if (masterClientList.length > 0) {
+    const confirmUpdate = window.confirm(
+      "O sistema já possui dados de clientes carregados.\n\n" +
+      "Deseja ADICIONAR os novos dados à lista existente?\n" +
+      "Clique em OK para continuar ou Cancelar para abortar.\n\n" +
+      "Dica: Para substituir tudo, cancele e use o botão 'Limpar Base de Clientes'."
+    );
+    if (!confirmUpdate) {
+      event.target.value = ''; // Reset file input
+      return;
+    }
+  }
+
+  // Initialize Background Process State
+  setProcState({
+    isActive: true,
+    total: 0,
+    current: 0,
+    fileName: file.name,
+    ownerName: ownerName,
+    status: 'reading'
+  });
+
+  event.target.value = '';
+
+  try {
+    const rawData = await parseCSV(file);
+
+    if (rawData.length === 0) throw new Error("Arquivo vazio.");
+
+    setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
+
+    const enrichedData = await processClientsWithAI(
+      rawData,
+      ownerId,
+      activeApiKey,
+      categories,
+      (processed, total) => {
+        setProcState(prev => ({ ...prev, current: processed, total: total }));
+      }
+    );
+
+    // Update Master List
+    setMasterClientList(prev => {
+      // Remove old data for this salesperson if needed? No, usually append or merge.
+      // For simplicity here, we append.
+      const others = prev.filter(c => c.salespersonId !== ownerId);
+      const newClients = [...others, ...enrichedData];
+
+      // Re-run distribution if products exist
+      if (products.length > 0) {
+        // This is a bit recursive but OK for this mock structure
+        // We need to access 'distributeProductsToClients' logic inline because setState is async
+        return newClients.map(c => {
+          if (c.purchasedProducts && c.purchasedProducts.length > 0) return c;
+          let eligible = products.filter(p => p.category.includes(c.category) || c.category.includes(p.category));
+          if (eligible.length === 0) eligible = products;
+          const count = Math.floor(Math.random() * 5) + 1;
+          const selected = [...eligible].sort(() => 0.5 - Math.random()).slice(0, count);
+          return { ...c, purchasedProducts: selected };
+        });
+      }
+      return newClients;
+    });
+
+    if (currentUser.role === 'admin') {
+      setFilterSalespersonId(ownerId);
+    }
+
+    setProcState(prev => ({ ...prev, status: 'completed' }));
+
+    setTimeout(() => {
+      setProcState(prev => prev.status === 'completed' ? { ...prev, isActive: false } : prev);
+    }, 5000);
+
+  } catch (err: any) {
+    console.error(err);
+    setProcState(prev => ({ ...prev, status: 'error', errorMessage: err.message || "Erro desconhecido" }));
+  }
+};
+
+if (!currentUser) {
+  return <LoginScreen users={users} onLogin={handleLogin} />;
+}
+
+const isAdmin = currentUser.role === 'admin';
+const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
+
+return (
+  <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
+
+    {/* SIDEBAR */}
+    <aside className={`w-72 ${isAdmin ? 'bg-slate-900' : 'bg-blue-900'} text-white flex flex-col shadow-xl z-20 transition-colors duration-500`}>
+      <div className="p-6 border-b border-white/10">
+        <h1 className="text-lg font-bold flex items-center gap-2">
+          <LayoutDashboard className="w-5 h-5 text-blue-400" />
+          Vendas A.I.
+        </h1>
+        <p className="text-xs text-white/50 mt-1">
+          {isAdmin ? 'Painel Administrativo' : 'Portal do Vendedor'}
+        </p>
+      </div>
+
+      <div className="p-4 flex-1 overflow-y-auto">
+        <div className="bg-black/20 rounded-lg p-4 mb-6 border border-white/5">
+          <p className="text-xs text-white/50 uppercase font-semibold">Logado como:</p>
+          <div className="flex items-center gap-2 mt-1">
+            <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-purple-400' : 'bg-green-400'}`}></div>
+            <p className="font-bold text-white truncate">{currentUser.name}</p>
+          </div>
         </div>
 
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="bg-black/20 rounded-lg p-4 mb-6 border border-white/5">
-            <p className="text-xs text-white/50 uppercase font-semibold">Logado como:</p>
-            <div className="flex items-center gap-2 mt-1">
-              <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-purple-400' : 'bg-green-400'}`}></div>
-              <p className="font-bold text-white truncate">{currentUser.name}</p>
-            </div>
-          </div>
+        <nav className="space-y-1 mb-8">
+          <p className="px-3 text-xs font-semibold text-white/40 uppercase mb-2">Visualização</p>
+          <button
+            onClick={() => setActiveView('map')}
+            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'map' ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5'}`}
+          >
+            <MapIcon className="w-4 h-4" /> Mapa da Carteira
+          </button>
+          <button
+            onClick={() => setActiveView('table')}
+            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'table' ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5'}`}
+          >
+            <TableIcon className="w-4 h-4" /> Listagem de Dados
+          </button>
+        </nav>
 
-          <nav className="space-y-1 mb-8">
-            <p className="px-3 text-xs font-semibold text-white/40 uppercase mb-2">Visualização</p>
+        {isAdmin && (
+          <nav className="space-y-1 mb-8 animate-fade-in">
+            <p className="px-3 text-xs font-semibold text-purple-300 uppercase mb-2 flex items-center gap-1">
+              <Shield className="w-3 h-3" /> Admin
+            </p>
             <button
-              onClick={() => setActiveView('map')}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'map' ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5'}`}
+              onClick={() => setActiveView('admin_users')}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_users' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
             >
-              <MapIcon className="w-4 h-4" /> Mapa da Carteira
+              <UsersIcon className="w-4 h-4" /> Gerenciar Acessos
             </button>
             <button
-              onClick={() => setActiveView('table')}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'table' ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5'}`}
+              onClick={() => setActiveView('admin_categories')}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_categories' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
             >
-              <TableIcon className="w-4 h-4" /> Listagem de Dados
+              <Layers className="w-4 h-4" /> Categorias de Clientes
+            </button>
+            <button
+              onClick={() => setActiveView('admin_products')}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_products' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
+            >
+              <Package className="w-4 h-4" /> Catálogo de Produtos
             </button>
           </nav>
+        )}
 
-          {isAdmin && (
-            <nav className="space-y-1 mb-8 animate-fade-in">
-              <p className="px-3 text-xs font-semibold text-purple-300 uppercase mb-2 flex items-center gap-1">
-                <Shield className="w-3 h-3" /> Admin
-              </p>
-              <button
-                onClick={() => setActiveView('admin_users')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_users' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <UsersIcon className="w-4 h-4" /> Gerenciar Acessos
-              </button>
-              <button
-                onClick={() => setActiveView('admin_categories')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_categories' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <Layers className="w-4 h-4" /> Categorias de Clientes
-              </button>
-              <button
-                onClick={() => setActiveView('admin_products')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_products' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <Package className="w-4 h-4" /> Catálogo de Produtos
-              </button>
-            </nav>
-          )}
-
-          {/* Upload Section */}
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <p className="px-3 text-xs font-semibold text-white/40 uppercase mb-3 flex items-center gap-2">
-              <FileUp className="w-3 h-3" /> Carga de Clientes
-            </p>
-
-            {isAdmin ? (
-              <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
-
-                {/* Target Salesperson Selector */}
-                <div>
-                  <p className="text-[10px] text-purple-300 font-bold uppercase mb-2">Atribuir Carteira a:</p>
-                  <select
-                    className="w-full bg-slate-800 border border-slate-600 rounded text-xs p-2 text-white mb-2 focus:ring-1 focus:ring-purple-500 outline-none"
-                    value={targetUploadUserId}
-                    onChange={(e) => setTargetUploadUserId(e.target.value)}
-                  >
-                    <option value="" disabled>Selecione o Vendedor...</option>
-                    {users.filter(u => u.role === 'salesperson').map(u => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Upload Button */}
-                <label className={`flex items-center justify-center w-full px-2 py-3 border border-white/20 border-dashed rounded-lg cursor-pointer hover:bg-white/5 transition-colors ${procState.isActive && procState.status === 'processing' ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <div className="flex flex-col items-center">
-                    <FileUp className="w-5 h-5 text-purple-400 mb-1" />
-                    <span className="text-[10px] text-white/70">
-                      {procState.isActive && procState.status === 'processing' ? 'Processando...' : 'Carregar CSV (Excel)'}
-                    </span>
-                  </div>
-                  <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={procState.isActive && procState.status === 'processing' || !targetUploadUserId} />
-                </label>
-
-                {/* Clear Data Button */}
-                <button
-                  onClick={handleClearClients}
-                  className="w-full flex items-center justify-center gap-2 px-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 rounded-lg text-[10px] font-medium transition-colors mt-2"
-                  title="Remover todos os clientes do sistema"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Limpar Base (Reset Total)
-                </button>
-
-              </div>
-            ) : (
-              <div className="px-3 py-4 bg-white/5 rounded-lg border border-white/10 text-center">
-                <Lock className="w-6 h-6 text-white/30 mx-auto mb-2" />
-                <p className="text-[10px] text-white/50 leading-tight">
-                  O upload da carteira de clientes é restrito ao Administrador.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-auto p-4 border-t border-white/10">
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 transition-colors w-full px-2">
-            <LogOut className="w-4 h-4" /> Sair
+        <div className="pt-4 border-t border-white/10 mt-auto">
+          <button
+            onClick={() => {
+              const data = {
+                clients: masterClientList,
+                users: users,
+                categories: categories,
+                products: products,
+                backupDate: new Date().toISOString()
+              };
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `rota_vendas_backup_${new Date().toISOString().split('T')[0]}.json`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-green-300 hover:bg-white/5 transition-colors mb-2"
+            title="Salvar cópia de segurança dos dados"
+          >
+            <Download className="w-4 h-4" /> Backup dos Dados
           </button>
+
+          <label className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-blue-300 hover:bg-white/5 transition-colors cursor-pointer" title="Carregar dados de um backup">
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  try {
+                    const json = JSON.parse(event.target?.result as string);
+
+                    // Basic validation
+                    if (!json.clients || !Array.isArray(json.clients)) throw new Error("Arquivo inválido: clientes não encontrados.");
+
+                    if (window.confirm(`Deseja restaurar o backup de ${json.backupDate || 'data desconhecida'}?\nIsso substituirá TODOS os dados atuais (${masterClientList.length} clientes).`)) {
+                      setMasterClientList(json.clients);
+                      if (json.users) setUsers(json.users);
+                      if (json.categories) setCategories(json.categories);
+                      if (json.products) setProducts(json.products);
+
+                      alert("Dados restaurados com sucesso!");
+                    }
+                  } catch (err) {
+                    alert("Erro ao ler arquivo de backup: " + err);
+                  }
+                };
+                reader.readAsText(file);
+                // Reset input value to allow selecting same file again
+                e.target.value = '';
+              }}
+            />
+            <FileUp className="w-4 h-4" /> Restaurar Backup
+          </label>
         </div>
-      </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
 
-        <header className="bg-white border-b border-gray-200 h-16 px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Portal</span>
-            <ChevronRight className="w-4 h-4" />
-            <span className="font-semibold text-blue-600">
-              {activeView === 'map' ? 'Mapa da Carteira' :
-                activeView === 'table' ? 'Listagem de Clientes' :
-                  activeView === 'admin_categories' ? 'Categorias de Clientes' :
-                    activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
-            </span>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-gray-400">
-                {isAdmin ? 'Clientes Visualizados' : 'Meus Clientes'}
-              </p>
-              <p className="text-lg font-bold leading-none">{visibleClients.length}</p>
-            </div>
-            {isAdmin && (
-              <div className="text-right border-l pl-6 border-gray-200">
-                <p className="text-xs text-gray-400">Total Sistema</p>
-                <p className="text-lg font-bold leading-none text-purple-600">{masterClientList.length}</p>
+        {/* Upload Section */}
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <p className="px-3 text-xs font-semibold text-white/40 uppercase mb-3 flex items-center gap-2">
+            <FileUp className="w-3 h-3" /> Carga de Clientes
+          </p>
+
+          {isAdmin ? (
+            <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
+
+              {/* Target Salesperson Selector */}
+              <div>
+                <p className="text-[10px] text-purple-300 font-bold uppercase mb-2">Atribuir Carteira a:</p>
+                <select
+                  className="w-full bg-slate-800 border border-slate-600 rounded text-xs p-2 text-white mb-2 focus:ring-1 focus:ring-purple-500 outline-none"
+                  value={targetUploadUserId}
+                  onChange={(e) => setTargetUploadUserId(e.target.value)}
+                >
+                  <option value="" disabled>Selecione o Vendedor...</option>
+                  {users.filter(u => u.role === 'salesperson').map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
               </div>
-            )}
-          </div>
-        </header>
 
-        {activeView === 'admin_users' && isAdmin ? (
+              {/* Upload Button */}
+              <label className={`flex items-center justify-center w-full px-2 py-3 border border-white/20 border-dashed rounded-lg cursor-pointer hover:bg-white/5 transition-colors ${procState.isActive && procState.status === 'processing' ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex flex-col items-center">
+                  <FileUp className="w-5 h-5 text-purple-400 mb-1" />
+                  <span className="text-[10px] text-white/70">
+                    {procState.isActive && procState.status === 'processing' ? 'Processando...' : 'Carregar CSV (Excel)'}
+                  </span>
+                </div>
+                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={procState.isActive && procState.status === 'processing' || !targetUploadUserId} />
+              </label>
+
+              {/* Clear Data Button */}
+              <button
+                onClick={handleClearClients}
+                className="w-full flex items-center justify-center gap-2 px-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 rounded-lg text-[10px] font-medium transition-colors mt-2"
+                title="Remover todos os clientes do sistema"
+              >
+                <Trash2 className="w-3 h-3" />
+                Limpar Base (Reset Total)
+              </button>
+
+            </div>
+          ) : (
+            <div className="px-3 py-4 bg-white/5 rounded-lg border border-white/10 text-center">
+              <Lock className="w-6 h-6 text-white/30 mx-auto mb-2" />
+              <p className="text-[10px] text-white/50 leading-tight">
+                O upload da carteira de clientes é restrito ao Administrador.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-auto p-4 border-t border-white/10">
+        <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 transition-colors w-full px-2">
+          <LogOut className="w-4 h-4" /> Sair
+        </button>
+      </div>
+    </aside >
+
+    {/* MAIN CONTENT */}
+    < main className="flex-1 flex flex-col h-full relative overflow-hidden" >
+
+      <header className="bg-white border-b border-gray-200 h-16 px-6 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span>Portal</span>
+          <ChevronRight className="w-4 h-4" />
+          <span className="font-semibold text-blue-600">
+            {activeView === 'map' ? 'Mapa da Carteira' :
+              activeView === 'table' ? 'Listagem de Clientes' :
+                activeView === 'admin_categories' ? 'Categorias de Clientes' :
+                  activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
+          </span>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="text-right">
+            <p className="text-xs text-gray-400">
+              {isAdmin ? 'Clientes Visualizados' : 'Meus Clientes'}
+            </p>
+            <p className="text-lg font-bold leading-none">{visibleClients.length}</p>
+          </div>
+          {isAdmin && (
+            <div className="text-right border-l pl-6 border-gray-200">
+              <p className="text-xs text-gray-400">Total Sistema</p>
+              <p className="text-lg font-bold leading-none text-purple-600">{masterClientList.length}</p>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {
+        activeView === 'admin_users' && isAdmin ? (
           <div className="flex-1 overflow-y-auto bg-gray-50">
             <AdminUserManagement
               users={users}
@@ -903,10 +991,12 @@ const App: React.FC = () => {
               )}
             </div>
           </>
-        )}
+        )
+      }
 
-        {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
-        {procState.isActive && (
+      {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
+      {
+        procState.isActive && (
           <div className="absolute bottom-6 right-6 z-50 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden animate-slide-up">
             <div className={`h-1.5 w-full ${procState.status === 'error' ? 'bg-red-200' : 'bg-blue-100'}`}>
               <div
@@ -959,11 +1049,12 @@ const App: React.FC = () => {
               )}
             </div>
           </div>
-        )}
+        )
+      }
 
-      </main>
-    </div>
-  );
+    </main >
+  </div >
+);
 };
 
 export default App;

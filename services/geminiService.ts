@@ -190,6 +190,14 @@ export const processClientsWithAI = async (
         // -----------------------------
 
         // Use valid data or fallbacks
+
+        // Helper to normalize category to array
+        const NormalizeCategory = (cat: any): string[] => {
+          if (Array.isArray(cat)) return cat;
+          if (typeof cat === 'string') return [cat];
+          return ['Outros'];
+        };
+
         allEnriched.push({
           id: id,
           salespersonId: salespersonId,
@@ -198,7 +206,7 @@ export const processClientsWithAI = async (
           contact: contact,
           originalAddress: rawAddress,
           cleanAddress: finalAddress,
-          category: aiData.category || 'Outros',
+          category: NormalizeCategory(aiData.category), // Fix: Call the helper
           region: finalRegion,
           state: finalState,
           city: finalCity,
@@ -259,7 +267,7 @@ export const processClientsWithAI = async (
             contact: contact,
             originalAddress: rawAddress,
             cleanAddress: fallbackAddress,
-            category: 'Outros',
+            category: ['Outros'],
             region: fallbackRegion as any,
             state: fallbackState,
             city: fallbackCity,
