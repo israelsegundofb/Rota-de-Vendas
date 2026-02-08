@@ -3,6 +3,9 @@ export interface RawClient {
   'Nome do Proprietário': string;
   'Contato': string;
   'Endereço': string;
+  'GoogleMapsLink'?: string; // Extracted from =HYPERLINK if present
+  'extractedLat'?: number;
+  'extractedLng'?: number;
 }
 
 export interface Product {
