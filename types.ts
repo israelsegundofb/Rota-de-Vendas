@@ -35,6 +35,7 @@ export interface EnrichedClient {
   lng: number;
   googleMapsUri?: string;
   purchasedProducts?: Product[]; // History of products bought by this client
+  sourceFileId?: string; // ID of the file this client was imported from
 }
 
 export type UserRole = 'admin' | 'salesperson';
@@ -49,5 +50,15 @@ export interface AppUser {
   password?: string; // For mock auth management
   salesCategory?: SalesCategory;
   color?: string; // Color for map pins and UI identification
+}
+
+export interface UploadedFile {
+  id: string;
+  fileName: string;
+  uploadDate: string; // ISO String
+  salespersonId: string;
+  salespersonName: string;
+  type: 'clients' | 'products';
+  itemCount: number;
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EnrichedClient } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
-import { X, Save, MapPin, Store, User, Phone, Tag, AlertCircle, Globe } from 'lucide-react';
+import { X, Save, MapPin, Store, AlertCircle, Globe } from 'lucide-react';
 
 interface AddClientModalProps {
     isOpen: boolean;
@@ -116,7 +116,6 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         onClose();
     };
 
-    return (
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-surface-container-high rounded-[28px] shadow-elevation-3 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">

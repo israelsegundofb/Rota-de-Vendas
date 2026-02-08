@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
-import { RawClient, EnrichedClient, Product } from './types';
+import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
-import { parseCSV } from './utils/csvParser';
-import { parseExcel } from './utils/excelParser';
+import { parseCSV, parseProductCSV } from './utils/csvParser';
+import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress } from './services/geocodingService';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges } from './services/firebaseService';
@@ -113,6 +113,25 @@ const App: React.FC = () => {
 
   // Admin Upload State
   const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
+
+  // File Management State
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(() => {
+    try {
+      const saved = localStorage.getItem('vendas_ai_files');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Persist Uploaded Files
+  useEffect(() => {
+    try {
+      localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles));
+    } catch (e) {
+      console.error("Failed to save uploaded files", e);
+    }
+  }, [uploadedFiles]);
 
   useEffect(() => {
     const initData = async () => {
@@ -522,36 +541,25 @@ const App: React.FC = () => {
     setFilterSalesCategory('Todos');
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !currentUser) return;
+  const handleClientFileDirect = async (file: File, ownerId: string, ownerName: string) => {
+    // CONFIRMATION ALERT (Only if called directly, but maybe we skip for direct calls if UI handles it? 
+    // Let's keep it for safety or rely on caller? 
+    // AdminFileManager might have its own confirm? No, it just calls onUpload.
+    // Let's keep the confirm logic but maybe we need to check if it's already confirmed?
+    // For now, let's keep it simple.
 
-    let ownerId = currentUser.id;
-    let ownerName = currentUser.name;
-
-    if (currentUser.role === 'admin') {
-      if (!targetUploadUserId) {
-        alert("Selecione um vendedor para atribuir esta planilha.");
-        return;
-      }
-      ownerId = targetUploadUserId;
-      const targetUser = users.find(u => u.id === targetUploadUserId);
-      ownerName = targetUser?.name || 'Unknown';
-    }
-
-    // CONFIRMATION ALERT
     if (masterClientList.length > 0) {
       const confirmUpdate = window.confirm(
         "O sistema já possui dados de clientes carregados.\n\n" +
         "Deseja ADICIONAR os novos dados à lista existente?\n" +
         "Clique em OK para continuar ou Cancelar para abortar.\n\n" +
-        "Dica: Para substituir tudo, cancele e use o botão 'Limpar Base de Clientes'."
+        "Dica: Para substituir tudo, cancele e use o botão 'Limpar Base de Clientes' na aba de Admin."
       );
-      if (!confirmUpdate) {
-        event.target.value = ''; // Reset file input
-        return;
-      }
+      if (!confirmUpdate) return;
     }
+
+    // Generate File ID
+    const fileId = crypto.randomUUID();
 
     // Initialize Background Process State
     setProcState({
@@ -562,8 +570,6 @@ const App: React.FC = () => {
       ownerName: ownerName,
       status: 'reading'
     });
-
-    event.target.value = '';
 
     try {
       let rawData: any[] = [];
@@ -586,6 +592,19 @@ const App: React.FC = () => {
 
       if (rawData.length === 0) throw new Error("Arquivo vazio.");
 
+      // Create and Save File Record
+      const newFileRecord: UploadedFile = {
+        id: fileId,
+        fileName: file.name,
+        uploadDate: new Date().toISOString(),
+        salespersonId: ownerId,
+        salespersonName: ownerName,
+        type: 'clients',
+        itemCount: rawData.length
+      };
+
+      setUploadedFiles(prev => [newFileRecord, ...prev]);
+
       setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
 
       const enrichedData = await processClientsWithAI(
@@ -598,19 +617,18 @@ const App: React.FC = () => {
         }
       );
 
-      // Update Master List
-      // Update Master List - APPEND mode (Fixed based on user feedback)
+      // Tag clients with Source File ID
+      const taggedData = enrichedData.map(c => ({
+        ...c,
+        sourceFileId: fileId
+      }));
+
+      // Update Master List - APPEND mode
       setMasterClientList(prev => {
-        // We simply append the new enriched data to the existing list
-        // If we wanted to avoid duplicates based on ID or Name, we'd add logic here.
-        // For now, "juntar-se" implies simple addition.
-        return [...prev, ...enrichedData];
+        return [...prev, ...taggedData];
       });
 
-      if (currentUser.role === 'admin') {
-        // We do NOT change the filter automatically to avoid confusion if multiple uploaded
-        // setFilterSalespersonId(ownerId); 
-      }
+      // We don't automatically switch filter here.
 
       setProcState(prev => ({ ...prev, status: 'completed' }));
 
@@ -621,8 +639,108 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setProcState(prev => ({ ...prev, status: 'error', errorMessage: err.message || "Erro desconhecido" }));
+      // Remove file record if failed
+      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
     }
   };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    let ownerId = currentUser.id;
+    let ownerName = currentUser.name;
+
+    if (currentUser.role === 'admin') {
+      if (!targetUploadUserId) {
+        alert("Selecione um vendedor para atribuir esta planilha.");
+        event.target.value = '';
+        return;
+      }
+      ownerId = targetUploadUserId;
+      const targetUser = users.find(u => u.id === targetUploadUserId);
+      ownerName = targetUser?.name || 'Unknown';
+    }
+
+    await handleClientFileDirect(file, ownerId, ownerName);
+    event.target.value = '';
+  };
+
+
+  const handleDeleteFile = (fileId: string) => {
+    const file = uploadedFiles.find(f => f.id === fileId);
+    if (!file) return;
+
+    if (!window.confirm(`Tem certeza que deseja excluir o arquivo "${file.fileName}"?\n\nIsso removerá todos os ${file.itemCount} registros associados.`)) {
+      return;
+    }
+
+    if (file.type === 'clients') {
+      setMasterClientList(prev => prev.filter(c => c.sourceFileId !== fileId));
+    } else if (file.type === 'products') {
+      // Remove products associated with this file if we had sourceFileId
+      // For now, if we match products by some criteria, we could delete.
+      // Assuming we implement product sourceFileId tracking in handleProductFileUpload
+      // But Product interface doesn't have sourceFileId yet?
+      // Let's assume we won't strictly delete products from the list yet unless we update Product type.
+      // BUT, the user wants to see "Loaded Tables".
+      // Let's update Product type in next step if needed. 
+      // For now, just remove the file record is safe-ish.
+      alert("Nota: A remoção de produtos individuais por arquivo ainda não está totalmente implementada (requer atualização de tipo). Apenas o registro do arquivo será removido.");
+    }
+
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    // alert("Arquivo e dados associados foram removidos.");
+  };
+
+  const handleProductFileUpload = async (file: File) => {
+    // Generate File ID
+    const fileId = crypto.randomUUID();
+
+    setProcState({
+      isActive: true, total: 0, current: 0, fileName: file.name, ownerName: 'Sistema', status: 'reading'
+    });
+
+    try {
+      let newProducts: Product[] = [];
+      const lowerName = file.name.toLowerCase();
+
+      if (lowerName.endsWith('.csv')) {
+        newProducts = await parseProductCSV(file);
+      } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+        newProducts = await parseProductExcel(file);
+      } else {
+        throw new Error("Formato não suportado.");
+      }
+
+      if (newProducts.length === 0) throw new Error("Arquivo vazio.");
+
+      // Create File Record
+      const newFileRecord: UploadedFile = {
+        id: fileId,
+        fileName: file.name,
+        uploadDate: new Date().toISOString(),
+        salespersonId: 'system', // Products are system-wide
+        salespersonName: 'Catálogo Geral',
+        type: 'products',
+        itemCount: newProducts.length
+      };
+
+      setUploadedFiles(prev => [newFileRecord, ...prev]);
+
+      // Update Products List
+      handleUploadProducts(newProducts);
+
+      setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
+      alert(`${newProducts.length} produtos importados com sucesso.`);
+
+    } catch (e: any) {
+      console.error(e);
+      setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
+      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    }
+  };
+
 
   if (!currentUser) {
     return <LoginScreen users={users} onLogin={handleLogin} />;
@@ -942,6 +1060,52 @@ const App: React.FC = () => {
                 onUploadProducts={handleUploadProducts}
                 onClearProducts={handleClearProducts}
                 onSaveProducts={handleSaveProducts} // Pass save handler
+              />
+            </div>
+          ) : activeView === 'admin_files' && isAdmin ? (
+            <div className="flex-1 overflow-y-auto bg-gray-50">
+              <AdminFileManager
+                users={users}
+                uploadedFiles={uploadedFiles}
+                onUploadClients={(file, targetId) => {
+                  // Initial wrapper to adapt to handleFileUpload structure
+                  // We need to set targetUploadUserId state temporarily or refactor handleFileUpload
+                  setTargetUploadUserId(targetId);
+                  // Simulate event
+                  // Check if handleFileUpload uses targetUploadUserId state or if we can pass it?
+                  // handleFileUpload uses state `targetUploadUserId`.
+                  // So we set it, then call. But setState is async.
+                  // Better: Refactor handleFileUpload to accept optional targetOverride.
+                  // For now, let's call it directly with a small hack or verify if AdminFileManager sets the state?
+                  // Actually AdminFileManager UI has the dropdown. 
+                  // App.tsx's handleFileUpload (via input) relies on App.tsx state.
+                  // AdminFileManager has its OWN input and state.
+                  // If AdminFileManager calls this prop, it passes the file and targetId.
+
+                  // Helper to trigger logic:
+                  // We can't easily reuse handleFileUpload as is without refactoring.
+                  // Let's assume for this step I will Refactor handleFileUpload to take args in next step or use a workaround.
+                  // Workaround: 
+                  const fakeEvent = { target: { files: [file], value: '' } } as any;
+                  // We need to force targetUploadUserId to be targetId.
+                  // Since state update is async, this might fail.
+
+                  // CORRECT APPROACH: Refactor handleFileUpload to accept (file, userId).
+                  // But I can't do that inside this replacement string.
+
+                  // SAFE APPROACH FOR NOW: Just pass the file and rely on App.state? 
+                  // NO, AdminFileManager passes `targetId`.
+
+                  // I will implement a bridge function in App.tsx body later.
+                  // For now, I'll pass a placeholder or try to use handleFileUpload if I update it.
+                  // I will call `handleClientFileDirect(file, targetId)` which I will add.
+                  const targetUser = users.find(u => u.id === targetId);
+                  const targetName = targetUser?.name || 'Unknown';
+                  handleClientFileDirect(file, targetId, targetName);
+                }}
+                onUploadProducts={handleProductFileUpload}
+                onDeleteFile={handleDeleteFile}
+                procState={procState}
               />
             </div>
           ) : (

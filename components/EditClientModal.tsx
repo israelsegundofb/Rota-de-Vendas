@@ -47,7 +47,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     };
 
     return (
-    return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-surface-container-high w-full max-w-2xl rounded-[28px] shadow-elevation-3 overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
 

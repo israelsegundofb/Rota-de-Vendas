@@ -30,7 +30,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
     setSalesCategory('Externo');
   };
 
-  const handleEditClick = (user: UserType) => {
+  const handleEditClick = (user: AppUser) => {
     setEditingId(user.id);
     setName(user.name);
     setUsername(user.username);
@@ -38,7 +38,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
     setRole(user.role);
     setSalesCategory(user.salesCategory || 'N/A');
 
-    // Scroll to form top (optional, but good UX)
+    // Scroll to form top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -67,7 +67,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
   // Filter Users
   const filteredUsers = users.filter(user => {
     if (filterType === 'Todos') return true;
-    if (user.role === 'admin') return false; // Admins don't have sales categories usually
+    if (user.role === 'admin') return false;
     return user.salesCategory === filterType;
   });
 
@@ -77,59 +77,59 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
     <div className="p-6 max-w-5xl mx-auto space-y-8 animate-fade-in pb-20">
 
       {/* Create/Edit User Section */}
-      <div className={`bg-white rounded-xl shadow-sm border ${editingId ? 'border-orange-200 ring-4 ring-orange-50' : 'border-gray-200'} p-6 transition-all`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-lg font-bold flex items-center gap-2 ${editingId ? 'text-orange-600' : 'text-gray-800'}`}>
-            {editingId ? <Pencil className="w-5 h-5" /> : <UserPlus className="w-5 h-5 text-blue-600" />}
+      <div className={`bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 transition-all border ${editingId ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className={`text-xl font-normal flex items-center gap-2 ${editingId ? 'text-primary' : 'text-on-surface'}`}>
+            {editingId ? <Pencil className="w-5 h-5" /> : <UserPlus className="w-5 h-5 text-primary" />}
             {editingId ? 'Editar Usuário' : 'Cadastrar Novo Usuário'}
           </h2>
           {editingId && (
-            <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            <button onClick={resetForm} className="text-sm text-on-surface-variant hover:text-on-surface flex items-center gap-1">
               <X className="w-4 h-4" /> Cancelar Edição
             </button>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Nome Completo</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Nome Completo</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
               placeholder="Ex: Carlos Oliveira"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Usuário de Login</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Usuário de Login</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
               placeholder="Ex: vendedor_carlos"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Senha</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Senha</label>
             <input
               type="text"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
               placeholder="Senha de acesso"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Perfil de Acesso</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Perfil de Acesso</label>
             <select
               value={role}
               onChange={e => setRole(e.target.value as any)}
-              className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none cursor-pointer"
             >
               <option value="salesperson">Vendedor</option>
               <option value="admin">Administrador</option>
@@ -138,11 +138,11 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
 
           {role === 'salesperson' && (
             <div className="animate-fade-in">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Categoria de Venda</label>
+              <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Categoria de Venda</label>
               <select
                 value={salesCategory}
                 onChange={e => setSalesCategory(e.target.value as SalesCategory)}
-                className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none cursor-pointer"
               >
                 <option value="Externo">Externo</option>
                 <option value="Interno">Interno</option>
@@ -155,8 +155,10 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
             <button
               type="submit"
               disabled={!name || !username || !password}
-              className={`px-6 py-2 rounded-lg text-white font-semibold transition-colors flex items-center gap-2 ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'
-                } disabled:bg-gray-300 disabled:cursor-not-allowed`}
+              className={`px-6 py-2.5 rounded-full font-medium transition-all shadow-elevation-1 hover:shadow-elevation-2 flex items-center gap-2 ${editingId
+                  ? 'bg-primary-container text-on-primary-container hover:bg-primary-container/80'
+                  : 'bg-primary text-on-primary hover:bg-primary/90'
+                } disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none`}
             >
               {editingId ? <Save className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
               {editingId ? 'Salvar Alterações' : 'Criar Acesso'}
@@ -166,20 +168,22 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
       </div>
 
       {/* List Users Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-gray-600" />
+      <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 overflow-hidden">
+        <div className="p-6 border-b border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-xl font-normal text-on-surface flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
             Usuários Ativos
           </h2>
 
           {/* Filters */}
-          <div className="flex bg-gray-100 p-1 rounded-lg">
+          <div className="flex bg-surface-container-highest p-1 rounded-full">
             {categoryTabs.map(tab => (
               <button
                 key={tab}
                 onClick={() => setFilterType(tab)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterType === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all ${filterType === tab
+                    ? 'bg-white text-on-surface shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
                   }`}
               >
                 {tab}
@@ -190,45 +194,47 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+            <thead className="text-xs text-on-surface-variant uppercase bg-surface-container-highest/50">
               <tr>
-                <th className="px-6 py-3">Nome</th>
-                <th className="px-6 py-3">Usuário</th>
-                <th className="px-6 py-3">Função</th>
-                <th className="px-6 py-3">Categoria</th>
-                <th className="px-6 py-3">Senha</th>
-                <th className="px-6 py-3 text-right">Ações</th>
+                <th className="px-6 py-4 font-medium">Nome</th>
+                <th className="px-6 py-4 font-medium">Usuário</th>
+                <th className="px-6 py-4 font-medium">Função</th>
+                <th className="px-6 py-4 font-medium">Categoria</th>
+                <th className="px-6 py-4 font-medium">Senha</th>
+                <th className="px-6 py-4 font-medium text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-outline-variant/30">
               {filteredUsers.map(user => (
-                <tr key={user.id} className={`hover:bg-gray-50 ${editingId === user.id ? 'bg-orange-50' : ''}`}>
-                  <td className="px-6 py-3 font-medium text-gray-900">{user.name}</td>
-                  <td className="px-6 py-3 text-gray-600">{user.username}</td>
-                  <td className="px-6 py-3">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
+                <tr key={user.id} className={`hover:bg-surface-container-highest/30 transition-colors ${editingId === user.id ? 'bg-primary-container/30' : ''}`}>
+                  <td className="px-6 py-4 font-medium text-on-surface">{user.name}</td>
+                  <td className="px-6 py-4 text-on-surface-variant">{user.username}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${user.role === 'admin'
+                        ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                        : 'bg-secondary-container text-on-secondary-container border-secondary-container'
                       }`}>
                       {user.role === 'admin' ? 'Admin' : 'Vendedor'}
                     </span>
                   </td>
-                  <td className="px-6 py-3">
+                  <td className="px-6 py-4">
                     {user.role === 'salesperson' ? (
-                      <span className="flex items-center gap-1 text-xs text-gray-600">
-                        <Briefcase className="w-3 h-3" />
+                      <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+                        <Briefcase className="w-3.5 h-3.5" />
                         {user.salesCategory || 'N/A'}
                       </span>
                     ) : (
-                      <span className="text-gray-300">-</span>
+                      <span className="text-outline-variant">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-3 font-mono text-gray-400">
+                  <td className="px-6 py-4 font-mono text-on-surface-variant/70 text-xs">
                     {user.password || '***'}
                   </td>
-                  <td className="px-6 py-3 text-right">
+                  <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleEditClick(user)}
-                        className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                        className="p-2 text-primary hover:bg-primary-container/30 rounded-full transition-colors"
                         title="Editar"
                       >
                         <Pencil className="w-4 h-4" />
@@ -237,7 +243,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
                       {user.username !== 'admin' && (
                         <button
                           onClick={() => onDeleteUser(user.id)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                          className="p-2 text-error hover:bg-error-container/30 rounded-full transition-colors"
                           title="Remover"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -249,7 +255,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
               ))}
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">
                     Nenhum usuário encontrado para este filtro.
                   </td>
                 </tr>

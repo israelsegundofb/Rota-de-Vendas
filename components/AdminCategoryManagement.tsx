@@ -7,10 +7,10 @@ interface AdminCategoryManagementProps {
   onDeleteCategory: (category: string) => void;
 }
 
-const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({ 
-  categories, 
-  onAddCategory, 
-  onDeleteCategory 
+const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({
+  categories,
+  onAddCategory,
+  onDeleteCategory
 }) => {
   const [newCategory, setNewCategory] = useState('');
 
@@ -23,31 +23,31 @@ const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-8 animate-fade-in">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-blue-600" />
+    <div className="p-6 max-w-4xl mx-auto space-y-6 animate-fade-in pb-20">
+      <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 border border-transparent">
+        <h2 className="text-xl font-normal text-on-surface mb-2 flex items-center gap-2">
+          <Layers className="w-5 h-5 text-primary" />
           Gerenciar Categorias de Produtos
         </h2>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-on-surface-variant mb-6">
           Defina as categorias que a Inteligência Artificial utilizará para classificar os novos clientes importados.
         </p>
-        
+
         <form onSubmit={handleSubmit} className="flex gap-3 mb-8">
           <div className="relative flex-1">
-            <Tag className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            <input 
-              type="text" 
+            <Tag className="absolute left-3 top-3 h-5 w-5 text-on-surface-variant" />
+            <input
+              type="text"
               value={newCategory}
               onChange={e => setNewCategory(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border-b border-outline-variant rounded-t-lg text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors placeholder:text-on-surface-variant/50"
               placeholder="Nova Categoria (ex: Auto Elétrica)"
             />
           </div>
-          <button 
+          <button
             type="submit"
             disabled={!newCategory.trim()}
-            className="bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="bg-primary text-on-primary font-medium px-6 py-2.5 rounded-full hover:bg-primary/90 disabled:bg-on-surface/12 disabled:text-on-surface/38 disabled:cursor-not-allowed transition-all shadow-elevation-1 hover:shadow-elevation-2 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Adicionar
           </button>
@@ -55,17 +55,17 @@ const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {categories.map((category) => (
-            <div 
-              key={category} 
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-blue-200 transition-colors"
+            <div
+              key={category}
+              className="flex items-center justify-between p-3 pl-4 bg-surface-container-highest/50 rounded-xl border border-outline-variant/50 group hover:border-primary/50 transition-colors"
             >
-              <span className="font-medium text-gray-700 flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+              <span className="font-medium text-on-surface flex items-center gap-2">
+                <div className="w-2 h-2 bg-primary rounded-full"></div>
                 {category}
               </span>
-              <button 
+              <button
                 onClick={() => onDeleteCategory(category)}
-                className="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                className="text-on-surface-variant hover:text-error p-2 rounded-full hover:bg-error-container/30 transition-all opacity-0 group-hover:opacity-100"
                 title="Remover Categoria"
               >
                 <Trash2 className="w-4 h-4" />
@@ -74,7 +74,7 @@ const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({
           ))}
 
           {categories.length === 0 && (
-            <div className="col-span-full py-8 text-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <div className="col-span-full py-12 text-center text-on-surface-variant bg-surface-container-low rounded-[16px] border border-dashed border-outline-variant/50">
               Nenhuma categoria definida. Adicione categorias acima.
             </div>
           )}
