@@ -157,97 +157,72 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto bg-white flex-1 custom-scrollbar relative">
+      {/* MD3 LIST/CARDS */}
+      <div className="overflow-x-auto bg-surface flex-1 custom-scrollbar relative p-4">
         {filteredClients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center text-gray-400 animate-fade-in">
-            <div className="bg-gray-100 p-4 rounded-full mb-3">
+          <div className="flex flex-col items-center justify-center p-12 text-center text-on-surface-variant animate-fade-in">
+            <div className="bg-surface-container-highest p-4 rounded-full mb-3">
               <Search className="w-8 h-8 opacity-50" />
             </div>
             <p className="text-sm">Nenhum cliente encontrado com os filtros atuais.</p>
           </div>
         ) : (
-          <table className="w-full text-sm text-left text-gray-600">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50/80 border-b border-gray-100 sticky top-0 z-10 backdrop-blur-sm">
-              <tr>
-                <th className="px-6 py-3 font-semibold tracking-wider">Cód/ID</th>
-                <th className="px-6 py-3 font-semibold tracking-wider">Cliente / Razão Social</th>
-                <th className="px-6 py-3 font-semibold tracking-wider">Proprietário</th>
-                <th className="px-6 py-3 font-semibold tracking-wider">Localização</th>
-                <th className="px-6 py-3 font-semibold tracking-wider">Região</th>
-                <th className="px-6 py-3 font-semibold tracking-wider">Segmento</th>
-                <th className="px-6 py-3 text-center font-semibold tracking-wider">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredClients.map((client) => (
-                <tr key={client.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="px-6 py-4 font-mono text-[10px] text-gray-400">{client.id}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                        <Store className="w-4 h-4" />
-                      </div>
-                      <span className="font-bold text-gray-800 leading-tight">{client.companyName}</span>
+          <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+            {filteredClients.map((client) => (
+              <div key={client.id} className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-0">
+                  <span className={`px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider
+                        ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
+                      client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
+                        client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
+                          client.region === 'Norte' ? 'bg-green-100 text-green-800' :
+                            'bg-yellow-100 text-yellow-800'}
+                      `}>
+                    {client.region}
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-4 pr-12">
+                  <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg shrink-0">
+                    {client.companyName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-on-surface truncate pr-2">{client.companyName}</h3>
+                    <div className="flex items-center gap-1 text-xs text-on-surface-variant mt-0.5">
+                      <Tag className="w-3 h-3" />
+                      <span className="truncate">{client.category.join(', ')}</span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-gray-600 font-medium">{client.ownerName}</td>
-                  <td className="px-6 py-4">
-                    <a
-                      href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-gray-500 hover:text-blue-600 transition-colors group/link"
-                    >
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span className="max-w-[150px] truncate block group-hover/link:underline">{client.city} - {client.state}</span>
-                      <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                    </a>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border
-                      ${client.region === 'Nordeste' ? 'bg-orange-50 text-orange-700 border-orange-100' :
-                        client.region === 'Sudeste' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                          client.region === 'Sul' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                            client.region === 'Norte' ? 'bg-green-50 text-green-700 border-green-100' :
-                              'bg-yellow-50 text-yellow-700 border-yellow-100'}
-                    `}>
-                      {client.region}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {client.category.map((cat, idx) => (
-                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold border border-slate-200">
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openEditModal(client)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        title="Editar Dados"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <a
-                        href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                        title="Ver no Maps"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+                    <Store className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{client.ownerName}</span>
+                  </div>
+                  <a
+                    href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors group/link"
+                  >
+                    <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="line-clamp-2 group-hover/link:underline">{client.cleanAddress}</span>
+                    <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity ml-auto" />
+                  </a>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => openEditModal(client)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/30 rounded-full transition-colors"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Editar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

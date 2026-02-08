@@ -47,77 +47,78 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     };
 
     return (
+    return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-in">
-                {/* Header */}
-                <div className="bg-slate-800 p-6 flex justify-between items-center text-white">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-600 rounded-lg">
-                            <Store className="w-5 h-5" />
+            <div className="bg-surface-container-high w-full max-w-2xl rounded-[28px] shadow-elevation-3 overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
+
+                {/* Header (MD3) */}
+                <div className="p-6 pb-2 flex justify-between items-start shrink-0">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Store className="w-5 h-5 text-primary" />
+                            <span className="text-xs font-bold text-primary uppercase tracking-wider">Editando</span>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-white">Editar Cliente</h2>
-                            <p className="text-xs text-slate-400">ID: {client.id}</p>
-                        </div>
+                        <h2 className="text-2xl font-normal text-on-surface">Dados do Cliente</h2>
+                        <p className="text-xs text-on-surface-variant mt-1 font-mono">{client.id}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2 text-on-surface-variant hover:bg-surface-variant/30 rounded-full transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Razão Social */}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                <Store className="w-3 h-3" /> Razão Social
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                Razão Social
                             </label>
                             <input
                                 type="text"
                                 name="companyName"
                                 value={formData.companyName}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                                 required
                             />
                         </div>
 
                         {/* Proprietário */}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                <User className="w-3 h-3" /> Proprietário
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                Proprietário
                             </label>
                             <input
                                 type="text"
                                 name="ownerName"
                                 value={formData.ownerName}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                                 required
                             />
                         </div>
 
                         {/* Contato */}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                <Phone className="w-3 h-3" /> Contato
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                Contato
                             </label>
                             <input
                                 type="text"
                                 name="contact"
                                 value={formData.contact}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                             />
                         </div>
 
                         {/* Categoria/Segmento - MULTI SELECT */}
                         <div className="md:col-span-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 mb-2">
-                                <Tag className="w-3 h-3" /> Segmento(s)
+                            <label className="text-xs font-medium text-on-surface-variant ml-1 mb-2 block">
+                                Segmento(s)
                             </label>
-                            <div className="flex flex-wrap gap-2 p-2 border border-gray-300 rounded-lg bg-gray-50 max-h-32 overflow-y-auto custom-scrollbar">
+                            <div className="flex flex-wrap gap-2 p-3 border border-outline-variant rounded-xl bg-surface-container-low max-h-32 overflow-y-auto custom-scrollbar">
                                 {CATEGORIES.filter(c => c !== 'Todos').map(cat => {
                                     const isSelected = formData.category.includes(cat);
                                     return (
@@ -135,9 +136,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                                     }
                                                 });
                                             }}
-                                            className={`px-2 py-1 text-[10px] font-bold rounded-md border transition-all ${isSelected
-                                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                                : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                            className={`px-3 py-1 text-xs font-medium rounded-lg transition-all border ${isSelected
+                                                ? 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                                                : 'bg-surface text-on-surface-variant border-outline-variant hover:border-outline'
                                                 }`}
                                         >
                                             {cat}
@@ -149,40 +150,43 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
 
                         {/* Região */}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                <Globe className="w-3 h-3" /> Região
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                Região
                             </label>
-                            <select
-                                name="region"
-                                value={formData.region}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                            >
-                                <option value="Indefinido">Indefinido</option>
-                                {REGIONS.map(reg => (
-                                    <option key={reg} value={reg}>{reg}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <select
+                                    name="region"
+                                    value={formData.region}
+                                    onChange={handleChange}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all appearance-none"
+                                >
+                                    <option value="Indefinido">Indefinido</option>
+                                    {REGIONS.map(reg => (
+                                        <option key={reg} value={reg}>{reg}</option>
+                                    ))}
+                                </select>
+                                <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
+                            </div>
                         </div>
 
                         {/* Município */}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                <MapPin className="w-3 h-3" /> Município
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                Município
                             </label>
                             <input
                                 type="text"
                                 name="city"
                                 value={formData.city}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                             />
                         </div>
 
                         {/* UF */}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                <MapPin className="w-3 h-3" /> UF
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                UF
                             </label>
                             <input
                                 type="text"
@@ -190,38 +194,38 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 maxLength={2}
                                 value={formData.state}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all uppercase"
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all uppercase"
                             />
                         </div>
                     </div>
 
                     <div className="space-y-1 pt-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                            <MapPin className="w-3 h-3" /> Endereço Completo
+                        <label className="text-xs font-medium text-on-surface-variant ml-1">
+                            Endereço Completo
                         </label>
                         <input
                             type="text"
                             name="cleanAddress"
                             value={formData.cleanAddress}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                            className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                         />
                     </div>
                 </form>
 
                 {/* Footer */}
-                <div className="bg-gray-50 p-6 border-t border-gray-100 flex justify-end gap-3">
+                <div className="p-6 pt-2 flex justify-end gap-2 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition-colors"
+                        className="px-6 py-2.5 text-primary font-medium hover:bg-primary-container/30 rounded-full transition-colors text-sm"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         onClick={handleSubmit}
-                        className="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors flex items-center gap-2 shadow-md shadow-slate-200"
+                        className="px-6 py-2.5 bg-primary text-on-primary font-medium rounded-full hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-elevation-1 hover:shadow-elevation-2 text-sm"
                     >
                         <Save className="w-4 h-4" /> Salvar Alterações
                     </button>
