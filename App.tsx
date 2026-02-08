@@ -4,6 +4,7 @@ import { RawClient, EnrichedClient, Product } from './types';
 import type { AppUser } from './types';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
 import { parseCSV } from './utils/csvParser';
+import { parseExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress } from './services/geocodingService';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from './services/firebaseService';
@@ -534,7 +535,19 @@ const App: React.FC = () => {
     event.target.value = '';
 
     try {
-      const rawData = await parseCSV(file);
+      let rawData: any[] = [];
+      const lowerName = file.name.toLowerCase();
+
+      if (lowerName.endsWith('.csv')) {
+        rawData = await parseCSV(file);
+      } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+        rawData = await parseExcel(file);
+      } else {
+        throw new Error("Formato não suportado. Use .csv, .xlsx ou .xls");
+      }
+
+      console.log('Parsed Items Count:', rawData.length); // DEBUG
+      if (rawData.length > 0) console.log('Sample Parsed Item:', rawData[0]); // DEBUG
 
       if (rawData.length === 0) throw new Error("Arquivo vazio.");
 
