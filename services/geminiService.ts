@@ -168,6 +168,58 @@ export const processClientsWithAI = async (
         } else {
           console.error(`Failed to process client ${i}`, error);
           // Fallback to avoid breaking the whole list
+
+          // Try to recover with Geocoding API even if Gemini failed
+          let fallbackLat = 0;
+          let fallbackLng = 0;
+          let fallbackAddress = rawAddress;
+          let fallbackCity = 'Erro Proc.';
+          let fallbackState = 'BR';
+          let fallbackRegion = 'Indefinido';
+
+          if (rawAddress && apiKey) {
+            try {
+              // We can't await inside this catch block without refactoring, 
+              // but we are in an async function so actually we CAN await.
+              // Note: This adds latency to the error path but saves data quality.
+              console.log(`Attempting fallback geocoding for failed client ${i}...`);
+              // Assuming geocodeAddress is imported. It is.
+              // We need to fetch it again if we want to be safe, but it's imported at top.
+              const geoResult = await geocodeAddress(rawAddress, apiKey);
+              if (geoResult) {
+                fallbackLat = geoResult.lat;
+                fallbackLng = geoResult.lng;
+                if (geoResult.formattedAddress) fallbackAddress = geoResult.formattedAddress;
+
+                // Try to extract city/state from formatted address roughly
+                // "Rua X, Bairro, Cidade - UF, CEP"
+                const parts = fallbackAddress.split('-');
+                if (parts.length > 1) {
+                  const ufPart = parts[parts.length - 1].trim().split(' ')[0]; // UF usually start of last part
+                  if (ufPart.length === 2) fallbackState = ufPart;
+
+                  const cityPart = parts[parts.length - 2]?.trim().split(',').pop()?.trim(); // City usually before UF
+                  if (cityPart) fallbackCity = cityPart;
+                }
+
+                // Infer region from State
+                const nordeste = ['MA', 'PI', 'CE', 'RN', 'PB', 'PE', 'AL', 'SE', 'BA'];
+                const norte = ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'];
+                const centroOeste = ['GO', 'MT', 'MS', 'DF'];
+                const sudeste = ['ES', 'MG', 'RJ', 'SP'];
+                const sul = ['PR', 'SC', 'RS'];
+
+                if (nordeste.includes(fallbackState)) fallbackRegion = 'Nordeste';
+                else if (norte.includes(fallbackState)) fallbackRegion = 'Norte';
+                else if (centroOeste.includes(fallbackState)) fallbackRegion = 'Centro-Oeste';
+                else if (sudeste.includes(fallbackState)) fallbackRegion = 'Sudeste';
+                else if (sul.includes(fallbackState)) fallbackRegion = 'Sul';
+              }
+            } catch (e) {
+              // Ignore fallback error
+            }
+          }
+
           allEnriched.push({
             id: id,
             salespersonId: salespersonId,
@@ -175,13 +227,13 @@ export const processClientsWithAI = async (
             ownerName: owner,
             contact: contact,
             originalAddress: rawAddress,
-            cleanAddress: address,
+            cleanAddress: fallbackAddress,
             category: 'Outros',
-            region: 'Indefinido',
-            state: 'BR',
-            city: 'Erro Proc.',
-            lat: 0,
-            lng: 0
+            region: fallbackRegion as any,
+            state: fallbackState,
+            city: fallbackCity,
+            lat: fallbackLat,
+            lng: fallbackLng
           });
           success = true;
         }

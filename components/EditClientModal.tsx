@@ -12,6 +12,10 @@ interface EditClientModalProps {
 const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave }) => {
     const [formData, setFormData] = useState<EnrichedClient>({ ...client });
 
+    React.useEffect(() => {
+        setFormData({ ...client });
+    }, [client]);
+
     if (!isOpen) return null;
 
     const handleSubmit = (e: React.FormEvent) => {
