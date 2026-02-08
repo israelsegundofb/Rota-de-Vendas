@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { EnrichedClient, RawClient } from "../types";
 import { cleanAddress } from "../utils/csvParser";
+import { geocodeAddress } from "./geocodingService";
 
 // Use batch size 1 to ensure accurate association of Maps Grounding metadata (URIs) to specific clients.
 const BATCH_SIZE = 1;
@@ -104,6 +105,36 @@ export const processClientsWithAI = async (
           }
         }
 
+        // --- GEOCODING ENHANCEMENT ---
+        // Prioritize coordinates from CSV (hyperlink), then Geocoding API, then Gemini fallback.
+        let finalLat = client['extractedLat'] || (typeof aiData.lat === 'number' ? aiData.lat : 0);
+        let finalLng = client['extractedLng'] || (typeof aiData.lng === 'number' ? aiData.lng : 0);
+        let finalAddress = aiData.cleanAddress || address;
+
+        // If CSV didn't provide coords, try robust Geocoding API
+        if (!client['extractedLat']) {
+          // Prefer the address cleaned/verified by Gemini, or fallback to raw
+          const addressToGeocode = finalAddress || rawAddress;
+
+          // Only geocode if we have a somewhat valid address string
+          if (addressToGeocode && addressToGeocode.length > 5) {
+            try {
+              const geocodeResult = await geocodeAddress(addressToGeocode, apiKey);
+              if (geocodeResult) {
+                finalLat = geocodeResult.lat;
+                finalLng = geocodeResult.lng;
+                // Use the official formatted address from Google Maps if available
+                if (geocodeResult.formattedAddress) {
+                  finalAddress = geocodeResult.formattedAddress;
+                }
+              }
+            } catch (geoError) {
+              console.warn(`Geocoding failed for ${client['Razão Social']}`, geoError);
+            }
+          }
+        }
+        // -----------------------------
+
         // Use valid data or fallbacks
         allEnriched.push({
           id: id,
@@ -112,13 +143,13 @@ export const processClientsWithAI = async (
           ownerName: owner,
           contact: contact,
           originalAddress: rawAddress,
-          cleanAddress: aiData.cleanAddress || address,
+          cleanAddress: finalAddress,
           category: aiData.category || 'Outros',
           region: aiData.region || 'Indefinido',
           state: aiData.state || 'BR',
           city: aiData.city || 'Desconhecido',
-          lat: client['extractedLat'] || (typeof aiData.lat === 'number' ? aiData.lat : 0),
-          lng: client['extractedLng'] || (typeof aiData.lng === 'number' ? aiData.lng : 0),
+          lat: finalLat,
+          lng: finalLng,
           googleMapsUri: client['GoogleMapsLink'] || googleMapsUri // PRIORITIZE CSV EXACT LINK
         });
 
