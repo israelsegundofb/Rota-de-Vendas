@@ -17,7 +17,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
         ownerName: '',
         contact: '',
         address: '',
-        category: '',
+        categories: [] as string[],
         salespersonId: ''
     });
 
@@ -30,7 +30,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
                 ownerName: client.ownerName || '',
                 contact: client.contact || '',
                 address: client.cleanAddress || client.originalAddress || '',
-                category: client.category || CATEGORIES[1],
+                categories: client.categories || [CATEGORIES[1]],
                 salespersonId: client.salespersonId || ''
             });
         }
@@ -50,7 +50,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
             ownerName: formData.ownerName,
             contact: formData.contact,
             cleanAddress: formData.address, // For now, we update the display address. Re-geocoding would require async logic similar to Add.
-            category: formData.category,
+            categories: formData.categories,
             salespersonId: formData.salespersonId
         };
 
@@ -138,13 +138,17 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, onSa
 
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                            <Tag className="w-4 h-4 text-gray-400" /> Categoria Principal
+                            <Tag className="w-4 h-4 text-gray-400" /> Categorias (Segure Ctrl para selecionar múltiplas)
                         </label>
                         <select
-                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
-                            value={formData.category}
-                            onChange={e => setFormData({ ...formData, category: e.target.value })}
-                            aria-label="Selecionar Categoria"
+                            multiple
+                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer min-h-[100px]"
+                            value={formData.categories}
+                            onChange={e => {
+                                const selected = Array.from(e.target.selectedOptions).map(opt => (opt as HTMLOptionElement).value);
+                                setFormData({ ...formData, categories: selected });
+                            }}
+                            aria-label="Selecionar Categorias"
                         >
                             {CATEGORIES.filter(c => c !== 'Todos').map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
