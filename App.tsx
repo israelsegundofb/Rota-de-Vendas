@@ -16,9 +16,9 @@ import EditClientModal from './components/EditClientModal';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminCategoryManagement from './components/AdminCategoryManagement';
 import AdminProductManagement from './components/AdminProductManagement';
-import AdminProductManagement from './components/AdminProductManagement';
 import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
+import AdminFileManager from './components/AdminFileManager';
 
 
 // Initial Mock Data
@@ -92,7 +92,7 @@ const App: React.FC = () => {
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
-  const [activeView, setActiveView] = useState<'map' | 'table' | 'admin_users' | 'admin_categories' | 'admin_products'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'table' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files'>('map');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
@@ -693,6 +693,12 @@ const App: React.FC = () => {
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_products' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
               >
                 <Package className="w-4 h-4" /> Catálogo de Produtos
+              </button>
+              <button
+                onClick={() => setActiveView('admin_files')}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_files' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
+              >
+                <FileUp className="w-4 h-4" /> Gerenciar Arquivos
               </button>
             </nav>
           )}
