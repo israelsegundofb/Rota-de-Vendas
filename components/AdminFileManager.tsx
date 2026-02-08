@@ -8,6 +8,7 @@ interface AdminFileManagerProps {
     onUploadClients: (file: File, targetUserId: string) => void;
     onUploadProducts: (file: File) => void;
     onDeleteFile: (fileId: string) => void;
+    onReassignSalesperson?: (fileId: string, newSalespersonId: string) => void;
     procState?: {
         isActive: boolean;
         status: 'reading' | 'processing' | 'completed' | 'error';
@@ -21,6 +22,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
     onUploadClients,
     onUploadProducts,
     onDeleteFile,
+    onReassignSalesperson,
     procState = { isActive: false, status: 'completed', errorMessage: '' }
 }) => {
     const [activeTab, setActiveTab] = useState<'clients' | 'products'>('clients');
@@ -205,8 +207,8 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                     {/* Icon & Details */}
                                     <div className="flex items-start gap-4 flex-1">
                                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${file.status === 'error' ? 'bg-error-container text-error' :
-                                                file.status === 'processing' ? 'bg-surface-container-high text-primary animate-pulse' :
-                                                    'bg-surface-container-high text-primary'
+                                            file.status === 'processing' ? 'bg-surface-container-high text-primary animate-pulse' :
+                                                'bg-surface-container-high text-primary'
                                             }`}>
                                             {file.status === 'processing' ? <Loader2 className="w-5 h-5 animate-spin" /> :
                                                 file.status === 'error' ? <AlertCircle className="w-5 h-5" /> :
@@ -238,17 +240,30 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Owner Info (Only for clients) */}
+                                    {/* Owner Info with Reassignment (Only for clients) */}
                                     {activeTab === 'clients' && (
-                                        <div className="flex items-center gap-3 sm:border-l sm:border-r border-outline-variant/30 sm:px-6 sm:w-48 shrink-0">
-                                            <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary">
-                                                {file.salespersonName?.charAt(0) || '?'}
+                                        <div className="flex items-center gap-3 sm:border-l sm:border-r border-outline-variant/30 sm:px-4 sm:w-56 shrink-0">
+                                            <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                                {(() => {
+                                                    const user = users.find(u => u.id === file.salespersonId);
+                                                    return user?.name?.charAt(0) || '?';
+                                                })()}
                                             </div>
-                                            <div className="truncate">
-                                                <p className="text-xs font-medium text-on-surface truncate" title={file.salespersonName}>
-                                                    {file.salespersonName}
-                                                </p>
-                                                <p className="text-[10px] text-on-surface-variant">Responsável</p>
+                                            <div className="min-w-0 flex-1">
+                                                <select
+                                                    value={file.salespersonId}
+                                                    onChange={(e) => onReassignSalesperson?.(file.id, e.target.value)}
+                                                    className="w-full text-xs font-medium bg-transparent border border-outline-variant/50 rounded-md px-2 py-1 text-on-surface hover:bg-surface-container-highest focus:ring-2 focus:ring-primary focus:border-primary outline-none cursor-pointer"
+                                                    disabled={file.status === 'processing'}
+                                                >
+                                                    <option value="" className="bg-surface text-on-surface">None</option>
+                                                    {users.filter(u => u.role === 'salesperson').map(u => (
+                                                        <option key={u.id} value={u.id} className="bg-surface text-on-surface">
+                                                            {u.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-[10px] text-on-surface-variant mt-0.5">Responsável</p>
                                             </div>
                                         </div>
                                     )}

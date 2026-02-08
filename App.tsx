@@ -231,6 +231,14 @@ const App: React.FC = () => {
   };
 
   const handleDeleteUser = (userId: string) => {
+    // Update uploaded files from this user to show as orphaned
+    setUploadedFiles(prev => prev.map(f =>
+      f.salespersonId === userId
+        ? { ...f, salespersonId: '', salespersonName: 'None' }
+        : f
+    ));
+
+    // Remove the user
     setUsers(users.filter(u => u.id !== userId));
   };
 
@@ -695,6 +703,35 @@ const App: React.FC = () => {
     // alert("Arquivo e dados associados foram removidos.");
   };
 
+  const handleReassignFileSalesperson = (fileId: string, newSalespersonId: string) => {
+    // Find the target user
+    const targetUser = users.find(u => u.id === newSalespersonId);
+    const newSalespersonName = targetUser?.name || 'None';
+
+    // Update the file record
+    setUploadedFiles(prev => prev.map(f =>
+      f.id === fileId
+        ? { ...f, salespersonId: newSalespersonId, salespersonName: newSalespersonName }
+        : f
+    ));
+
+    // Update all clients from this file to the new salesperson
+    setMasterClientList(prev => prev.map(c =>
+      c.sourceFileId === fileId
+        ? { ...c, salespersonId: newSalespersonId }
+        : c
+    ));
+
+    // Show confirmation
+    if (newSalespersonId === '') {
+      // Unassigned
+      alert('Arquivo desmarcado. Clientes ficaram sem vendedor até que outro seja atribuído.');
+    } else {
+      alert(`Arquivo e clientes reatribuídos para: ${newSalespersonName}`);
+    }
+  };
+
+
   const handleProductFileUpload = async (file: File) => {
     // Generate File ID
     const fileId = crypto.randomUUID();
@@ -1047,6 +1084,7 @@ const App: React.FC = () => {
                 }}
                 onUploadProducts={handleProductFileUpload}
                 onDeleteFile={handleDeleteFile}
+                onReassignSalesperson={handleReassignFileSalesperson}
                 procState={procState}
               />
             </div>
