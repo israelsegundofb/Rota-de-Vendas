@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
+    base: '/Rota-de-Vendas/',
     server: {
       port: 3000,
     },
