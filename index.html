@@ -9,7 +9,73 @@
   <meta name="theme-color" content="#1e3a8a" />
   <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/pwa-icon.svg">
+  
+  <!-- Roboto Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Roboto', 'sans-serif'],
+          },
+          colors: {
+            primary: '#0061A4',
+            'on-primary': '#FFFFFF',
+            'primary-container': '#D1E4FF',
+            'on-primary-container': '#001D36',
+            
+            secondary: '#535F70',
+            'on-secondary': '#FFFFFF',
+            'secondary-container': '#D7E3F7',
+            'on-secondary-container': '#101C2B',
+            
+            tertiary: '#6B5778',
+            'on-tertiary': '#FFFFFF',
+            'tertiary-container': '#F2DAFF',
+            'on-tertiary-container': '#251431',
+            
+            error: '#BA1A1A',
+            'on-error': '#FFFFFF',
+            'error-container': '#FFDAD6',
+            'on-error-container': '#410002',
+            
+            background: '#FDFCFF',
+            'on-background': '#1A1C1E',
+            
+            surface: '#FDFCFF',
+            'on-surface': '#1A1C1E',
+            'surface-variant': '#DFE2EB',
+            'on-surface-variant': '#43474E',
+            'surface-container': '#F0F4F8',
+            
+            outline: '#73777F',
+            'outline-variant': '#C3C7CF',
+          },
+          borderRadius: {
+            'none': '0',
+            'sm': '4px',
+            'md': '8px',
+            'lg': '12px',
+            'xl': '16px',
+            '2xl': '24px',
+            '3xl': '28px',
+            'full': '9999px',
+          },
+          boxShadow: {
+            'elevation-1': '0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30)',
+            'elevation-2': '0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30)',
+            'elevation-3': '0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.30)',
+          }
+        }
+      }
+    }
+  </script>
+  
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script type="module" src="/index.tsx"></script>
 </head>
