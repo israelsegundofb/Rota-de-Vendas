@@ -36,7 +36,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         e.preventDefault();
 
         // Validation
-        if (!formData.companyName || !formData.originalAddress || !formData.city || !formData.state) {
+        if (!formData.companyName || !formData.originalAddress || !formData.city || !formData.state || !formData.contact) {
             setError('Por favor, preencha todos os campos obrigatórios (*).');
             return;
         }
@@ -44,7 +44,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         onAdd({
             companyName: formData.companyName,
             ownerName: formData.ownerName || 'Não Informado',
-            contact: formData.contact || 'Não Informado',
+            contact: formData.contact,
             category: formData.category,
             region: formData.region as any,
             state: formData.state,
@@ -121,10 +121,11 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                             {/* Contact */}
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
-                                    <Phone className="w-3 h-3" /> Contato
+                                    <Phone className="w-3 h-3" /> Contato *
                                 </label>
                                 <input
                                     type="text"
+                                    required
                                     value={formData.contact}
                                     onChange={e => handleChange('contact', e.target.value)}
                                     className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
