@@ -110,20 +110,10 @@ const ClientMapContent: React.FC<{
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const markersRef = useRef<any[]>([]);
 
-  // Optimization: Create a base DOM element for the glyph once, then clone it.
-  const baseGlyphElement = useMemo(() => {
-    const el = document.createElement('div');
-    el.innerHTML = shoppingBagSvg;
-    el.style.display = 'flex';
-    el.style.alignItems = 'center';
-    el.style.justifyContent = 'center';
-    return el;
-  }, []);
-
   useEffect(() => {
     if (!map) return;
 
-    // DEFENSIVE CHECK: Using standard markers, this library check is less critical but good to keep basic google check
+    // DEFENSIVE CHECK
     if (!google) {
       console.warn("Google Maps not loaded.");
       return;
@@ -131,8 +121,12 @@ const ClientMapContent: React.FC<{
 
     // 1. Cleanup
     if (clustererRef.current) {
-      clustererRef.current.clearMarkers();
-      (clustererRef.current as any).setMap(null);
+      try {
+        clustererRef.current.clearMarkers();
+        (clustererRef.current as any).setMap(null);
+      } catch (e) {
+        console.warn("Cleanup error (safe to ignore):", e);
+      }
     }
     markersRef.current.forEach(m => google.maps.event.clearInstanceListeners(m));
     markersRef.current = [];
@@ -155,7 +149,6 @@ const ClientMapContent: React.FC<{
     const processBatch = () => {
       if (!isActive) return;
 
-      // Double check google inside the loop just in case
       if (!google) return;
 
       const batch = clients.slice(index, index + BATCH_SIZE);
@@ -164,15 +157,11 @@ const ClientMapContent: React.FC<{
       const newMarkers = batch.map(client => {
         const colors = productFilterActive
           ? { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' }
-          : getRegionColor(client.region);
+          : getRegionColor(client.categories[0]);
 
-        // Using standard Marker for broader compatibility
         const marker = new google.maps.Marker({
           position: { lat: client.lat, lng: client.lng },
           title: client.companyName,
-          // Simple colored icon using Google Charts API or a standard URL if desired, 
-          // but standard red marker is safest fallback if dynamic icons fail.
-          // Or use a data URI SVG:
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 8,
@@ -201,17 +190,20 @@ const ClientMapContent: React.FC<{
       }
     };
 
-    // Start processing
     processBatch();
 
     return () => {
       isActive = false;
       if (clustererRef.current) {
-        clustererRef.current.clearMarkers();
-        (clustererRef.current as any).setMap(null);
+        try {
+          clustererRef.current.clearMarkers();
+          (clustererRef.current as any).setMap(null);
+        } catch (e) {
+          console.warn("Unmount cleanup error:", e);
+        }
       }
     };
-  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement]);
+  }, [map, clients, productFilterActive, onClientSelect]);
 
   return <MapBoundsUpdater clients={clients} />;
 };
@@ -401,7 +393,8 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                 <div className="pt-2 mt-2 border-t border-gray-100 flex justify-between items-center">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600">
                     <Tag className="w-3 h-3" />
-                    {selectedClient.category}
+                    {selectedClient.categories[0]}
+                    {selectedClient.categories.length > 1 && ` +${selectedClient.categories.length - 1}`}
                   </span>
                   <a
                     href={selectedClient.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`}

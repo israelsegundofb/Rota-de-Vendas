@@ -25,7 +25,7 @@ export interface EnrichedClient {
   contact: string;
   originalAddress: string;
   cleanAddress: string;
-  category: string;
+  categories: string[];
   region: 'Norte' | 'Nordeste' | 'Centro-Oeste' | 'Sudeste' | 'Sul' | 'Indefinido';
   state: string;
   city: string;

@@ -11,9 +11,8 @@ interface ClientListProps {
 const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient }) => {
   const [localSearch, setLocalSearch] = React.useState('');
 
-  // Effectively disable pagination to show "all" clients as requested
-  // but keep the concept if we need to paginate later for performance
-  const itemsPerPage = 10000;
+  // Pagination to prevent DOM overload
+  const itemsPerPage = 100;
   const [currentPage, setCurrentPage] = React.useState(1);
 
   // Reset page when search changes
@@ -25,12 +24,19 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
     client.companyName.toLowerCase().includes(localSearch.toLowerCase())
   );
 
-  // Pagination logic remains but with huge page size
+  // Pagination logic
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedClients = filteredClients.slice(startIndex, startIndex + itemsPerPage);
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
   const handleExportCSV = () => {
+    // ... (keep existing export logic)
     // Define headers
     const headers = [
       'ID',
@@ -62,7 +68,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
         client.city,
         client.state,
         client.region,
-        client.category,
+        client.categories.join('; '),
         productsSummary,
         client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`
       ];
@@ -185,7 +191,9 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
                 <td className="px-6 py-3">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
                     <Tag className="w-3 h-3" />
-                    {client.category}
+                    <Tag className="w-3 h-3" />
+                    {client.categories[0]}
+                    {client.categories.length > 1 && <span className="text-[10px] ml-1 opacity-70">+{client.categories.length - 1}</span>}
                   </span>
                 </td>
                 <td className="px-6 py-3 text-center whitespace-nowrap">
@@ -253,7 +261,8 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
                   <p className="text-xs text-gray-400 uppercase">Segmento</p>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
                     <Tag className="w-3 h-3" />
-                    {client.category}
+                    {client.categories[0]}
+                    {client.categories.length > 1 && <span className="text-[9px] ml-1">+{client.categories.length - 1}</span>}
                   </span>
                 </div>
                 <div>
@@ -279,11 +288,37 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onAddClient })
 
       </div>
 
-      {/* Footer Info Only (No Pagination Buttons for now, unless > 1000) */}
+      {/* Footer Info & Pagination */}
       <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 mt-2 rounded-lg shadow-sm flex-shrink-0">
         <div className="text-sm text-gray-500">
-          Total de Clientes: <span className="font-medium">{filteredClients.length}</span>
+          Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredClients.length)} de <span className="font-medium">{filteredClients.length}</span> clientes
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent"
+              title="Página Anterior"
+              aria-label="Página Anterior"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <span className="text-sm text-gray-600 font-medium">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent"
+              title="Próxima Página"
+              aria-label="Próxima Página"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

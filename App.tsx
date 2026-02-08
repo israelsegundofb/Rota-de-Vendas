@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Trash2, RefreshCw, Plus, Menu } from 'lucide-react';
+import { get, set, clear } from 'idb-keyval'; // Import idb-keyval
 import { RawClient, EnrichedClient, CATEGORIES, User, REGIONS, Product } from './types';
 import { parseCSV } from './utils/csvParser';
 import { processClientsWithAI } from './services/geminiService';
@@ -11,6 +12,13 @@ import AdminCategoryManagement from './components/AdminCategoryManagement';
 import AdminProductManagement from './components/AdminProductManagement';
 import AddClientModal from './components/AddClientModal';
 import EditClientModal from './components/EditClientModal';
+import MaintenanceScreen from './components/MaintenanceScreen';
+import { IS_MAINTENANCE_ACTIVE } from './maintenanceConfig';
+
+// Basic configuration for IDB keys
+const DB_CLIENTS_KEY = 'vendas_ai_clients';
+const DB_PRODUCTS_KEY = 'vendas_ai_products';
+const DB_CATEGORIES_KEY = 'vendas_ai_categories';
 
 // Initial Mock Data
 const INITIAL_USERS: User[] = [
@@ -30,37 +38,54 @@ interface ProcessingState {
 }
 
 const App: React.FC = () => {
-  // Global App State (Simulating DB with LocalStorage Persistence)
+  // Global App State
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
 
-  const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_clients');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load clients from storage", e);
-      return [];
-    }
-  });
+  // Data Loading State - Critical for IDB
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  const [categories, setCategories] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_categories');
-      return saved ? JSON.parse(saved) : CATEGORIES.filter(c => c !== 'Todos');
-    } catch (e) {
-      return CATEGORIES.filter(c => c !== 'Todos');
-    }
-  });
+  const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
+  const [categories, setCategories] = useState<string[]>(CATEGORIES.filter(c => c !== 'Todos'));
+  const [products, setProducts] = useState<Product[]>([]);
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_products');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load products from storage", e);
-      return [];
-    }
-  });
+  // Load Data from IndexedDB on Mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [savedClients, savedProducts, savedCategories] = await Promise.all([
+          get<EnrichedClient[]>(DB_CLIENTS_KEY),
+          get<Product[]>(DB_PRODUCTS_KEY),
+          get<string[]>(DB_CATEGORIES_KEY)
+        ]);
+
+        if (savedClients) setMasterClientList(savedClients);
+        if (savedProducts) setProducts(savedProducts);
+        if (savedCategories) setCategories(savedCategories);
+
+      } catch (error) {
+        console.error("Failed to load data from IndexedDB:", error);
+      } finally {
+        setIsDataLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Save Data to IndexedDB (Only if loaded!)
+  useEffect(() => {
+    if (!isDataLoaded) return;
+    set(DB_CLIENTS_KEY, masterClientList).catch(err => console.error("Save Clients Failed", err));
+  }, [masterClientList, isDataLoaded]);
+
+  useEffect(() => {
+    if (!isDataLoaded) return;
+    set(DB_CATEGORIES_KEY, categories).catch(err => console.error("Save Categories Failed", err));
+  }, [categories, isDataLoaded]);
+
+  useEffect(() => {
+    if (!isDataLoaded) return;
+    set(DB_PRODUCTS_KEY, products).catch(err => console.error("Save Products Failed", err));
+  }, [products, isDataLoaded]);
 
   // Auth State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -113,6 +138,23 @@ const App: React.FC = () => {
 
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Maintenance Mode State
+  // Toggle this to true to show the maintenance screen
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(IS_MAINTENANCE_ACTIVE);
+
+  // Keyboard shortcut to toggle maintenance mode (Ctrl+Shift+M for demo)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'M') {
+        setIsMaintenanceMode(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+
 
   useEffect(() => {
     // If env var exists, it takes precedence
@@ -188,8 +230,8 @@ const App: React.FC = () => {
 
       // Find products matching client category
       let eligibleProducts = allProducts.filter(p =>
-        p.category.toLowerCase().includes(client.category.toLowerCase()) ||
-        client.category.toLowerCase().includes(p.category.toLowerCase())
+        client.categories.some(cat => p.category.toLowerCase().includes(cat.toLowerCase())) ||
+        client.categories.some(cat => cat.toLowerCase().includes(p.category.toLowerCase()))
       );
 
       // Fallback if no category match
@@ -359,8 +401,13 @@ const App: React.FC = () => {
 
   const handleClearData = () => {
     setMasterClientList([]);
-    localStorage.removeItem('vendas_ai_clients');
-    // Also clear products? Let's just clear clients for now as per request "files... sent to project" (CSVs)
+    // Clear from IDB
+    clear().then(() => {
+      // Re-save empty products/categories? Or just clients?
+      // Ideally just clear clients key
+      // But 'clear()' wipes everything. Let's use specific keys
+      set(DB_CLIENTS_KEY, []);
+    });
     setShowPersistencePrompt(false);
   };
 
@@ -550,7 +597,12 @@ const App: React.FC = () => {
   };
 
   if (!currentUser) {
-    return <LoginScreen users={users} onLogin={handleLogin} />;
+    return (
+      <div className="relative min-h-screen">
+        {isMaintenanceMode && <MaintenanceScreen onComplete={() => setIsMaintenanceMode(false)} />}
+        <LoginScreen users={users} onLogin={handleLogin} />
+      </div>
+    );
   }
 
   const isAdmin = currentUser.role === 'admin';
@@ -558,6 +610,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
+      {isMaintenanceMode && <MaintenanceScreen onComplete={() => setIsMaintenanceMode(false)} />}
 
       {/* MOBILE OVERLAY */}
       {isMobileMenuOpen && (
@@ -1123,10 +1176,10 @@ const App: React.FC = () => {
       <AddClientModal
         isOpen={showAddClientModal}
         onClose={() => setShowAddClientModal(false)}
-        onSave={handleAddClient}
+        onSave={handleManualAddClient}
         users={users}
         currentUser={currentUser}
-        preSelectedOwnerId={filterUser}
+        preSelectedOwnerId={filterSalespersonId}
       />
 
       <EditClientModal
