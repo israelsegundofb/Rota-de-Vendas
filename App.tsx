@@ -779,7 +779,7 @@ const App: React.FC = () => {
 
         {/* Cloud Sync Status/Button (Admin only) */}
         {isAdmin && (
-          <div className="px-3 mb-6">
+          <div className="px-3 mb-6 space-y-2">
             <button
               onClick={() => setIsCloudConfigOpen(true)}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg text-purple-200 bg-purple-900/50 hover:bg-purple-900/70 transition-colors border border-purple-800"
@@ -788,6 +788,30 @@ const App: React.FC = () => {
               {isFirebaseConnected ? 'Nuvem Conectada' : 'Configurar Nuvem'}
               {isFirebaseConnected && <div className="w-1.5 h-1.5 rounded-full bg-green-400 ml-auto"></div>}
             </button>
+
+            {isFirebaseConnected && (
+              <button
+                onClick={async () => {
+                  try {
+                    // Show loading state if desired, for now just simple alert flow
+                    const btn = document.getElementById('btn-sync-manual');
+                    if (btn) btn.innerText = 'Sincronizando...';
+
+                    await saveToCloud(masterClientList, products, categories, users);
+
+                    if (btn) btn.innerText = 'Sincronizar Agora';
+                    alert('Dados sincronizados com a nuvem com sucesso!');
+                  } catch (e: any) {
+                    alert('Erro ao sincronizar: ' + e.message);
+                  }
+                }}
+                id="btn-sync-manual"
+                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-[10px] font-medium rounded-lg text-purple-300 hover:bg-purple-900/40 transition-colors"
+              >
+                <Save className="w-3 h-3" />
+                Sincronizar Agora
+              </button>
+            )}
           </div>
         )}
 
