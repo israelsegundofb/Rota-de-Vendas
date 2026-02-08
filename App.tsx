@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
 import { RawClient, EnrichedClient, CATEGORIES, REGIONS, Product, getRegionByUF } from './types';
 import type { User } from './types';
-import { INITIAL_USERS } from './constants';
 import { parseCSV } from './utils/csvParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress } from './services/geocodingService';
@@ -17,6 +16,13 @@ import AdminCategoryManagement from './components/AdminCategoryManagement';
 import AdminProductManagement from './components/AdminProductManagement';
 import CloudConfigModal from './components/CloudConfigModal';
 
+
+// Initial Mock Data
+const INITIAL_USERS: User[] = [
+  { id: 'admin', name: 'Administrador Geral', username: 'admin', email: 'admin@vendas.ai', role: 'admin', password: '123', salesCategory: 'N/A' },
+  { id: '1', name: 'João Silva (Vendedor A)', username: 'vendedor_a', email: 'joao.silva@vendas.ai', role: 'salesperson', password: '123', salesCategory: 'Externo' },
+  { id: '2', name: 'Maria Santos (Vendedor B)', username: 'vendedor_b', email: 'maria.santos@vendas.ai', role: 'salesperson', password: '123', salesCategory: 'Interno' },
+];
 
 interface ProcessingState {
   isActive: boolean;
