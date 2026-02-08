@@ -21,9 +21,9 @@ import CloudConfigModal from './components/CloudConfigModal';
 
 // Initial Mock Data
 const INITIAL_USERS: AppUser[] = [
-  { id: 'admin', name: 'Administrador Geral', username: 'admin', email: 'admin@vendas.ai', role: 'admin', password: '123', salesCategory: 'N/A' },
-  { id: '1', name: 'João Silva (Vendedor A)', username: 'vendedor_a', email: 'joao.silva@vendas.ai', role: 'salesperson', password: '123', salesCategory: 'Externo' },
-  { id: '2', name: 'Maria Santos (Vendedor B)', username: 'vendedor_b', email: 'maria.santos@vendas.ai', role: 'salesperson', password: '123', salesCategory: 'Interno' },
+  { id: 'admin', name: 'Administrador Geral', username: 'admin', email: 'admin@vendas.ai', role: 'admin', password: '123', salesCategory: 'N/A', color: '#6B7280' },
+  { id: '1', name: 'João Silva (Vendedor A)', username: 'vendedor_a', email: 'joao.silva@vendas.ai', role: 'salesperson', password: '123', salesCategory: 'Externo', color: '#EF4444' }, // Red
+  { id: '2', name: 'Maria Santos (Vendedor B)', username: 'vendedor_b', email: 'maria.santos@vendas.ai', role: 'salesperson', password: '123', salesCategory: 'Interno', color: '#3B82F6' }, // Blue
 ];
 
 interface ProcessingState {
@@ -292,21 +292,50 @@ const App: React.FC = () => {
   };
 
   const handleClearClients = () => {
-    const confirmClear = window.confirm(
-      "⚠️ AVISO CRÍTICO ⚠️\n\n" +
-      "Tem certeza que deseja DELETAR TODOS os clientes do sistema?\n" +
-      "Isso removerá todo o histórico e limpará o cache local.\n\n" +
-      "Esta ação não pode ser desfeita."
-    );
+    let targetId: string | undefined;
+    let targetName = "TODOS";
+
+    // Determine context for granular clear
+    if (currentUser?.role === 'admin') {
+      if (filterSalespersonId !== 'Todos') {
+        targetId = filterSalespersonId;
+        const u = users.find(u => u.id === targetId);
+        targetName = u?.name || 'Desconhecido';
+      } else if (targetUploadUserId) {
+        targetId = targetUploadUserId;
+        const u = users.find(u => u.id === targetId);
+        targetName = u?.name || 'Desconhecido';
+      }
+    } else if (currentUser?.role === 'salesperson') {
+      // Salesperson can only clear their own? Or system policy?
+      // Let's assume for now they clear their own view, which is effectively "their" data if segmented.
+      // However, often local storage is shared. Let's ask confirmation.
+      targetId = currentUser.id;
+      targetName = currentUser.name;
+    }
+
+    const isPartial = !!targetId;
+
+    const message = isPartial
+      ? `⚠️ ATENÇÃO ⚠️\n\nDeseja remover APENAS os clientes de:\n\n👤 ${targetName}?\n\n(Os outros dados serão mantidos)`
+      : `⚠️ AVISO CRÍTICO ⚠️\n\nTem certeza que deseja DELETAR TODOS os clientes do sistema?\nIsso removerá todo o histórico e limpará o cache local.\n\nEsta ação não pode ser desfeita.`;
+
+    const confirmClear = window.confirm(message);
 
     if (confirmClear) {
-      setMasterClientList([]);
-      localStorage.removeItem('vendas_ai_clients');
-      // Optional: Also clear any processing state
+      if (isPartial && targetId) {
+        setMasterClientList(prev => prev.filter(c => c.salespersonId !== targetId));
+        alert(`Dados de ${targetName} removidos com sucesso!`);
+      } else {
+        setMasterClientList([]);
+        localStorage.removeItem('vendas_ai_clients');
+        alert("Base de dados limpa com sucesso!");
+      }
+
+      // Optional: Clear processing state if relevant
       setProcState({
         isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
       });
-      alert("Base de dados limpa com sucesso!");
     }
   };
 

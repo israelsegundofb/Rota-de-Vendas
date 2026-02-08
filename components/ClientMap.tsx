@@ -104,6 +104,10 @@ const getPinColor = (client: EnrichedClient, users: AppUser[] = [], productFilte
   if (seller && seller.color) {
     // Darken color for border approx
     return { bg: seller.color, border: 'black', glyph: '#fff' };
+  } else if (seller) {
+    console.warn(`User found but no color: ${seller.name} (ID: ${seller.id})`);
+  } else {
+    // console.warn(`Salesperson ID not found in users: ${client.salespersonId}`);
   }
 
   return getRegionColor(client.region);
