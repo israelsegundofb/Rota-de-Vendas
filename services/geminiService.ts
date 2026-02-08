@@ -8,6 +8,44 @@ const BATCH_SIZE = 1;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper to determine Region from CEP
+const getRegionFromCEP = (cep: string): string => {
+  const cleanCep = cep.replace(/\D/g, '');
+  if (cleanCep.length < 5) return 'Indefinido';
+
+  const prefix = parseInt(cleanCep.substring(0, 1));
+  const range = parseInt(cleanCep.substring(0, 2)); // For more granular checks if needed
+
+  // Region mapping based on first digit of CEP
+  // 0xxxx - SP (Sudeste)
+  // 1xxxx - SP (Sudeste)
+  // 2xxxx - RJ, ES (Sudeste)
+  // 3xxxx - MG (Sudeste)
+  // 4xxxx - BA, SE (Nordeste)
+  // 5xxxx - PE, AL, PB, RN (Nordeste)
+  // 6xxxx - CE, PI, MA, PA, AP, AM, RR, AC (Nordeste/Norte) - 66-69 is Norte, 60-65 is Nordeste
+  // 7xxxx - DF, GO, TO, MT, RO, MS (Centro-Oeste/Norte) - 77 is TO (Norte), 76 is RO (Norte)
+  // 8xxxx - PR, SC (Sul)
+  // 9xxxx - RS (Sul)
+
+  if (prefix === 0 || prefix === 1 || prefix === 2 || prefix === 3) return 'Sudeste';
+  if (prefix === 8 || prefix === 9) return 'Sul';
+
+  if (prefix === 4 || prefix === 5) return 'Nordeste';
+
+  if (prefix === 6) {
+    if (range >= 60 && range <= 65) return 'Nordeste'; // CE, PI, MA
+    return 'Norte'; // PA, AP, AM, RR, AC
+  }
+
+  if (prefix === 7) {
+    if (range === 77 || range === 76) return 'Norte'; // TO, RO
+    return 'Centro-Oeste'; // DF, GO, MS, MT
+  }
+
+  return 'Indefinido';
+};
+
 // Helper to determine Region from State (UF)
 const getRegionFromState = (uf: string): string => {
   const nordeste = ['MA', 'PI', 'CE', 'RN', 'PB', 'PE', 'AL', 'SE', 'BA'];
@@ -70,6 +108,10 @@ export const processClientsWithAI = async (
     const owner = client['Nome do Proprietário'] || "";
     const contact = client['Contato'] || "";
 
+    // Extract CEP from address for region fallback
+    const cepMatch = address.match(/\d{5}[-]?\d{3}/);
+    const extractedCEP = cepMatch ? cepMatch[0] : "";
+
     const id = `${salespersonId}-${Date.now()}-${i}`;
 
     // Skip completely empty rows to save tokens and prevent errors
@@ -84,7 +126,7 @@ export const processClientsWithAI = async (
       TAREFA: 
       1. Pesquise no Google Maps a empresa "${company}" localizada EXATAMENTE em "${address}".
       2. Se não encontrar exatamente nesse local, procure nos arredores imediatos.
-      3. Obtenha a localização exata (latitude/longitude), o endereço formatado oficial e o link do Maps.
+      3. Obtenha a localização exata (latitude/longitude), o endereço formatado oficial, telefone oficial, website e o link do Maps.
       4. Classifique a empresa em uma destas opções: ${categoryListString} | "Outros".
 
       IMPORTANTE: Use o endereço "${address}" como âncora principal para a busca.
@@ -97,7 +139,9 @@ export const processClientsWithAI = async (
         "city": "Nome da Cidade",
         "lat": number,
         "lng": number,
-        "cleanAddress": "Endereço completo oficial encontrado"
+        "cleanAddress": "Endereço completo oficial encontrado",
+        "phone": "Telefone encontrado ou null",
+        "website": "Website encontrado ou null"
       }
     `;
 
@@ -152,6 +196,11 @@ export const processClientsWithAI = async (
         let finalState = aiData.state || 'BR';
         let finalRegion = aiData.region || 'Indefinido';
 
+        // Check if region is still Indefinido and we have CEP
+        if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
+          finalRegion = getRegionFromCEP(extractedCEP);
+        }
+
         // Check if we need to refine the location data (if AI failed or we need coords)
         const needsGeocoding = !client['extractedLat'] || finalCity === 'Desconhecido' || finalState === 'BR';
 
@@ -178,6 +227,11 @@ export const processClientsWithAI = async (
                   finalRegion = parsed.region as any;
                 }
 
+                // Final fallback for region if still undefined
+                if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
+                  finalRegion = getRegionFromCEP(extractedCEP);
+                }
+
                 if (geocodeResult.formattedAddress) {
                   finalAddress = geocodeResult.formattedAddress;
                 }
@@ -198,12 +252,21 @@ export const processClientsWithAI = async (
           return ['Outros'];
         };
 
+        // ENRICH CONTACT INFO WITH MAPS DATA
+        let finalContact = contact;
+        if (aiData.phone) {
+          finalContact = finalContact ? `${finalContact} | Maps: ${aiData.phone}` : aiData.phone;
+        }
+        if (aiData.website) {
+          finalContact = finalContact ? `${finalContact} | Site: ${aiData.website}` : `Site: ${aiData.website}`;
+        }
+
         allEnriched.push({
           id: id,
           salespersonId: salespersonId,
           companyName: company,
           ownerName: owner,
-          contact: contact,
+          contact: finalContact,
           originalAddress: rawAddress,
           cleanAddress: finalAddress,
           category: NormalizeCategory(aiData.category), // Fix: Call the helper
