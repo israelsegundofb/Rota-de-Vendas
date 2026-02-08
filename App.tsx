@@ -1040,9 +1040,10 @@ const App: React.FC = () => {
                     className={`h-full transition-all duration-300 ${procState.status === 'completed' ? 'bg-green-500 w-full' :
                       procState.status === 'error' ? 'bg-red-500 w-full' :
                         'bg-blue-600'
-                      }`}
-                    // eslint-disable-next-line react-dom/no-unsafe-inline-style
-                    style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
+                      } w-[var(--progress-width)]`}
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    style={{ '--progress-width': procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
                   />
                 </div>
                 <div className="p-4">
