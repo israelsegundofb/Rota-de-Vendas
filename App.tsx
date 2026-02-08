@@ -114,6 +114,9 @@ const App: React.FC = () => {
   // Admin Upload State
   const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
 
+  // Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // File Management State
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(() => {
     try {
@@ -528,7 +531,9 @@ const App: React.FC = () => {
     setFilterCity('Todas');
     setFilterSalespersonId('Todos');
     setFilterSalesCategory('Todos');
+    setFilterSalesCategory('Todos');
     setActiveView('map');
+    setIsMobileMenuOpen(false); // Close menu on login
     if (user.role === 'admin') {
       const firstSeller = users.find(u => u.role === 'salesperson');
       if (firstSeller) setTargetUploadUserId(firstSeller.id);
@@ -683,15 +688,7 @@ const App: React.FC = () => {
     if (file.type === 'clients') {
       setMasterClientList(prev => prev.filter(c => c.sourceFileId !== fileId));
     } else if (file.type === 'products') {
-      // Remove products associated with this file if we had sourceFileId
-      // For now, if we match products by some criteria, we could delete.
-      // Assuming we implement product sourceFileId tracking in handleProductFileUpload
-      // But Product interface doesn't have sourceFileId yet?
-      // Let's assume we won't strictly delete products from the list yet unless we update Product type.
-      // BUT, the user wants to see "Loaded Tables".
-      // Let's update Product type in next step if needed. 
-      // For now, just remove the file record is safe-ish.
-      alert("Nota: A remoção de produtos individuais por arquivo ainda não está totalmente implementada (requer atualização de tipo). Apenas o registro do arquivo será removido.");
+      setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
     }
 
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
@@ -720,6 +717,9 @@ const App: React.FC = () => {
 
       if (newProducts.length === 0) throw new Error("Arquivo vazio.");
 
+      // Attach Source File ID
+      newProducts = newProducts.map(p => ({ ...p, sourceFileId: fileId }));
+
       // Create File Record
       const newFileRecord: UploadedFile = {
         id: fileId,
@@ -729,7 +729,7 @@ const App: React.FC = () => {
         salespersonName: 'Catálogo Geral',
         type: 'products',
         itemCount: newProducts.length,
-        status: 'processing'
+        status: 'completed'
       };
 
       setUploadedFiles(prev => [newFileRecord, ...prev]);
@@ -737,7 +737,7 @@ const App: React.FC = () => {
       // Update Products List
       handleUploadProducts(newProducts);
 
-      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed' } : f));
+      // setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed' } : f));
 
       setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
       alert(`${newProducts.length} produtos importados com sucesso.`);
@@ -761,261 +761,193 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
 
+      {/* MOBILE OVERLAY */}
+      {isMobileMenuOpen && (
+        <div
+          className="absolute inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <aside className={`w-72 ${isAdmin ? 'bg-slate-900' : 'bg-blue-900'} text-white flex flex-col shadow-xl z-20 transition-colors duration-500`}>
-        <div className="p-6 border-b border-white/10">
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 text-blue-400" />
+      <aside
+        className={`
+          w-72 bg-surface-container-low text-on-surface shadow-elevation-2 z-30 
+          fixed md:relative h-full transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          flex flex-col border-r border-outline-variant/30
+        `}
+      >
+        <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
+          <h1 className="text-xl font-bold flex items-center gap-2 text-primary">
+            <LayoutDashboard className="w-6 h-6" />
             Vendas A.I.
           </h1>
-          <p className="text-xs text-white/50 mt-1">
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden text-on-surface-variant hover:text-primary"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="px-6 py-2">
+          <p className="text-xs font-medium text-on-surface-variant/80 uppercase tracking-wider">
             {isAdmin ? 'Painel Administrativo' : 'Portal do Vendedor'}
           </p>
         </div>
 
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="bg-black/20 rounded-lg p-4 mb-6 border border-white/5">
-            <p className="text-xs text-white/50 uppercase font-semibold">Logado como:</p>
-            <div className="flex items-center gap-2 mt-1">
-              <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-purple-400' : 'bg-green-400'}`}></div>
-              <p className="font-bold text-white truncate">{currentUser.name}</p>
+        <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
+          <div className="bg-surface-container-highest rounded-2xl p-4 mb-6 border border-outline-variant/30 shadow-sm relative overflow-hidden group">
+            <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
+            <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
+            <div className="flex items-center gap-3 relative z-10">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md ${isAdmin ? 'bg-tertiary' : 'bg-secondary'}`}>
+                {currentUser.name.charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>
+                <p className="text-xs text-on-surface-variant truncate opacity-80">{currentUser.email}</p>
+              </div>
             </div>
           </div>
 
           <nav className="space-y-1 mb-8">
-            <p className="px-3 text-xs font-semibold text-white/40 uppercase mb-2">Visualização</p>
+            <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
             <button
-              onClick={() => setActiveView('map')}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'map' ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5'}`}
+              onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
+                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                }`}
             >
-              <MapIcon className="w-4 h-4" /> Mapa da Carteira
+              <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
+              Mapa da Carteira
             </button>
             <button
-              onClick={() => setActiveView('table')}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'table' ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5'}`}
+              onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
+                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                }`}
             >
-              <TableIcon className="w-4 h-4" /> Listagem de Dados
+              <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
+              Listagem de Dados
             </button>
           </nav>
 
-          {isAdmin && (
-            <nav className="space-y-1 mb-8 animate-fade-in">
-              <p className="px-3 text-xs font-semibold text-purple-300 uppercase mb-2 flex items-center gap-1">
-                <Shield className="w-3 h-3" /> Admin
-              </p>
-              <button
-                onClick={() => setActiveView('admin_users')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_users' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <UsersIcon className="w-4 h-4" /> Gerenciar Acessos
-              </button>
-              <button
-                onClick={() => setActiveView('admin_categories')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_categories' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <Layers className="w-4 h-4" /> Categorias de Clientes
-              </button>
-              <button
-                onClick={() => setActiveView('admin_products')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_products' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <Package className="w-4 h-4" /> Catálogo de Produtos
-              </button>
-              <button
-                onClick={() => setActiveView('admin_files')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeView === 'admin_files' ? 'bg-purple-600 text-white' : 'text-white/70 hover:bg-white/5'}`}
-              >
-                <FileUp className="w-4 h-4" /> Gerenciar Arquivos
-              </button>
-            </nav>
-          )}
+          <nav className="space-y-1 mb-8">
+            <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
 
-          <div className="pt-4 border-t border-white/10 mt-auto">
             <button
-              onClick={() => {
-                const data = {
-                  clients: masterClientList,
-                  users: users,
-                  categories: categories,
-                  products: products,
-                  backupDate: new Date().toISOString()
-                };
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `rota_vendas_backup_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-green-300 hover:bg-white/5 transition-colors mb-2"
-              title="Salvar cópia de segurança dos dados"
+              onClick={() => { setActiveView('admin_users'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
+                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                }`}
             >
-              <Download className="w-4 h-4" /> Backup dos Dados
+              <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
+              Gerenciar Usuários
             </button>
 
-            <label className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-blue-300 hover:bg-white/5 transition-colors cursor-pointer" title="Carregar dados de um backup">
-              <input
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
+            <button
+              onClick={() => { setActiveView('admin_categories'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
+                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                }`}
+            >
+              <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
+              Categorias
+            </button>
 
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    try {
-                      const json = JSON.parse(event.target?.result as string);
+            <button
+              onClick={() => { setActiveView('admin_products'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
+                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                }`}
+            >
+              <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
+              Produtos
+            </button>
 
-                      // Basic validation
-                      if (!json.clients || !Array.isArray(json.clients)) throw new Error("Arquivo inválido: clientes não encontrados.");
+            <button
+              onClick={() => { setActiveView('admin_files'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
+                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                }`}
+            >
+              <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
+              Arquivos
+            </button>
 
-                      if (window.confirm(`Deseja restaurar o backup de ${json.backupDate || 'data desconhecida'}?\nIsso substituirá TODOS os dados atuais (${masterClientList.length} clientes).`)) {
-                        setMasterClientList(json.clients);
-                        if (json.users) setUsers(json.users);
-                        if (json.categories) setCategories(json.categories);
-                        if (json.products) setProducts(json.products);
-
-                        alert("Dados restaurados com sucesso!");
-                      }
-                    } catch (err) {
-                      alert("Erro ao ler arquivo de backup: " + err);
-                    }
-                  };
-                  reader.readAsText(file);
-                  // Reset input value to allow selecting same file again
-                  e.target.value = '';
-                }}
-              />
-              <FileUp className="w-4 h-4" /> Restaurar Backup
-            </label>
-          </div>
-
-
-          {/* Upload Section */}
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <p className="px-3 text-xs font-semibold text-white/40 uppercase mb-3 flex items-center gap-2">
-              <FileUp className="w-3 h-3" /> Carga de Clientes
-            </p>
-
-            {isAdmin ? (
-              <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
-
-                {/* Target Salesperson Selector */}
-                <div>
-                  <p className="text-[10px] text-purple-300 font-bold uppercase mb-2">Atribuir Carteira a:</p>
-                  <select
-                    className="w-full bg-slate-800 border border-slate-600 rounded text-xs p-2 text-white mb-2 focus:ring-1 focus:ring-purple-500 outline-none"
-                    value={targetUploadUserId}
-                    onChange={(e) => setTargetUploadUserId(e.target.value)}
-                  >
-                    <option value="" disabled>Selecione o Vendedor...</option>
-                    {users.filter(u => u.role === 'salesperson').map(u => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Upload Button */}
-                <label className={`flex items-center justify-center w-full px-2 py-3 border border-white/20 border-dashed rounded-lg cursor-pointer hover:bg-white/5 transition-colors ${procState.isActive && procState.status === 'processing' ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <div className="flex flex-col items-center">
-                    <FileUp className="w-5 h-5 text-purple-400 mb-1" />
-                    <span className="text-[10px] text-white/70">
-                      {procState.isActive && procState.status === 'processing' ? 'Processando...' : 'Carregar Planilha CSV'}
-                    </span>
-                  </div>
-                  <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={procState.isActive && procState.status === 'processing' || !targetUploadUserId} />
-                </label>
-
-                {/* Clear Data Button */}
-                <button
-                  onClick={handleClearClients}
-                  className="w-full flex items-center justify-center gap-2 px-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 rounded-lg text-[10px] font-medium transition-colors mt-2"
-                  title="Remover todos os clientes do sistema"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Limpar Base (Reset Total)
-                </button>
-
-              </div>
-            ) : (
-              <div className="px-3 py-4 bg-white/5 rounded-lg border border-white/10 text-center">
-                <Lock className="w-6 h-6 text-white/30 mx-auto mb-2" />
-                <p className="text-[10px] text-white/50 leading-tight">
-                  O upload da carteira de clientes é restrito ao Administrador.
-                </p>
-              </div>
-            )}
-          </div>
+            <button
+              onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
+            >
+              <Cloud className="w-5 h-5" />
+              Backup & Cloud
+            </button>
+          </nav>
         </div>
 
-        {/* Cloud Sync Status/Button (Admin only) */}
-        {isAdmin && (
-          <div className="px-3 mb-6 space-y-2">
-            <button
-              onClick={() => setIsCloudConfigOpen(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg text-purple-200 bg-purple-900/50 hover:bg-purple-900/70 transition-colors border border-purple-800"
-            >
-              <Cloud className="w-3 h-3" />
-              {isFirebaseConnected ? 'Nuvem Conectada' : 'Configurar Nuvem'}
-              {isFirebaseConnected && <div className="w-1.5 h-1.5 rounded-full bg-green-400 ml-auto"></div>}
-            </button>
-
-            {isFirebaseConnected && (
-              <button
-                onClick={async () => {
-                  try {
-                    // Show loading state if desired, for now just simple alert flow
-                    const btn = document.getElementById('btn-sync-manual');
-                    if (btn) btn.innerText = 'Sincronizando...';
-
-                    await saveToCloud(masterClientList, products, categories, users);
-
-                    if (btn) btn.innerText = 'Sincronizar Agora';
-                    alert('Dados sincronizados com a nuvem com sucesso!');
-                  } catch (e: any) {
-                    alert('Erro ao sincronizar: ' + e.message);
-                  }
-                }}
-                id="btn-sync-manual"
-                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-[10px] font-medium rounded-lg text-purple-300 hover:bg-purple-900/40 transition-colors"
-              >
-                <Save className="w-3 h-3" />
-                Sincronizar Agora
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="mt-auto p-4 border-t border-white/10">
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 transition-colors w-full px-2">
-            <LogOut className="w-4 h-4" /> Sair
+        <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
+          >
+            <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
           </button>
+
+          <div className="text-center mt-4">
+            <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
+          </div>
         </div>
-      </aside >
+      </aside>
 
-      {/* MODALS */}
-      <CloudConfigModal
-        isOpen={isCloudConfigOpen}
-        onClose={() => setIsCloudConfigOpen(false)}
-      />
-
-      <CookieConsent
-        onAccept={() => {
-          console.log("Cookie consent accepted. Storage enabled.");
-          // We are already using localStorage by default for MVP, but this signals explicit consent.
-          // In a stricter implementation, we would selectively enable the persistence hooks here.
-        }}
-        onDecline={() => {
-          console.warn("Cookie consent declined. Storage should be minimized.");
-        }}
-      />
+      {/* TOP BAR FOR MOBILE */}
+      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-surface-container-low shadow-sm z-10 flex items-center justify-between px-4 border-b border-outline-variant/30">
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 text-on-surface hover:bg-surface-container-highest rounded-full transition-colors"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+        <span className="font-bold text-lg text-primary flex items-center gap-2">
+          <LayoutDashboard className="w-5 h-5" /> Vendas A.I.
+        </span>
+        <div className="w-10"></div> {/* Spacer for center alignment */}
+      </header>
 
 
-      {/* MAIN CONTENT */}
-      < main className="flex-1 flex flex-col h-full relative overflow-hidden" >
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-surface transition-all duration-300 md:pt-0 pt-16">
+
+        {/* Floating Add Button for Mobile (when not in admin views) */}
+        {!isAdmin && activeView === 'table' && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-elevation-2 flex items-center justify-center z-50 animate-bounce-in"
+          >
+            <UsersIcon className="w-6 h-6" />
+          </button>
+        )}
+        {/* MODALS */}
+        <CloudConfigModal
+          isOpen={isCloudConfigOpen}
+          onClose={() => setIsCloudConfigOpen(false)}
+        />
+
+        <CookieConsent
+          onAccept={() => {
+            console.log("Cookie consent accepted. Storage enabled.");
+          }}
+          onDecline={() => {
+            console.warn("Cookie consent declined. Storage should be minimized.");
+          }}
+        />
 
         <header className="bg-white border-b border-gray-200 h-16 px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-gray-500">

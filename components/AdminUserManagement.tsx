@@ -156,8 +156,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
               type="submit"
               disabled={!name || !username || !password}
               className={`px-6 py-2.5 rounded-full font-medium transition-all shadow-elevation-1 hover:shadow-elevation-2 flex items-center gap-2 ${editingId
-                  ? 'bg-primary-container text-on-primary-container hover:bg-primary-container/80'
-                  : 'bg-primary text-on-primary hover:bg-primary/90'
+                ? 'bg-primary-container text-on-primary-container hover:bg-primary-container/80'
+                : 'bg-primary text-on-primary hover:bg-primary/90'
                 } disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none`}
             >
               {editingId ? <Save className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
@@ -182,8 +182,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
                 key={tab}
                 onClick={() => setFilterType(tab)}
                 className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all ${filterType === tab
-                    ? 'bg-white text-on-surface shadow-sm'
-                    : 'text-on-surface-variant hover:text-on-surface'
+                  ? 'bg-white text-on-surface shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
                   }`}
               >
                 {tab}
@@ -192,7 +192,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-on-surface-variant uppercase bg-surface-container-highest/50">
               <tr>
@@ -211,8 +211,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
                   <td className="px-6 py-4 text-on-surface-variant">{user.username}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${user.role === 'admin'
-                        ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
-                        : 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                      ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                      : 'bg-secondary-container text-on-secondary-container border-secondary-container'
                       }`}>
                       {user.role === 'admin' ? 'Admin' : 'Vendedor'}
                     </span>
@@ -262,6 +262,57 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, onAddU
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4 p-4">
+          {filteredUsers.map(user => (
+            <div key={user.id} className={`bg-surface-container-highest/30 rounded-xl p-4 border border-outline-variant/30 ${editingId === user.id ? 'bg-primary-container/30 border-primary/30' : ''}`}>
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="font-bold text-on-surface">{user.name}</h3>
+                  <p className="text-xs text-on-surface-variant">@{user.username}</p>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${user.role === 'admin'
+                  ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                  : 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                  }`}>
+                  {user.role === 'admin' ? 'Admin' : 'Vendedor'}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-sm text-on-surface-variant mb-4">
+                <div className="flex justify-between border-b border-outline-variant/20 pb-1">
+                  <span>Categoria:</span>
+                  <span className="font-medium text-on-surface">{user.salesCategory || '-'}</span>
+                </div>
+                <div className="flex justify-between border-b border-outline-variant/20 pb-1">
+                  <span>Senha:</span>
+                  <span className="font-mono">{user.password || '***'}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => handleEditClick(user)}
+                  className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" /> Editar
+                </button>
+                {user.username !== 'admin' && (
+                  <button
+                    onClick={() => onDeleteUser(user.id)}
+                    className="px-3 py-1.5 bg-error/10 text-error rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-error/20 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {filteredUsers.length === 0 && (
+            <p className="text-center text-on-surface-variant py-8 text-sm">Nenhum usuário encontrado.</p>
+          )}
         </div>
       </div>
     </div>

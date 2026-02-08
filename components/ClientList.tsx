@@ -95,14 +95,14 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
 
           {/* Filters Group */}
           <div className="flex flex-wrap items-center gap-3 flex-1">
-            <div className="relative group">
+            <div className="relative group w-full md:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
               <input
                 type="text"
                 placeholder="Razão Social ou Proprietário..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none w-64 transition-all"
+                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none w-full transition-all"
               />
             </div>
 

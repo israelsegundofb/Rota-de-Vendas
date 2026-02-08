@@ -2,8 +2,7 @@ import * as XLSX from 'xlsx';
 import { RawClient, Product } from '../types';
 import { parseHyperlink, cleanAddress } from './csvParser';
 
-// Helper to normalize headers (remove accents, lowercase) - duplicated from csvParser to avoid circular dep if refactoring is messy, 
-// or optimally we should export it from a shared util. For now, local is fine.
+// Helper to normalize headers (remove accents, lowercase)
 const normalizeHeader = (header: string): string => {
     return String(header)
         .toLowerCase()
@@ -37,46 +36,109 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
 
-                // Convert to JSON with raw values
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+                if (!worksheet['!ref']) {
+                    resolve([]);
+                    return;
+                }
+
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
                 const normalizedData: RawClient[] = [];
 
-                jsonData.forEach((row: any) => {
-                    const normalizedRow: Record<string, any> = {};
-                    Object.keys(row).forEach(key => {
-                        normalizedRow[normalizeHeader(key)] = row[key];
+                // 1. Identify Headers
+                const headers: { index: number; name: string; normalized: string }[] = [];
+                const R_header = range.s.r; // Assume first row is header
+
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ c: C, r: R_header });
+                    const cell = worksheet[cellAddress];
+                    if (cell && cell.v) {
+                        const headerName = String(cell.v);
+                        headers.push({
+                            index: C,
+                            name: headerName,
+                            normalized: normalizeHeader(headerName)
+                        });
+                    }
+                }
+
+                // 2. Iterate Rows
+                for (let R = R_header + 1; R <= range.e.r; ++R) {
+                    const rowData: Record<string, any> = {};
+                    let addressLink: string | undefined = undefined;
+
+                    // Extract data for each column
+                    headers.forEach(header => {
+                        const cellAddress = XLSX.utils.encode_cell({ c: header.index, r: R });
+                        const cell = worksheet[cellAddress];
+
+                        if (cell) {
+                            rowData[header.normalized] = cell.v;
+
+                            // Check for Hyperlink in Address-related columns
+                            if (
+                                !addressLink &&
+                                (header.normalized.includes('endereco') ||
+                                    header.normalized.includes('logradouro') ||
+                                    header.normalized.includes('localizacao') ||
+                                    header.normalized === 'rua' ||
+                                    header.normalized === 'mapa' ||
+                                    header.normalized === 'link')
+                            ) {
+                                if (cell.l && cell.l.Target) {
+                                    addressLink = cell.l.Target;
+                                }
+                            }
+                        }
                     });
 
-                    // Parse hyperlink if present in address col
-                    const addressInput = normalizedRow['endereco'] || normalizedRow['logradouro'] || normalizedRow['localizacao'] ||
-                        normalizedRow['endereco completo'] || normalizedRow['rua'] || normalizedRow['end'] || '';
+                    // Skip empty rows (check if essential keys are missing)
+                    if (Object.keys(rowData).length === 0) continue;
+
+                    // 3. Map to RawClient
+                    const addressInput = rowData['endereco'] || rowData['logradouro'] || rowData['localizacao'] ||
+                        rowData['endereco completo'] || rowData['rua'] || rowData['end'] || '';
 
                     const { address, link, lat, lng } = parseHyperlink(addressInput);
 
-                    // Robust Header Finding
-                    const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['nome fantasia'] ||
-                        normalizedRow['empresa'] || normalizedRow['nome'] || normalizedRow['nome cliente'] ||
-                        normalizedRow['parceiro'] || normalizedRow['loja'] || '';
+                    // Prioritize the extracted Excel Hyperlink if available
+                    // If we have a direct range link (cell.l.Target), use that.
+                    // Otherwise rely on text parsing.
+                    const finalLink = addressLink || link;
 
-                    const ownerName = normalizedRow['nome do proprietario'] || normalizedRow['proprietario'] || normalizedRow['dono'] ||
-                        normalizedRow['contato principal'] || normalizedRow['responsavel'] || normalizedRow['socio'] || '';
+                    // Note: If addressLink provides a direct Google Maps URL, we might want to 
+                    // re-run extraction logic to get lat/lng from IT if 'lat'/'lng' are undefined.
+                    // However, `parseHyperlink` already attempts to extract from text.
+                    // If the text was just "Endereço", parseHyperlink won't find coords.
+                    // But if `addressLink` is "https://maps.google.com/...", we can optionally extracting coords from it.
+                    // For now, passing it as `GoogleMapsLink` is the critical part for `geminiService` to use it.
 
-                    const contact = String(normalizedRow['contato'] || normalizedRow['telefone'] || normalizedRow['celular'] ||
-                        normalizedRow['whatsapp'] || normalizedRow['tel'] || normalizedRow['fone'] || '');
+                    const companyName = rowData['razao social'] || rowData['cliente'] || rowData['nome fantasia'] ||
+                        rowData['empresa'] || rowData['nome'] || rowData['nome cliente'] ||
+                        rowData['parceiro'] || rowData['loja'] || '';
 
-                    normalizedData.push({
-                        'Razão Social': companyName,
-                        'Nome do Proprietário': ownerName,
-                        'Contato': contact,
-                        'Endereço': address,
-                        'GoogleMapsLink': link,
-                        'extractedLat': lat,
-                        'extractedLng': lng
-                    });
-                });
+                    const ownerName = rowData['nome do proprietario'] || rowData['proprietario'] || rowData['dono'] ||
+                        rowData['contato principal'] || rowData['responsavel'] || rowData['socio'] || '';
+
+                    const contact = String(rowData['contato'] || rowData['telefone'] || rowData['celular'] ||
+                        rowData['whatsapp'] || rowData['tel'] || rowData['fone'] || '');
+
+                    // Only add if we have at least a Name or Address
+                    if (companyName || address || addressInput) {
+                        normalizedData.push({
+                            'Razão Social': companyName,
+                            'Nome do Proprietário': ownerName,
+                            'Contato': contact,
+                            'Endereço': address, // The display address
+                            'GoogleMapsLink': finalLink,
+                            'extractedLat': lat,
+                            'extractedLng': lng
+                        });
+                    }
+                }
 
                 resolve(normalizedData);
             } catch (error) {
+                console.error("Excel Parsing Error:", error);
                 reject(error);
             }
         };
@@ -97,8 +159,10 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
 
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
                 const products: Product[] = [];
+                // For products, sheet_to_json is usually sufficient as we don't heavily rely on hyperlinks
+                // But let's use it for simplicity unless we need specific cell metadata
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
                 jsonData.forEach((row: any) => {
                     const normalizedRow: Record<string, any> = {};
@@ -132,6 +196,7 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
 
                 resolve(products);
             } catch (error) {
+                console.error("Product Excel Parsing Error:", error);
                 reject(error);
             }
         };

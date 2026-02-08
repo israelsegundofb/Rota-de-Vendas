@@ -193,7 +193,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
               />
             </div>
 
-            <div className="flex-1 overflow-auto border border-outline-variant/30 rounded-xl shadow-inner scrollbar-thin scrollbar-thumb-outline-variant scrollbar-track-surface-container-low">
+            <div className="hidden md:block flex-1 overflow-auto border border-outline-variant/30 rounded-xl shadow-inner scrollbar-thin scrollbar-thumb-outline-variant scrollbar-track-surface-container-low">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-on-surface-variant uppercase bg-surface-container-highest/80 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
@@ -243,7 +243,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                 </thead>
                 <tbody className="divide-y divide-outline-variant/30 bg-surface">
                   {displayedProducts.map((p) => (
-                    <tr key={`${p.sku}-${p.originalIndex}`} className="hover:bg-surface-container-highest/30 transition-colors group">
+                    <tr key={`${p.sku}-${(p as any).originalIndex}`} className="hover:bg-surface-container-highest/30 transition-colors group">
                       <td className="px-4 py-2 font-mono text-on-surface-variant text-xs">{p.sku}</td>
                       <td className="px-4 py-2 font-medium text-on-surface text-xs">
                         {p.brand}
@@ -257,7 +257,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           type="text"
                           className="w-full text-xs text-on-surface border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.category}
-                          onChange={(e) => handleProductChange(p.originalIndex, 'category', e.target.value)}
+                          onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
                         />
                       </td>
 
@@ -268,7 +268,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           step="0.01"
                           className="w-full text-xs text-right font-bold text-primary border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.price}
-                          onChange={(e) => handleProductChange(p.originalIndex, 'price', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleProductChange((p as any).originalIndex, 'price', parseFloat(e.target.value) || 0)}
                         />
                       </td>
 
@@ -281,13 +281,69 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           max="100"
                           className="w-full text-xs text-right text-tertiary border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-tertiary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.discount || 0}
-                          onChange={(e) => handleProductChange(p.originalIndex, 'discount', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
                         />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card Layout */}
+            <div className="md:hidden space-y-4 pb-4">
+              {displayedProducts.map((p) => (
+                <div key={`${p.sku}-${(p as any).originalIndex}`} className="bg-surface-container-highest/30 p-4 rounded-xl border border-outline-variant/30 space-y-3">
+
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="text-xs font-mono text-on-surface-variant mb-1">{p.sku}</p>
+                      <h3 className="font-bold text-sm text-on-surface line-clamp-2 leading-tight">{p.name}</h3>
+                      <p className="text-xs text-primary mt-1 font-medium">{p.brand}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] bg-surface-container-high px-2 py-1 rounded text-on-surface-variant font-mono block mb-1">
+                        {p.factoryCode}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-outline-variant/20">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-on-surface-variant font-bold">Categoria</label>
+                      <input
+                        type="text"
+                        className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-primary outline-none"
+                        value={p.category}
+                        onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-on-surface-variant font-bold">Desconto (%)</label>
+                      <input
+                        type="number"
+                        className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-tertiary outline-none text-tertiary font-bold"
+                        value={p.discount || 0}
+                        onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-on-surface-variant font-bold">Preço de Venda (R$)</label>
+                    <input
+                      type="number"
+                      className="w-full text-sm bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-2 focus:border-primary outline-none text-primary font-bold"
+                      value={p.price}
+                      onChange={(e) => handleProductChange((p as any).originalIndex, 'price', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+
+                </div>
+              ))}
+              {displayedProducts.length === 0 && (
+                <p className="text-center text-on-surface-variant text-sm py-4">Nenhum produto encontrado.</p>
+              )}
             </div>
 
             <div className="mt-4 text-xs text-on-surface-variant flex justify-between px-2">
@@ -297,7 +353,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
