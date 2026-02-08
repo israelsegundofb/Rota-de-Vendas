@@ -600,7 +600,8 @@ const App: React.FC = () => {
         salespersonId: ownerId,
         salespersonName: ownerName,
         type: 'clients',
-        itemCount: rawData.length
+        itemCount: rawData.length,
+        status: 'processing'
       };
 
       setUploadedFiles(prev => [newFileRecord, ...prev]);
@@ -632,6 +633,9 @@ const App: React.FC = () => {
 
       setProcState(prev => ({ ...prev, status: 'completed' }));
 
+      // Update file status to completed
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed' } : f));
+
       setTimeout(() => {
         setProcState(prev => prev.status === 'completed' ? { ...prev, isActive: false } : prev);
       }, 5000);
@@ -639,8 +643,9 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setProcState(prev => ({ ...prev, status: 'error', errorMessage: err.message || "Erro desconhecido" }));
-      // Remove file record if failed
-      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+
+      // Update file status to error instead of removing
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: err.message || "Erro desconhecido" } : f));
     }
   };
 
@@ -723,7 +728,8 @@ const App: React.FC = () => {
         salespersonId: 'system', // Products are system-wide
         salespersonName: 'Catálogo Geral',
         type: 'products',
-        itemCount: newProducts.length
+        itemCount: newProducts.length,
+        status: 'processing'
       };
 
       setUploadedFiles(prev => [newFileRecord, ...prev]);
@@ -731,13 +737,16 @@ const App: React.FC = () => {
       // Update Products List
       handleUploadProducts(newProducts);
 
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed' } : f));
+
       setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
       alert(`${newProducts.length} produtos importados com sucesso.`);
 
     } catch (e: any) {
       console.error(e);
       setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
-      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+      // Update file status to error instead of removing
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: e.message } : f));
     }
   };
 

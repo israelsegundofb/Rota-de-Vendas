@@ -216,9 +216,19 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                 </td>
                                             )}
                                             <td className="px-6 py-4 text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                    {file.itemCount}
-                                                </span>
+                                                {file.status === 'processing' ? (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 gap-1">
+                                                        <Loader2 className="w-3 h-3 animate-spin" /> Processando
+                                                    </span>
+                                                ) : file.status === 'error' ? (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 gap-1 cursor-help" title={file.errorMessage || 'Erro desconhecido'}>
+                                                        <AlertCircle className="w-3 h-3" /> Erro
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        {file.itemCount}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <button

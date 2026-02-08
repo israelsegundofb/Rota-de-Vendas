@@ -60,5 +60,7 @@ export interface UploadedFile {
   salespersonName: string;
   type: 'clients' | 'products';
   itemCount: number;
+  status: 'processing' | 'completed' | 'error';
+  errorMessage?: string;
 }
 
