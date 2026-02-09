@@ -1,3 +1,12 @@
+/* 
+  DESENVOLVIDO POR: Israel França
+  PROJETO: Rota de Vendas Inteligente
+  PORTFOLIO: https://www.behance.net/israelsegundo
+  
+  Este projeto foi desenvolvido com dedicação e expertise em desenvolvimento web. Conheça mais sobre meus trabalhos e projetos visitando meu portfólio no Behance.
+  
+  Developed with passion and technical excellence.
+*/
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -34,7 +43,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
             <div className="bg-gray-900 text-gray-200 p-4 rounded-lg overflow-x-auto text-sm font-mono mb-6">
               {this.state.error?.toString()}
             </div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors"
             >

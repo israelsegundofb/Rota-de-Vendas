@@ -1,4 +1,13 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+/* 
+  DESENVOLVIDO POR: Israel França
+  PROJETO: Rota de Vendas Inteligente
+  PORTFOLIO: https://www.behance.net/israelsegundo
+  
+  Este projeto foi desenvolvido com dedicação e expertise em desenvolvimento web. Conheça mais sobre meus trabalhos e projetos visitando meu portfólio no Behance.
+  
+  Developed with passion and technical excellence.
+*/
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
