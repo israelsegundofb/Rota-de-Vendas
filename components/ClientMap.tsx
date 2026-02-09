@@ -418,11 +418,8 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           <AlertCircle className="w-8 h-8" />
         </div>
         <h3 className="text-xl font-bold text-gray-800 mb-2">Erro de Autenticação do Mapa</h3>
-        <p className="text-sm text-gray-600 mb-2 max-w-xs">
+        <p className="text-sm text-gray-600 mb-4 max-w-xs">
           A chave de API atual é inválida para o Google Maps. Certifique-se de que a API "Maps JavaScript" está habilitada no console do Google Cloud.
-        </p>
-        <p className="text-xs text-gray-400 mb-4 bg-gray-100 px-2 py-1 rounded border border-gray-200 font-mono">
-          Chave em uso termina em: ...{apiKey ? apiKey.slice(-6) : 'VAZIA'}
         </p>
         <button onClick={onInvalidKey} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-md">
           <Key className="w-4 h-4" /> Trocar API Key
