@@ -33,6 +33,26 @@ export const isFirebaseInitialized = () => !!db;
 
 // -- DATA SYNC FUNCTIONS --
 
+// Helper: Remove undefined values (Firestore doesn't support undefined)
+const removeUndefined = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (Array.isArray(obj)) return obj.map(removeUndefined);
+    if (typeof obj !== 'object') return obj;
+
+    const cleaned: any = {};
+    for (const key in obj) {
+        const value = obj[key];
+        if (value === undefined) {
+            cleaned[key] = null; // Convert undefined to null
+        } else if (value !== null && typeof value === 'object') {
+            cleaned[key] = removeUndefined(value);
+        } else {
+            cleaned[key] = value;
+        }
+    }
+    return cleaned;
+};
+
 // Save Master Data (Clients, Products, Users, Categories, UploadedFiles)
 export const saveToCloud = async (
     clients: EnrichedClient[],
@@ -45,11 +65,11 @@ export const saveToCloud = async (
 
     try {
         const dataToSave = {
-            clients,
-            products,
-            categories,
-            users,
-            uploadedFiles,
+            clients: removeUndefined(clients),
+            products: removeUndefined(products),
+            categories: removeUndefined(categories),
+            users: removeUndefined(users),
+            uploadedFiles: removeUndefined(uploadedFiles),
             lastUpdated: new Date().toISOString(),
             updatedBy: 'App Sync'
         };
@@ -57,6 +77,7 @@ export const saveToCloud = async (
         // We store extensive data in a single doc for MVP simplicity (like the JSON backup)
         // In a real large-scale app, we would use subcollections.
         await setDoc(doc(db, 'rota-vendas', 'master-data'), dataToSave);
+        console.log('✅ Data saved to cloud successfully');
     } catch (e) {
         console.error("Error saving to cloud:", e);
         throw e;
