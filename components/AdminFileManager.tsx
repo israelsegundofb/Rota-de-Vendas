@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter, X } from 'lucide-react';
+import { isSalesTeam } from '../utils/authUtils';
 import { AppUser, UploadedFile } from '../types';
+import { isSalesTeam } from '../utils/authUtils';
 
 interface AdminFileManagerProps {
     users: AppUser[];
@@ -172,7 +174,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                             onChange={(e) => setTargetUploadUserId(e.target.value)}
                                         >
                                             <option value="" disabled>Selecione um vendedor...</option>
-                                            {users.filter(u => u.role === 'salesperson').map(u => (
+                                            {users.filter(u => isSalesTeam(u.role)).map(u => (
                                                 <option key={u.id} value={u.id}>{u.name}</option>
                                             ))}
                                         </select>
@@ -208,7 +210,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                         className={`bg-transparent border rounded px-1 py-0.5 outline-none w-24 ${!pf.targetUserId ? 'border-error text-error' : 'border-outline-variant text-on-surface'}`}
                                                     >
                                                         <option value="" disabled>Vendedor...</option>
-                                                        {users.filter(u => u.role === 'salesperson').map(u => (
+                                                        {users.filter(u => isSalesTeam(u.role)).map(u => (
                                                             <option key={u.id} value={u.id}>{u.name}</option>
                                                         ))}
                                                     </select>
@@ -373,7 +375,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                     disabled={file.status === 'processing'}
                                                 >
                                                     <option value="" className="bg-surface text-on-surface">None</option>
-                                                    {users.filter(u => u.role === 'salesperson').map(u => (
+                                                    {users.filter(u => isSalesTeam(u.role)).map(u => (
                                                         <option key={u.id} value={u.id} className="bg-surface text-on-surface">
                                                             {u.name}
                                                         </option>

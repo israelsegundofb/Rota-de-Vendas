@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { EnrichedClient } from '../types';
+import { EnrichedClient, UserRole } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
+import { isSalesTeam } from '../utils/authUtils';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
@@ -9,7 +10,7 @@ interface ClientListProps {
   clients: EnrichedClient[];
   onUpdateClient: (updatedClient: EnrichedClient) => void;
   onAddClient?: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
-  currentUserRole?: string;
+  currentUserRole?: UserRole;
   currentUserId?: string;
   currentUserName?: string;
 }
@@ -190,7 +191,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
 
           {/* Actions Group */}
           <div className="flex items-center gap-3">
-            {currentUserRole === 'salesperson' && onAddClient && (
+            {currentUserRole && isSalesTeam(currentUserRole) && onAddClient && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-200 hover:shadow-lg active:scale-95"

@@ -39,7 +39,18 @@ export interface EnrichedClient {
   sourceFileId?: string; // ID of the file this client was imported from
 }
 
-export type UserRole = 'admin' | 'salesperson';
+// Roles com hierarquia (1 = maior poder)
+export type UserRole =
+  | 'admin_dev'        // Nível 1: Deus
+  | 'admin_general'    // Nível 2: Admin
+  | 'general_manager'  // Nível 3: Gerente Geral
+  | 'sales_manager'    // Nível 4: Gerente de Vendas
+  | 'sales_supervisor' // Nível 5: Supervisor
+  | 'sales_internal'   // Nível 6: Vendedor Interno
+  | 'sales_external'   // Nível 7: Vendedor Externo
+  | 'admin'            // Legacy (será tratado como admin_dev)
+  | 'salesperson';     // Legacy (será tratado como sales_external)
+
 export type SalesCategory = 'Externo' | 'Interno' | 'Mercado Livre' | 'N/A';
 
 export interface AppUser {

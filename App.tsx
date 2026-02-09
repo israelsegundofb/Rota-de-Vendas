@@ -11,6 +11,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
+import { isAdmin, isSalesTeam } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
 import { parseCSV, parseProductCSV } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
@@ -302,7 +303,7 @@ const App: React.FC = () => {
     let targetName = "TODOS";
 
     // Determine context for granular clear
-    if (currentUser?.role === 'admin') {
+    if (currentUser && isAdmin(currentUser.role)) {
       if (filterSalespersonId !== 'Todos') {
         targetId = filterSalespersonId;
         const u = users.find(u => u.id === targetId);
@@ -312,7 +313,7 @@ const App: React.FC = () => {
         const u = users.find(u => u.id === targetId);
         targetName = u?.name || 'Desconhecido';
       }
-    } else if (currentUser?.role === 'salesperson') {
+    } else if (currentUser && isSalesTeam(currentUser.role)) {
       // Salesperson can only clear their own? Or system policy?
       // Let's assume for now they clear their own view, which is effectively "their" data if segmented.
       // However, often local storage is shared. Let's ask confirmation.
@@ -407,8 +408,8 @@ const App: React.FC = () => {
     resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
-    if (user.role === 'admin') {
-      const firstSeller = users.find(u => u.role === 'salesperson');
+    if (isAdmin(user.role)) {
+      const firstSeller = users.find(u => isSalesTeam(u.role));
       if (firstSeller) setTargetUploadUserId(firstSeller.id);
     }
   };
@@ -559,7 +560,7 @@ const App: React.FC = () => {
     let ownerId = currentUser.id;
     let ownerName = currentUser.name;
 
-    if (currentUser.role === 'admin') {
+    if (isAdmin(currentUser.role)) {
       if (!targetUploadUserId) {
         alert("Selecione um vendedor para atribuir esta planilha.");
         event.target.value = '';
@@ -705,7 +706,7 @@ const App: React.FC = () => {
     );
   }
 
-  const isAdmin = currentUser.role === 'admin';
+  const isAdminUser = isAdmin(currentUser.role);
   const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
 
   return (
@@ -752,7 +753,7 @@ const App: React.FC = () => {
 
           <div className="px-6 py-2">
             <p className="text-xs font-medium text-on-surface-variant/80 uppercase tracking-wider">
-              {isAdmin ? 'Painel Administrativo' : 'Portal do Vendedor'}
+              {isAdminUser ? 'Painel Administrativo' : 'Portal do Vendedor'}
             </p>
           </div>
 
@@ -761,7 +762,7 @@ const App: React.FC = () => {
               <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
               <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
               <div className="flex items-center gap-3 relative z-10">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md ${isAdmin ? 'bg-tertiary' : 'bg-secondary'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md ${isAdminUser ? 'bg-tertiary' : 'bg-secondary'}`}>
                   {currentUser.name.charAt(0)}
                 </div>
                 <div className="min-w-0">
@@ -945,6 +946,7 @@ const App: React.FC = () => {
             activeView === 'admin_users' && isAdmin ? (
               <div className="flex-1 overflow-y-auto bg-gray-50">
                 <AdminUserManagement
+                  currentUser={currentUser}
                   users={users}
                   onAddUser={handleAddUser}
                   onUpdateUser={handleUpdateUser}
@@ -1001,22 +1003,10 @@ const App: React.FC = () => {
 
                     // CORRECT APPROACH: Refactor handleFileUpload to accept (file, userId).
                     // But I can't do that inside this replacement string.
-
-                    // SAFE APPROACH FOR NOW: Just pass the file and rely on App.state? 
-                    // NO, AdminFileManager passes `targetId`.
-
-                    // I will implement a bridge function in App.tsx body later.
-                    // For now, I'll pass a placeholder or try to use handleFileUpload if I update it.
-                    // I will call `handleClientFileDirect(file, targetId)` which I will add.
-                    const targetUser = users.find(u => u.id === targetId);
-                    const targetName = targetUser?.name || 'Unknown';
-                    handleClientFileDirect(file, targetId);
-                  }}
-                  onUploadProducts={handleProductFileUpload}
-                  onDeleteFile={handleDeleteFile}
-                  onReassignSalesperson={handleReassignFileSalesperson}
-                  procState={procState}
-                />
+                    onDeleteFile = { handleDeleteFile }
+                    onReassignSalesperson = { handleReassignFileSalesperson }
+                    procState = { procState }
+                      />
               </div>
             ) : (
               <>

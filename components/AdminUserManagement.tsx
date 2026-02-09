@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase, AlertCircle } from 'lucide-react';
-import { AppUser, SalesCategory } from '../types';
+import { AppUser, SalesCategory, UserRole } from '../types';
+import { getRoleLabel, getAvailableRoles, canManageRole, normalizeRole, ROLE_HIERARCHY, ROLE_LABELS } from '../utils/authUtils';
 
 interface AdminUserManagementProps {
+  currentUser: AppUser;
   users: AppUser[];
   onAddUser: (user: AppUser) => void;
   onUpdateUser: (user: AppUser) => void;
@@ -12,6 +14,7 @@ interface AdminUserManagementProps {
 }
 
 const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
+  currentUser,
   users,
   onAddUser,
   onUpdateUser,
@@ -24,7 +27,12 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'salesperson' | 'admin'>('salesperson');
+
+  // Default to the first available role or lowest hierarchy role
+  const availableRoles = getAvailableRoles(currentUser.role);
+  const defaultRole = availableRoles.includes('sales_external') ? 'sales_external' : availableRoles[0];
+
+  const [role, setRole] = useState<UserRole>(defaultRole);
   const [salesCategory, setSalesCategory] = useState<SalesCategory>('Externo');
   const [color, setColor] = useState('#3B82F6'); // Default Blue
 
@@ -36,17 +44,22 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     setName('');
     setUsername('');
     setPassword('');
-    setRole('salesperson');
+    setRole(defaultRole);
     setSalesCategory('Externo');
     setColor('#3B82F6');
   };
 
   const handleEditClick = (user: AppUser) => {
+    if (!canManageRole(currentUser.role, user.role)) {
+      alert("Você não tem permissão para editar este usuário (Nível Hierárquico Superior ou Igual).");
+      return;
+    }
+
     setEditingId(user.id);
     setName(user.name);
     setUsername(user.username);
     setPassword(user.password || '');
-    setRole(user.role);
+    setRole(normalizeRole(user.role)); // Normalize old roles if any
     setSalesCategory(user.salesCategory || 'N/A');
     setColor(user.color || '#3B82F6');
 
@@ -58,14 +71,17 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     e.preventDefault();
     if (!name || !username || !password) return;
 
+    // Security check logic again just in case
+    const isSalesRole = ROLE_HIERARCHY[role] >= 4; // Managers and below
+
     const userData: AppUser = {
       id: editingId || Date.now().toString(),
       name,
       username,
       role,
       password,
-      salesCategory: role === 'salesperson' ? salesCategory : 'N/A',
-      color: role === 'salesperson' ? color : undefined
+      salesCategory: isSalesRole ? salesCategory : 'N/A',
+      color: isSalesRole ? color : undefined
     };
 
     if (editingId) {
@@ -80,7 +96,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
   // Filter Users
   const filteredUsers = users.filter(user => {
     if (filterType === 'Todos') return true;
-    if (user.role === 'admin') return false;
+    // Special filter for Admins in the list
+    if (filterType === 'N/A' && ROLE_HIERARCHY[user.role] <= 2) return true;
     return user.salesCategory === filterType;
   });
 
@@ -141,15 +158,21 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
             <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Perfil de Acesso</label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value as any)}
+              onChange={e => setRole(e.target.value as UserRole)}
               className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none cursor-pointer"
             >
-              <option value="salesperson">Vendedor</option>
-              <option value="admin">Administrador</option>
+              {availableRoles.map(r => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r] || r}
+                </option>
+              ))}
             </select>
+            <p className="text-[10px] text-on-surface-variant mt-1 pl-1">
+              * Você só pode criar níveis abaixo do seu.
+            </p>
           </div>
 
-          {role === 'salesperson' && (
+          {ROLE_HIERARCHY[role] >= 4 && (
             <>
               <div className="animate-fade-in">
                 <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Categoria de Venda</label>
@@ -268,15 +291,15 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                   <td className="px-6 py-4 font-medium text-on-surface">{user.name}</td>
                   <td className="px-6 py-4 text-on-surface-variant">{user.username}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${user.role === 'admin'
-                      ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
-                      : 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${ROLE_HIERARCHY[user.role] <= 2
+                        ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                        : 'bg-secondary-container text-on-secondary-container border-secondary-container'
                       }`}>
-                      {user.role === 'admin' ? 'Admin' : 'Vendedor'}
+                      {getRoleLabel(user.role)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {user.role === 'salesperson' ? (
+                    {ROLE_HIERARCHY[user.role] >= 4 ? (
                       <span className="flex items-center gap-1 text-xs text-on-surface-variant">
                         <Briefcase className="w-3.5 h-3.5" />
                         {user.salesCategory || 'N/A'}
@@ -286,7 +309,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    {user.role === 'salesperson' && user.color ? (
+                    {ROLE_HIERARCHY[user.role] >= 4 && user.color ? (
                       <div className="flex items-center gap-2" title={user.color}>
                         <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: user.color }}></div>
                       </div>
@@ -296,22 +319,28 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEditClick(user)}
-                        className="p-2 text-primary hover:bg-primary-container/30 rounded-full transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      {canManageRole(currentUser.role, user.role) ? (
+                        <>
+                          <button
+                            onClick={() => handleEditClick(user)}
+                            className="p-2 text-primary hover:bg-primary-container/30 rounded-full transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
 
-                      {user.username !== 'admin' && (
-                        <button
-                          onClick={() => onDeleteUser(user.id)}
-                          className="p-2 text-error hover:bg-error-container/30 rounded-full transition-colors"
-                          title="Remover"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          <button
+                            onClick={() => onDeleteUser(user.id)}
+                            className="p-2 text-error hover:bg-error-container/30 rounded-full transition-colors"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 opacity-30 cursor-not-allowed">
+                          <span className="text-xs italic">Sem permissão</span>
+                        </div>
                       )}
                     </div>
                   </td>
@@ -337,11 +366,11 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                   <h3 className="font-bold text-on-surface">{user.name}</h3>
                   <p className="text-xs text-on-surface-variant">@{user.username}</p>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${user.role === 'admin'
-                  ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
-                  : 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${ROLE_HIERARCHY[user.role] <= 2
+                    ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                    : 'bg-secondary-container text-on-secondary-container border-secondary-container'
                   }`}>
-                  {user.role === 'admin' ? 'Admin' : 'Vendedor'}
+                  {getRoleLabel(user.role)}
                 </span>
               </div>
 
@@ -357,19 +386,21 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() => handleEditClick(user)}
-                  className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-primary/20 transition-colors"
-                >
-                  <Pencil className="w-3.5 h-3.5" /> Editar
-                </button>
-                {user.username !== 'admin' && (
-                  <button
-                    onClick={() => onDeleteUser(user.id)}
-                    className="px-3 py-1.5 bg-error/10 text-error rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-error/20 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Remover
-                  </button>
+                {canManageRole(currentUser.role, user.role) && (
+                  <>
+                    <button
+                      onClick={() => handleEditClick(user)}
+                      className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => onDeleteUser(user.id)}
+                      className="px-3 py-1.5 bg-error/10 text-error rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-error/20 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remover
+                    </button>
+                  </>
                 )}
               </div>
             </div>

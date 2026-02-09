@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { EnrichedClient, AppUser, Product } from '../types';
+import { isAdmin } from '../utils/authUtils';
+import { isAdmin } from '../utils/authUtils';
 
 export const useFilters = (
     masterClientList: EnrichedClient[],
@@ -26,7 +28,7 @@ export const useFilters = (
     const visibleClients = useMemo(() => {
         if (!currentUser) return [];
         let baseList = [];
-        if (currentUser.role === 'admin') {
+        if (isAdmin(currentUser.role)) {
             if (filterSalespersonId !== 'Todos') {
                 baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
             } else {
@@ -49,7 +51,7 @@ export const useFilters = (
 
             // Sales Category Filter (Admin Only)
             let matchSalesCat = true;
-            if (currentUser?.role === 'admin' && filterSalesCategory !== 'Todos') {
+            if (currentUser && isAdmin(currentUser.role) && filterSalesCategory !== 'Todos') {
                 const seller = users.find(u => u.id === c.salespersonId);
                 if (!seller || seller.salesCategory !== filterSalesCategory) {
                     matchSalesCat = false;
