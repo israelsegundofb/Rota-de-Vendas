@@ -98,11 +98,16 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  // Default to the provided key if process.env.API_KEY is missing
-  const [activeApiKey, setActiveApiKey] = useState<string>(import.meta.env.VITE_GOOGLE_API_KEY || getStoredFirebaseConfig()?.apiKey || "");
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
-  );
+  const [activeApiKey, setActiveApiKey] = useState<string>(() => {
+    const key = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || getStoredFirebaseConfig()?.apiKey || '';
+    console.log('[APP] Gemini API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
+    return key;
+  });
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(() => {
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || localStorage.getItem('google_maps_api_key') || import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || '';
+    console.log('[APP] Maps API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
+    return key;
+  });
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
@@ -378,22 +383,11 @@ const App: React.FC = () => {
   };
 
   const handleInvalidKey = async () => {
-    if ((window as any).aistudio) {
-      try {
-        await (window as any).aistudio.openSelectKey();
-        // Update key from env after selection
-        const newKey = process.env.API_KEY;
-        if (newKey) {
-          setActiveApiKey(newKey);
-        } else {
-          // If process.env not updated immediately, try to read it again or use current
-          if (process.env.API_KEY) setActiveApiKey(process.env.API_KEY);
-        }
-        // Increment version to force remount of map even if key string is identical
-        setKeyVersion(v => v + 1);
-      } catch (e) { console.error(e); }
-    } else {
-      console.error("AI Studio environment not detected.");
+    const newKey = prompt('Digite sua Chave de API do Google Maps:');
+    if (newKey && newKey.trim()) {
+      setGoogleMapsApiKey(newKey.trim());
+      localStorage.setItem('google_maps_api_key', newKey.trim());
+      setKeyVersion(v => v + 1);
     }
   };
 
