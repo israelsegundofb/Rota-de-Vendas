@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { EnrichedClient } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
-import { X, Save, MapPin, Store, AlertCircle, Globe } from 'lucide-react';
+import { consultarCNPJ } from '../services/cnpjService';
+import { X, Save, MapPin, Store, AlertCircle, Globe, Search, Loader2 } from 'lucide-react';
 
 interface AddClientModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
+    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress' | 'lastPurchaseDate' | 'purchaseCount' | 'totalSpent' | 'averageTicket' | 'productCount' | 'skuCount' | 'purchasedProducts'>) => void;
     salespersonId: string;
     ownerName: string;
 }
 
 const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd, salespersonId, ownerName }) => {
     // State for form
+    const [cnpj, setCnpj] = useState('');
+    const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
     const [formData, setFormData] = useState({
         companyName: '',
         ownerName: '',
         contact: '',
-        category: ['Outros'], // Changed to array
+        category: ['Outros'],
         region: 'Nordeste',
         state: 'CE',
         city: 'Fortaleza',
@@ -43,6 +46,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 originalAddress: '',
                 cleanAddress: ''
             });
+            setCnpj('');
             setError('');
 
             // Try to get current location
@@ -86,6 +90,36 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         });
     };
 
+    const handleSearchCNPJ = async () => {
+        if (!cnpj || cnpj.length < 14) {
+            setError('Digite um CNPJ válido para buscar.');
+            return;
+        }
+
+        setIsLoadingCNPJ(true);
+        setError('');
+
+        try {
+            const data = await consultarCNPJ(cnpj);
+            if (data) {
+                setFormData(prev => ({
+                    ...prev,
+                    companyName: data.nome_fantasia || data.razao_social,
+                    ownerName: data.razao_social, // Often used as official name
+                    contact: data.ddd_telefone_1,
+                    state: data.uf,
+                    city: data.municipio,
+                    originalAddress: `${data.logradouro}, ${data.numero} ${data.complemento} - ${data.bairro}, ${data.cep}`,
+                    region: getRegionByUF(data.uf) as any
+                }));
+            }
+        } catch (err: any) {
+            setError(err.message || 'Erro ao buscar CNPJ.');
+        } finally {
+            setIsLoadingCNPJ(false);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -109,7 +143,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
             city: formData.city,
             originalAddress: fullAddress,
             salespersonId: salespersonId,
-            googleMapsUri: ''
+            googleMapsUri: '',
+            cnpj: cnpj || undefined // Pass CNPJ if available
         });
 
         setIsSubmitting(false);
@@ -141,6 +176,46 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 {/* Body */}
                 <div className="px-6 py-4 overflow-y-auto custom-scrollbar flex-1">
                     <form id="add-client-form" onSubmit={handleSubmit} className="space-y-6">
+
+                        {/* CNPJ Search Section */}
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
+                            <label className="block text-xs font-bold text-blue-800 mb-2 uppercase tracking-wide">
+                                Preenchimento Automático
+                            </label>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={cnpj}
+                                        onChange={e => setCnpj(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="Digite o CNPJ (somente números)..."
+                                        className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-sm font-mono"
+                                        maxLength={14}
+                                    />
+                                    {cnpj && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setCnpj('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleSearchCNPJ}
+                                    disabled={isLoadingCNPJ || cnpj.length < 14}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium text-sm"
+                                >
+                                    {isLoadingCNPJ ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                    Buscar
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-blue-600 mt-2">
+                                * A busca preenche Razão Social, Endereço e Contato automaticamente.
+                            </p>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Company Name */}

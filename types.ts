@@ -3,6 +3,8 @@ export interface RawClient {
   'Nome do Proprietário': string;
   'Contato': string;
   'Endereço': string;
+  'CNPJ'?: string;
+  'CPF'?: string;
   'GoogleMapsLink'?: string; // Extracted from =HYPERLINK if present
   'extractedLat'?: number;
   'extractedLng'?: number;
@@ -26,6 +28,8 @@ export interface EnrichedClient {
   companyName: string;
   ownerName: string;
   contact: string;
+  cnpj?: string; // Added for BrasilAPI integration
+  cpf?: string;  // Added for manual entry
   originalAddress: string;
   cleanAddress: string;
   category: string[]; // Changed from string to string[] for multiple segments

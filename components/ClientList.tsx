@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { EnrichedClient, UserRole, Product } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isSalesTeam } from '../utils/authUtils';
-import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag } from 'lucide-react';
+import { consultarCNPJ } from '../services/cnpjService';
+import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag, RefreshCw, Loader2 } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
 import ClientProductAssignmentModal from './ClientProductAssignmentModal';
@@ -10,7 +11,7 @@ import ClientProductAssignmentModal from './ClientProductAssignmentModal';
 interface ClientListProps {
   clients: EnrichedClient[];
   onUpdateClient: (updatedClient: EnrichedClient) => void;
-  onAddClient?: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
+  onAddClient?: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress' | 'lastPurchaseDate' | 'purchaseCount' | 'totalSpent' | 'averageTicket' | 'productCount' | 'skuCount' | 'purchasedProducts'>) => void;
   currentUserRole?: UserRole;
   currentUserId?: string;
   currentUserName?: string;
@@ -32,6 +33,11 @@ const ClientList: React.FC<ClientListProps> = ({
   const [regionFilter, setRegionFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todos');
 
+  // Bulk Update State
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [totalToUpdate, setTotalToUpdate] = useState(0);
+
   // Modal State
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -45,7 +51,8 @@ const ClientList: React.FC<ClientListProps> = ({
     return clients.filter(client => {
       const matchesSearch =
         client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.ownerName.toLowerCase().includes(searchTerm.toLowerCase());
+        client.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (client.cnpj && client.cnpj.includes(searchTerm));
 
       const matchesRegion = regionFilter === 'Todos' || client.region === regionFilter;
       const matchesCategory = categoryFilter === 'Todos' || (
@@ -57,15 +64,80 @@ const ClientList: React.FC<ClientListProps> = ({
     });
   }, [clients, searchTerm, regionFilter, categoryFilter]);
 
+  const handleBulkUpdate = async () => {
+    const clientsWithCNPJ = filteredClients.filter(c => c.cnpj && c.cnpj.length === 14);
+
+    if (clientsWithCNPJ.length === 0) {
+      alert("Nenhum cliente com CNPJ encontrado na lista atual.");
+      return;
+    }
+
+    if (!confirm(`Encontrados ${clientsWithCNPJ.length} clientes com CNPJ.\nDeseja buscar dados atualizados na Receita Federal para eles?`)) {
+      return;
+    }
+
+    setIsUpdating(true);
+    setTotalToUpdate(clientsWithCNPJ.length);
+    setUpdateProgress(0);
+
+    let updatedCount = 0;
+
+    for (const client of clientsWithCNPJ) {
+      if (!client.cnpj) continue; // Should be handled by filter but typescript safety
+
+      try {
+        const data = await consultarCNPJ(client.cnpj);
+        if (data) {
+          // Check if anything meaningful changed? Or just overwrite?
+          // Let's overwrite fields that BrasilAPI provides, preserving others.
+          // Note: BrasilAPI address format might be slightly different.
+
+          // Re-construct address 
+          const cleanAddress = `${data.logradouro}, ${data.numero} ${data.complemento} - ${data.bairro}, ${data.cep}`;
+
+          const updatedClient: EnrichedClient = {
+            ...client,
+            companyName: data.nome_fantasia || data.razao_social,
+            ownerName: client.ownerName === 'Não Informado' ? data.razao_social : client.ownerName, // Only update owner if generic? Or always? User asked to "update data". Let's update ownerName if it matches Razao Social or if current is empty.
+            // Actually, let's play safe and update core business fields
+            contact: data.ddd_telefone_1 || client.contact, // Update contact if API has one
+            state: data.uf,
+            city: data.municipio,
+            cleanAddress: cleanAddress,
+            originalAddress: cleanAddress, // Update original address too
+            // We assume region mapping is handled by 'state' via utility if we wanted, but here we might trust existing region or re-calc. 
+            // Let's keep region as is unless state changed drastically.
+          };
+
+          onUpdateClient(updatedClient);
+          updatedCount++;
+        }
+      } catch (error) {
+        console.error(`Falha ao atualizar cliente ${client.companyName}:`, error);
+        // Continue to next
+      }
+
+      setUpdateProgress(prev => prev + 1);
+      // Small delay to be nice to API? filtering is client side, API calls are async.
+      // BrasilAPI has no strict rate limit but let's be polite.
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    setIsUpdating(false);
+    alert(`${updatedCount} clientes atualizados com sucesso!`);
+  };
+
   const handleExportCSV = () => {
     const headers = [
-      'ID', 'Razão Social', 'Proprietário', 'Contato', 'Endereço', 'Cidade', 'UF', 'Região', 'Segmento', 'Produtos Comprados', 'Link Maps'
+      'ID', 'Razão Social', 'Proprietário', 'CNPJ', 'CPF', 'Contato', 'Endereço', 'Cidade', 'UF', 'Região', 'Segmento', 'Produtos Comprados', 'Link Maps'
     ];
 
     const rows = filteredClients.map(client => [
       client.id,
       client.companyName,
       client.ownerName,
+      client.cnpj || '',
+      client.cpf || '',
       client.contact,
       client.cleanAddress,
       client.city,
@@ -140,6 +212,7 @@ const ClientList: React.FC<ClientListProps> = ({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-on-surface truncate pr-2" title={client.companyName}>{client.companyName}</h3>
+            {client.cnpj && <span className="text-[10px] text-gray-500 font-mono block">CNPJ: {client.cnpj}</span>}
             <div className="flex items-center gap-1 text-xs text-on-surface-variant mt-0.5">
               <Tag className="w-3 h-3" />
               <span className="truncate">{client.category.join(', ')}</span>
@@ -224,6 +297,7 @@ const ClientList: React.FC<ClientListProps> = ({
       <div className="flex justify-between items-start mb-2">
         <div>
           <h3 className="font-bold text-gray-900">{client.companyName}</h3>
+          {client.cnpj && <p className="text-[10px] text-gray-500 font-mono">CNPJ: {client.cnpj}</p>}
           <p className="text-xs text-gray-500">{client.category.join(', ')}</p>
 
           {/* BADGE DE PRODUTOS MOBILE */}
@@ -296,7 +370,7 @@ const ClientList: React.FC<ClientListProps> = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
-            placeholder="Razão Social ou Proprietário..."
+            placeholder="Razão Social, Proprietário ou CNPJ..."
             className="w-full pl-10 pr-4 py-2 bg-surface-container-highest border-none rounded-full text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant/50"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -324,6 +398,25 @@ const ClientList: React.FC<ClientListProps> = ({
           </select>
 
           <div className="md:ml-auto flex items-center gap-2 pl-2 border-l border-gray-200">
+            {/* Bulk Update Button */}
+            <button
+              onClick={handleBulkUpdate}
+              disabled={isUpdating}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Atualizar dados de clientes com CNPJ"
+            >
+              {isUpdating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {totalToUpdate > 0 ? `${updateProgress}/${totalToUpdate}` : 'Atualizando...'}
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" /> Atualizar (CNPJ)
+                </>
+              )}
+            </button>
+
             {currentUserRole && isSalesTeam(currentUserRole) && onAddClient && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
@@ -344,7 +437,8 @@ const ClientList: React.FC<ClientListProps> = ({
       </div>
 
       <div className="p-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
-        Exibindo {filteredClients.length} de {clients.length} clientes
+        Exibindo {filteredClients.length} de {clients.length} clientes.
+        {isUpdating && <span className="ml-2 text-teal-600 font-bold">Atualizando dados... Aguarde.</span>}
       </div>
 
       {/* Grid Content */}
@@ -387,7 +481,6 @@ const ClientList: React.FC<ClientListProps> = ({
             onUpdateClient(updated);
             setIsEditModalOpen(false);
           }}
-          currentUserRole={currentUserRole}
         />
       )}
 
@@ -395,12 +488,12 @@ const ClientList: React.FC<ClientListProps> = ({
         <AddClientModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
-          onSave={(newClient) => {
+          onAdd={(newClient) => {
             onAddClient(newClient);
             setIsAddModalOpen(false);
           }}
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
+          salespersonId={currentUserId || ''}
+          ownerName={currentUserName || ''}
         />
       )}
 
