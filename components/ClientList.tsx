@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { EnrichedClient, UserRole } from '../types';
+import { EnrichedClient, UserRole, Product } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isSalesTeam } from '../utils/authUtils';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag } from 'lucide-react';
@@ -144,7 +144,21 @@ const ClientList: React.FC<ClientListProps> = ({
               <Tag className="w-3 h-3" />
               <span className="truncate">{client.category.join(', ')}</span>
             </div>
-            {/* BADGE DE PRODUTOS */}
+
+            {/* PRODUCT STATS */}
+            {client.purchasedProducts && client.purchasedProducts.length > 0 && (
+              <div className="flex items-center gap-3 mt-1.5 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 w-fit">
+                <span className="flex items-center gap-1" title="Total de itens comprados">
+                  📦 <span className="font-bold text-gray-800">{client.purchasedProducts.length}</span> Prod.
+                </span>
+                <div className="h-3 w-px bg-gray-300"></div>
+                <span className="flex items-center gap-1" title="Quantidade de SKUs únicos">
+                  🔖 <span className="font-bold text-gray-800">{new Set(client.purchasedProducts.map(p => p.sku)).size}</span> SKUs
+                </span>
+              </div>
+            )}
+
+            {/* BADGE DE PRODUTOS RECENTES (Opcional - mantendo mas reduzindo destaque se necessário, ou mantendo como está) */}
             {client.purchasedProducts && client.purchasedProducts.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1">
                 {client.purchasedProducts.slice(0, 2).map((p, i) => (
