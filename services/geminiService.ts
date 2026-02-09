@@ -116,6 +116,11 @@ export const processClientsWithAI = async (
     const cnpj = client.cnpj || "";
     const cpf = client.cpf || "";
 
+    // DEBUG: Log para verificar se CNPJ está sendo recebido
+    if (cnpj || cpf) {
+      console.log(`[DEBUG] Cliente ${index}: CNPJ='${cnpj}', CPF='${cpf}'`);
+    }
+
     // Extract CEP from address for region fallback
     const cepMatch = address.match(/\d{5}[-]?\d{3}/);
     const extractedCEP = cepMatch ? cepMatch[0] : "";
@@ -257,6 +262,16 @@ export const processClientsWithAI = async (
           lng: finalLng,
           googleMapsUri: client.googleMapsLink || googleMapsUri
         };
+
+        // DEBUG: Log resultado final
+        console.log(`[DEBUG] Cliente ${index} processado:`, {
+          company,
+          cnpj,
+          cpf,
+          lat: finalLat,
+          lng: finalLng,
+          city: finalCity
+        });
 
         success = true;
 
