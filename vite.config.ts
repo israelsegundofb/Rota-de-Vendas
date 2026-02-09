@@ -4,32 +4,25 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+  const envDir = path.resolve(__dirname);
+  const env = loadEnv(mode, envDir, '');
+
+  // Build-time diagnostic
+  console.log('[VITE BUILD] envDir:', envDir);
+  console.log('[VITE BUILD] VITE_GOOGLE_API_KEY:', env.VITE_GOOGLE_API_KEY ? 'SET (' + env.VITE_GOOGLE_API_KEY.substring(0, 10) + '...)' : 'NOT SET');
+  console.log('[VITE BUILD] VITE_FIREBASE_API_KEY:', env.VITE_FIREBASE_API_KEY ? 'SET (' + env.VITE_FIREBASE_API_KEY.substring(0, 10) + '...)' : 'NOT SET');
+  console.log('[VITE BUILD] VITE_FIREBASE_PROJECT_ID:', env.VITE_FIREBASE_PROJECT_ID ? 'SET' : 'NOT SET');
+
   return {
     base: '/Rota-de-Vendas/',
+    envDir: envDir,
     server: {
       port: 3000,
     },
     plugins: [
       react(),
-      // Temporarily disabled PWA plugin due to build issues
-      // VitePWA({
-      //   registerType: 'autoUpdate',
-      //   workbox: {
-      //     globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}']
-      //   },
-      //   manifest: {
-      //     name: 'Rota de Vendas Inteligente',
-      //     short_name: 'Rota de Vendas',
-      //     description: 'Sistema Inteligente de Gestão de Vendas e Rotas',
-      //     theme_color: '#1e3a8a',
-      //     background_color: '#ffffff',
-      //     display: 'standalone'
-      //   }
-      // })
     ],
     define: {
-      // Explicitly define all VITE_* env vars for production build
       'import.meta.env.VITE_GOOGLE_API_KEY': JSON.stringify(env.VITE_GOOGLE_API_KEY || ''),
       'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY || ''),
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(env.VITE_FIREBASE_API_KEY || ''),
@@ -47,3 +40,4 @@ export default defineConfig(({ mode }) => {
     }
   };
 });
+
