@@ -76,19 +76,53 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
                         setIsDataLoaded(true);
                         return;
+                    } else {
+                        // Cloud is empty - migrate localStorage or use defaults
+                        console.log("Cloud is empty. Checking localStorage for migration...");
+
+                        const savedUsers = localStorage.getItem('vendas_ai_users');
+                        let usersToSave = savedUsers ? JSON.parse(savedUsers) : null;
+
+                        if (!usersToSave || usersToSave.length === 0) {
+                            // Import INITIAL_USERS if localStorage is also empty
+                            console.log("No users in localStorage. Using INITIAL_USERS.");
+                            const { INITIAL_USERS } = await import('./useAuth');
+                            usersToSave = INITIAL_USERS;
+                        }
+
+                        // Save to cloud for first time
+                        if (setUsers) setUsers(usersToSave);
+                        setMasterClientList(loadInitialClients());
+
+                        console.log("Saving initial data to cloud...");
+                        await saveToCloud(
+                            loadInitialClients(),
+                            loadInitialProducts(),
+                            loadInitialCategories(),
+                            usersToSave,
+                            loadInitialFiles()
+                        );
+
+                        setIsDataLoaded(true);
+                        return;
                     }
                 } catch (e) {
                     console.error("Cloud load error", e);
                 }
             }
 
-            // 3. Fallback to LocalStorage
+            // 3. Fallback to LocalStorage (Firebase not connected)
             console.log("Loading data from LocalStorage...");
             setMasterClientList(loadInitialClients());
-            // Products, Categories, Files are already init via useState lazy init, but redundant set is fine
 
             const savedUsers = localStorage.getItem('vendas_ai_users');
-            if (savedUsers && setUsers) setUsers(JSON.parse(savedUsers));
+            if (savedUsers && setUsers) {
+                setUsers(JSON.parse(savedUsers));
+            } else if (setUsers) {
+                // If no users exist, use INITIAL_USERS
+                const { INITIAL_USERS } = await import('./useAuth');
+                setUsers(INITIAL_USERS);
+            }
 
             setIsDataLoaded(true);
         };
