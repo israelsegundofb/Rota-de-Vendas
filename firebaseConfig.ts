@@ -17,14 +17,15 @@ export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
     const stored = localStorage.getItem('firebase_config');
     if (stored) return JSON.parse(stored);
 
-    // Default Config provided by User (Auto-connect)
+    // Default Firebase Config with hardcoded fallbacks
+    // Firebase client config is public/safe to hardcode (same as Google Maps key in HTML)
     return {
-        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-        appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAenb2sXL1h-y9uChCwjaZoU4I_rHzBd2w",
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0586123917.firebaseapp.com",
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0586123917",
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0586123917.firebasestorage.app",
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "66816750674",
+        appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:66816750674:web:a2ec5f3735ae90f821db8b"
     };
 };
 
