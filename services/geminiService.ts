@@ -190,6 +190,7 @@ export const processClientsWithAI = async (
         }
 
         // --- GEOCODING ENHANCEMENT ---
+        // 1. Initialize with AI data or existing data
         let finalLat = client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
         let finalLng = client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
         let finalAddress = aiData.cleanAddress || address;
@@ -197,31 +198,40 @@ export const processClientsWithAI = async (
         let finalState = aiData.state || 'BR';
         let finalRegion = aiData.region || 'Indefinido';
 
-        if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
-          finalRegion = getRegionFromCEP(extractedCEP);
-        }
-
-        const needsGeocoding = !client.latitude || finalCity === 'Desconhecido' || finalState === 'BR';
+        // 2. Check if we need to force geocoding (Missing coords or (0,0))
+        // We strictly trust the "Endereço Completo" (rawAddress) from the CSV as the source of truth if AI fails to pin it.
+        const hasValidCoords = finalLat !== 0 && finalLng !== 0;
+        const needsGeocoding = !hasValidCoords || finalCity === 'Desconhecido' || finalState === 'BR';
 
         if (needsGeocoding) {
-          const addressToGeocode = finalAddress || rawAddress;
-          if (addressToGeocode && addressToGeocode.length > 5 && mapsApiKey) { // Use mapsApiKey
+          // Prioritize the raw address from CSV for geocoding to ensure we find "where the pin is" based on input
+          const addressToGeocode = rawAddress || finalAddress;
+
+          if (addressToGeocode && addressToGeocode.length > 5 && mapsApiKey) {
             try {
-              const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey); // Use mapsApiKey
+              const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey);
+
               if (geocodeResult) {
-                if (!client.latitude) {
+                // Always update coordinates if we didn't have them or if they were 0,0
+                if (!hasValidCoords) {
                   finalLat = geocodeResult.lat;
                   finalLng = geocodeResult.lng;
                 }
+
+                // Always update location details from the authoritative geocoding result
                 if (geocodeResult.addressComponents) {
                   const parsed = parseAddressComponents(geocodeResult.addressComponents);
                   finalCity = parsed.city;
                   finalState = parsed.state;
                   finalRegion = parsed.region as any;
                 }
+
+                // Fallback to CEP if region is still undefined
                 if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
                   finalRegion = getRegionFromCEP(extractedCEP);
                 }
+
+                // Update formatted address if available
                 if (geocodeResult.formattedAddress) {
                   finalAddress = geocodeResult.formattedAddress;
                 }
