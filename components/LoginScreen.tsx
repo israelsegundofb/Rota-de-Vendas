@@ -34,30 +34,60 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     e.preventDefault();
     setError('');
 
+    // Log da chave para debug (sem expor chave completa)
+    const captchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    console.log('[CAPTCHA] Key configured:', captchaKey ? `${captchaKey.substring(0, 10)}...` : 'MISSING');
+    console.log('[CAPTCHA] executeRecaptcha available:', !!executeRecaptcha);
+
     // Verificar se o reCAPTCHA está pronto
     if (!executeRecaptcha) {
-      setError('Verificação de segurança ainda carregando. Aguarde...');
+      console.error('[CAPTCHA] executeRecaptcha not available - Provider may not be loaded');
+      setError('⚠️ Sistema de segurança não carregado. Recarregue a página.');
       return;
     }
 
     setIsVerifying(true);
 
     try {
+      console.log('[CAPTCHA] Executing reCAPTCHA verification...');
+
       // Executar verificação CAPTCHA
       const token = await executeRecaptcha('login');
-      console.log('reCAPTCHA token obtained:', token ? 'Success' : 'Failed');
 
-      // Proceder com validação de credenciais
+      console.log('[CAPTCHA] Token received:', token ? 'Success ✅' : 'Failed ❌');
+      console.log('[CAPTCHA] Token length:', token?.length || 0);
+
+      if (!token) {
+        throw new Error('reCAPTCHA token is empty');
+      }
+
+      // CAPTCHA OK - Proceder com validação de credenciais
+      console.log('[AUTH] CAPTCHA passed, validating credentials...');
       const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
 
       if (user && user.password === password) {
+        console.log('[AUTH] Login successful ✅');
         onLogin(user);
       } else {
-        setError('Credenciais inválidas. Tente novamente.');
+        console.warn('[AUTH] Invalid credentials');
+        setError('❌ Credenciais inválidas. Verifique usuário e senha.');
       }
-    } catch (error) {
-      console.error('reCAPTCHA error:', error);
-      setError('Falha na verificação de segurança. Tente novamente.');
+    } catch (error: any) {
+      console.error('[CAPTCHA] Error details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        error: error
+      });
+
+      // Mensagem mais específica baseada no erro
+      if (error?.message?.includes('Invalid site key')) {
+        setError('🔑 Erro de configuração: Chave reCAPTCHA inválida. Contate o administrador.');
+      } else if (error?.message?.includes('network')) {
+        setError('🌐 Erro de rede. Verifique sua conexão e tente novamente.');
+      } else {
+        setError(`🔒 Falha na verificação de segurança: ${error?.message || 'Erro desconhecido'}. Tente novamente.`);
+      }
     } finally {
       setIsVerifying(false);
     }

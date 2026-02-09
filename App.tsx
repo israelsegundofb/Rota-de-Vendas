@@ -691,6 +691,11 @@ const App: React.FC = () => {
 
   const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6Lc5JWUsAAAAAKysoFirSOJTvWfOXYAVRJyoVqnJ";
 
+  // Debug: Log da chave configurada (apenas primeiros caracteres por segurança)
+  console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
+  console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
+  console.log('[APP] Environment:', import.meta.env.MODE);
+
   return (
     <GoogleReCaptchaProvider
       reCaptchaKey={recaptchaKey}
