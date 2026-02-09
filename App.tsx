@@ -167,6 +167,8 @@ const App: React.FC = () => {
     }
   }, [uploadedFiles]);
 
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
   useEffect(() => {
     const initData = async () => {
       // 1. Try to init Firebase
@@ -186,6 +188,8 @@ const App: React.FC = () => {
           if (cloudData.categories) setCategories(cloudData.categories);
           if (cloudData.users) setUsers(cloudData.users);
           if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
+
+          setIsDataLoaded(true); // Mark as loaded
           return; // Stop here, use cloud data
         } else {
           console.log("Cloud data found but EMPTY. Ignoring Cloud to preserve Local data.");
@@ -222,6 +226,8 @@ const App: React.FC = () => {
 
       const savedFiles = localStorage.getItem('vendas_ai_files');
       if (savedFiles) setUploadedFiles(JSON.parse(savedFiles));
+
+      setIsDataLoaded(true); // Mark as loaded
     };
 
     initData();
@@ -229,14 +235,15 @@ const App: React.FC = () => {
 
   // Save changes to Cloud whenever critical data changes (Debounced ideally, but direct for MVP)
   useEffect(() => {
-    if (isFirebaseConnected && (masterClientList.length > 0 || users.length > 0 || uploadedFiles.length > 0)) {
+    // Only save if connected AND data has been initially loaded to avoid overwriting cloud with empty/partial init state
+    if (isFirebaseConnected && isDataLoaded && (masterClientList.length > 0 || users.length > 0 || uploadedFiles.length > 0)) {
       const timeout = setTimeout(() => {
         saveToCloud(masterClientList, products, categories, users, uploadedFiles)
           .catch(err => console.error("Auto-save failed", err));
       }, 2000); // 2s debounce
       return () => clearTimeout(timeout);
     }
-  }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected]);
+  }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
 
   useEffect(() => {
     // If env var exists, it takes precedence
