@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
       //   },
       //   manifest: {
       //     name: 'Rota de Vendas Inteligente',
-      //     short_name: 'Vendas A.I.',
+      //     short_name: 'Rota de Vendas',
       //     description: 'Sistema Inteligente de Gestão de Vendas e Rotas',
       //     theme_color: '#1e3a8a',
       //     background_color: '#ffffff',

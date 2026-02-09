@@ -745,7 +745,7 @@ const App: React.FC = () => {
           <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
             <h1 className="text-xl font-bold flex items-center gap-2 text-primary">
               <LayoutDashboard className="w-6 h-6" />
-              Vendas A.I.
+              Rota de Vendas
             </h1>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
@@ -886,7 +886,7 @@ const App: React.FC = () => {
             <Menu className="w-6 h-6" />
           </button>
           <span className="font-bold text-lg text-primary flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5" /> Vendas A.I.
+            <LayoutDashboard className="w-5 h-5" /> Rota de Vendas
           </span>
           <div className="w-10"></div> {/* Spacer for center alignment */}
         </header>
