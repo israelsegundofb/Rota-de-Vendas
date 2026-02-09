@@ -63,7 +63,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
 
       // CAPTCHA OK - Proceder com validação de credenciais
       console.log('[AUTH] CAPTCHA passed, validating credentials...');
-      const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+
+      // Buscar usuários atuais do Cloud para garantir dados frescos
+      let currentUsers = users;
+      try {
+        const { loadFromCloud } = await import('../services/firebaseService');
+        const cloudData = await loadFromCloud();
+        if (cloudData && cloudData.users) {
+          console.log('[AUTH] Fetched fresh users from cloud for validation');
+          currentUsers = cloudData.users;
+        }
+      } catch (e) {
+        console.warn('[AUTH] Failed to fetch fresh users, using prop users', e);
+      }
+
+      const user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
 
       if (user && user.password === password) {
         console.log('[AUTH] Login successful ✅');
