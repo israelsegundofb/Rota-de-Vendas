@@ -98,19 +98,38 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     const addressInput = rowData['endereco'] || rowData['logradouro'] || rowData['localizacao'] ||
                         rowData['endereco completo'] || rowData['rua'] || rowData['end'] || '';
 
-                    const { address, link, lat, lng } = parseHyperlink(addressInput);
+                    let { address, link, lat, lng } = parseHyperlink(addressInput);
 
-                    // Prioritize the extracted Excel Hyperlink if available
-                    // If we have a direct range link (cell.l.Target), use that.
-                    // Otherwise rely on text parsing.
-                    const finalLink = addressLink || link;
+                    // Prioritize the extracted Excel Hyperlink if available (from cell.l.Target)
+                    let finalLink = addressLink || link;
+
+                    // Explicit Link Column Check (New Feature for Excel)
+                    const explicitLinkInput = rowData['link'] || rowData['mapa'] || rowData['google maps'] || rowData['url'] || rowData['maps'] || rowData['coordenadas'] || rowData['geolocalizacao'];
+                    let explicitLinkTarget: string | undefined;
+
+                    // Also check if the *Exlicit Link Column* has a cell hyperlink target
+                    headers.forEach(h => {
+                        if (['link', 'mapa', 'google maps', 'url', 'maps', 'coordenadas', 'geolocalizacao'].includes(h.normalized)) {
+                            const cellAddress = XLSX.utils.encode_cell({ c: h.index, r: R });
+                            const cell = worksheet[cellAddress];
+                            if (cell && cell.l && cell.l.Target) {
+                                explicitLinkTarget = cell.l.Target;
+                            }
+                        }
+                    });
+
+                    // Use explicit input text or target
+                    const linkInputToParse = explicitLinkTarget || explicitLinkInput;
+
+                    if (linkInputToParse) {
+                        const linkData = parseHyperlink(linkInputToParse);
+                        if (linkData.link) finalLink = linkData.link;
+                        if (linkData.lat) lat = linkData.lat;
+                        if (linkData.lng) lng = linkData.lng;
+                    }
 
                     // Note: If addressLink provides a direct Google Maps URL, we might want to 
                     // re-run extraction logic to get lat/lng from IT if 'lat'/'lng' are undefined.
-                    // However, `parseHyperlink` already attempts to extract from text.
-                    // If the text was just "Endereço", parseHyperlink won't find coords.
-                    // But if `addressLink` is "https://maps.google.com/...", we can optionally extracting coords from it.
-                    // For now, passing it as `GoogleMapsLink` is the critical part for `geminiService` to use it.
 
                     const companyName = rowData['razao social'] || rowData['cliente'] || rowData['nome fantasia'] ||
                         rowData['empresa'] || rowData['nome'] || rowData['nome cliente'] ||

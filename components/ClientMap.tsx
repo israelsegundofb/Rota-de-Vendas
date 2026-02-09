@@ -208,10 +208,8 @@ const ClientMapContent: React.FC<{
       clustererRef.current = new (MarkerClusterer as any)({
         map,
         markers: [],
-        algorithm: new (SuperClusterAlgorithm as any)({
-          maxZoom: 13, // Aggressive clustering for performance (User Request)
-          radius: 80,
-        })
+        // Removed custom algorithm options to ensure default behavior works first.
+        // Default behavior usually handles clustering/declustering gracefully.
       }) as MarkerClusterer;
     } else {
       // Ensure clusterer is null/inactive

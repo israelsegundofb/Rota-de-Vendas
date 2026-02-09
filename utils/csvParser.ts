@@ -219,6 +219,17 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
             address = `${address}, ${cep}`;
           }
 
+          // Explicit Link Column Check (New Feature)
+          // Look for columns specifically meant for the map link, which might contain precise coords
+          const explicitLinkInput = map['link'] || map['mapa'] || map['google maps'] || map['url'] || map['maps'] || map['coordenadas'] || map['geolocalizacao'];
+          if (explicitLinkInput) {
+            const linkData = parseHyperlink(explicitLinkInput);
+            // Override if we found valid data in the dedicated link column
+            if (linkData.link) link = linkData.link;
+            if (linkData.lat) lat = linkData.lat;
+            if (linkData.lng) lng = linkData.lng;
+          }
+
           const rawClient = {
             companyName: map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
             ownerName: map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
