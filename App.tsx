@@ -796,61 +796,63 @@ const App: React.FC = () => {
               </button>
             </nav>
 
-            <nav className="space-y-1 mb-8">
-              <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
+            {isAdminUser && (
+              <nav className="space-y-1 mb-8">
+                <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
 
-              <button
-                onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
-                Gerenciar Usuários
-              </button>
+                <button
+                  onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
+                  Gerenciar Usuários
+                </button>
 
-              <button
-                onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
-                Categorias
-              </button>
+                <button
+                  onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
+                  Categorias
+                </button>
 
-              <button
-                onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
-                Produtos
-              </button>
+                <button
+                  onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
+                  Produtos
+                </button>
 
-              <button
-                onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
-                Arquivos
-              </button>
+                <button
+                  onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
+                  Arquivos
+                </button>
 
-              <button
-                onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
-              >
-                <Cloud className="w-5 h-5" />
-                Backup & Cloud
-              </button>
-            </nav>
+                <button
+                  onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
+                >
+                  <Cloud className="w-5 h-5" />
+                  Backup & Cloud
+                </button>
+              </nav>
+            )}
           </div>
 
           <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
@@ -943,7 +945,7 @@ const App: React.FC = () => {
           </header>
 
           {
-            activeView === 'admin_users' && isAdmin ? (
+            activeView === 'admin_users' && isAdminUser ? (
               <div className="flex-1 overflow-y-auto bg-gray-50">
                 <AdminUserManagement
                   currentUser={currentUser}
@@ -955,7 +957,7 @@ const App: React.FC = () => {
                   totalClients={masterClientList.length}
                 />
               </div>
-            ) : activeView === 'admin_categories' && isAdmin ? (
+            ) : activeView === 'admin_categories' && isAdminUser ? (
               <div className="flex-1 overflow-y-auto bg-gray-50">
                 <AdminCategoryManagement
                   categories={categories}
@@ -963,17 +965,17 @@ const App: React.FC = () => {
                   onDeleteCategory={handleDeleteCategory}
                 />
               </div>
-            ) : activeView === 'admin_products' && isAdmin ? (
+            ) : activeView === 'admin_products' && isAdminUser ? (
               <div className="flex-1 overflow-y-auto bg-gray-50">
                 <AdminProductManagement
                   products={products}
                   onUploadProducts={handleUploadProducts}
                   onClearProducts={handleClearProducts}
-                  onSaveProducts={handleSaveProducts} // Pass save handler
+                  onSaveProducts={handleSaveProducts}
                   apiKey={activeApiKey}
                 />
               </div>
-            ) : activeView === 'admin_files' && isAdmin ? (
+            ) : activeView === 'admin_files' && isAdminUser ? (
               <div className="flex-1 overflow-y-auto bg-gray-50">
                 <AdminFileManager
                   users={users}
@@ -1007,27 +1009,34 @@ const App: React.FC = () => {
                       <span className="text-sm font-bold hidden md:inline">Filtros:</span>
                     </div>
 
-                    {isAdmin && (
-                      <div className="flex items-center gap-2 bg-purple-50 px-2 py-1 rounded-md border border-purple-100 mr-2">
-                        <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1">
-                          <Shield className="w-3 h-3" /> Admin
-                        </span>
+                    <div className={`flex items-center gap-2 px-2 py-1 rounded-md border mr-2 transition-colors ${isAdminUser ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isAdminUser ? 'text-purple-600' : 'text-gray-500'}`}>
+                        {isAdminUser ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                        {isAdminUser ? 'Admin' : 'Vendedor'}
+                      </span>
 
-                        <div className="relative">
-                          <UserIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
-                          <select
-                            value={filterSalespersonId}
-                            onChange={(e) => setFilterSalespersonId(e.target.value)}
-                            className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
-                          >
-                            <option value="Todos">Todos Vendedores</option>
-                            {users.filter(u => u.role === 'salesperson').map(u => (
+                      <div className="relative">
+                        <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${isAdminUser ? 'text-purple-400' : 'text-gray-400'}`} />
+                        <select
+                          value={isAdminUser ? filterSalespersonId : currentUser?.id || ''}
+                          onChange={(e) => isAdminUser && setFilterSalespersonId(e.target.value)}
+                          disabled={!isAdminUser}
+                          className={`text-sm rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium appearance-none ${isAdminUser ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
+                          title={!isAdminUser ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
+                        >
+                          {isAdminUser && <option value="Todos">Todos Vendedores</option>}
+                          {/* Show all salespersons for Admin to choose. For User, show THEMSELVES even if not in 'users' list yet (fallback) */}
+                          {isAdminUser
+                            ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
                               <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
-                          </select>
-                        </div>
+                            ))
+                            : <option value={currentUser?.id}>{currentUser?.name}</option>
+                          }
+                        </select>
+                      </div>
 
-                        <div className="relative">
+                      {isAdminUser && (
+                        <div className="relative animate-fade-in">
                           <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
                           <select
                             value={filterSalesCategory}
@@ -1040,8 +1049,8 @@ const App: React.FC = () => {
                             <option value="Mercado Livre">Mercado Livre</option>
                           </select>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <select
                       value={filterRegion}
