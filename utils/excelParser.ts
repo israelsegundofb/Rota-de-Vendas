@@ -125,13 +125,13 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     // Only add if we have at least a Name or Address
                     if (companyName || address || addressInput) {
                         normalizedData.push({
-                            'Razão Social': companyName,
-                            'Nome do Proprietário': ownerName,
-                            'Contato': contact,
-                            'Endereço': address, // The display address
-                            'GoogleMapsLink': finalLink,
-                            'extractedLat': lat,
-                            'extractedLng': lng
+                            companyName: companyName,
+                            ownerName: ownerName,
+                            phone: contact,
+                            address: address, // The display address
+                            googleMapsLink: finalLink,
+                            latitude: lat,
+                            longitude: lng
                         });
                     }
                 }

@@ -1,11 +1,11 @@
 export interface RawClient {
-  'Razão Social': string;
-  'Nome do Proprietário': string;
-  'Contato': string;
-  'Endereço': string;
-  'GoogleMapsLink'?: string; // Extracted from =HYPERLINK if present
-  'extractedLat'?: number;
-  'extractedLng'?: number;
+  companyName: string;
+  ownerName: string;
+  phone: string;
+  address: string;
+  googleMapsLink?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Product {

@@ -108,11 +108,11 @@ export const processClientsWithAI = async (
       return null;
     }
 
-    const rawAddress = client['Endereço'] || "";
+    const rawAddress = client.address || "";
     const address = cleanAddress(rawAddress);
-    const company = client['Razão Social'] || "Empresa Desconhecida";
-    const owner = client['Nome do Proprietário'] || "";
-    const contact = client['Contato'] || "";
+    const company = client.companyName || "Empresa Desconhecida";
+    const owner = client.ownerName || "";
+    const contact = client.phone || "";
 
     // Extract CEP from address for region fallback
     const cepMatch = address.match(/\d{5}[-]?\d{3}/);
@@ -190,8 +190,8 @@ export const processClientsWithAI = async (
         }
 
         // --- GEOCODING ENHANCEMENT ---
-        let finalLat = client['extractedLat'] || (typeof aiData.lat === 'number' ? aiData.lat : 0);
-        let finalLng = client['extractedLng'] || (typeof aiData.lng === 'number' ? aiData.lng : 0);
+        let finalLat = client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
+        let finalLng = client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
         let finalAddress = aiData.cleanAddress || address;
         let finalCity = aiData.city || 'Desconhecido';
         let finalState = aiData.state || 'BR';
@@ -201,7 +201,7 @@ export const processClientsWithAI = async (
           finalRegion = getRegionFromCEP(extractedCEP);
         }
 
-        const needsGeocoding = !client['extractedLat'] || finalCity === 'Desconhecido' || finalState === 'BR';
+        const needsGeocoding = !client.latitude || finalCity === 'Desconhecido' || finalState === 'BR';
 
         if (needsGeocoding) {
           const addressToGeocode = finalAddress || rawAddress;
@@ -209,7 +209,7 @@ export const processClientsWithAI = async (
             try {
               const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey); // Use mapsApiKey
               if (geocodeResult) {
-                if (!client['extractedLat']) {
+                if (!client.latitude) {
                   finalLat = geocodeResult.lat;
                   finalLng = geocodeResult.lng;
                 }
@@ -256,7 +256,7 @@ export const processClientsWithAI = async (
           city: finalCity,
           lat: finalLat,
           lng: finalLng,
-          googleMapsUri: client['GoogleMapsLink'] || googleMapsUri
+          googleMapsUri: client.googleMapsLink || googleMapsUri
         };
 
         success = true;
@@ -289,7 +289,7 @@ export const processClientsWithAI = async (
             city: 'Erro Proc.',
             lat: 0,
             lng: 0,
-            googleMapsUri: client['GoogleMapsLink']
+            googleMapsUri: client.googleMapsLink
           };
           success = true; // Mark as "success" in terms of loop continuation (using fallback)
         }
