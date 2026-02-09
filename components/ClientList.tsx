@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { EnrichedClient, UserRole } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isSalesTeam } from '../utils/authUtils';
-import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus } from 'lucide-react';
+import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
+import ClientProductAssignmentModal from './ClientProductAssignmentModal';
 
 interface ClientListProps {
   clients: EnrichedClient[];
@@ -13,9 +14,20 @@ interface ClientListProps {
   currentUserRole?: UserRole;
   currentUserId?: string;
   currentUserName?: string;
+  products: Product[];
+  productCategories: string[];
 }
 
-const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddClient, currentUserRole, currentUserId, currentUserName }) => {
+const ClientList: React.FC<ClientListProps> = ({
+  clients,
+  onUpdateClient,
+  onAddClient,
+  currentUserRole,
+  currentUserId,
+  currentUserName,
+  products = [],
+  productCategories = []
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todos');
@@ -24,6 +36,10 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Product Assignment Modal State
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [clientForProductAssignment, setClientForProductAssignment] = useState<EnrichedClient | null>(null);
 
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
@@ -43,7 +59,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
 
   const handleExportCSV = () => {
     const headers = [
-      'ID', 'Razão Social', 'Proprietário', 'Contato', 'Endereço', 'Cidade', 'UF', 'Região', 'Segmento', 'Link Maps'
+      'ID', 'Razão Social', 'Proprietário', 'Contato', 'Endereço', 'Cidade', 'UF', 'Região', 'Segmento', 'Produtos Comprados', 'Link Maps'
     ];
 
     const rows = filteredClients.map(client => [
@@ -55,7 +71,8 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
       client.city,
       client.state,
       client.region,
-      client.category.join('; '), // Join array for CSV
+      client.category.join('; '),
+      client.purchasedProducts ? client.purchasedProducts.map(p => p.sku).join('; ') : '',
       client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`
     ]);
 
@@ -88,8 +105,21 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
     setIsEditModalOpen(true);
   };
 
+  const openProductAssignmentModal = (client: EnrichedClient) => {
+    setClientForProductAssignment(client);
+    setIsProductModalOpen(true);
+  };
+
+  const handleSaveProductAssignment = (clientId: string, assignedProducts: Product[]) => {
+    const clientToUpdate = clients.find(c => c.id === clientId);
+    if (clientToUpdate) {
+      const updatedClient = { ...clientToUpdate, purchasedProducts: assignedProducts };
+      onUpdateClient(updatedClient);
+    }
+  };
+
   // Card Component for Grid
-  const ClientCard = ({ client, style, openEditModal }: { client: EnrichedClient, style: React.CSSProperties, openEditModal: (c: EnrichedClient) => void }) => (
+  const ClientCard = ({ client, style }: { client: EnrichedClient, style: React.CSSProperties }) => (
     <div style={style} className="p-2">
       <div className="h-full bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden flex flex-col">
         <div className="absolute top-0 right-0 p-0">
@@ -129,21 +159,6 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
                 )}
               </div>
             )}
-            {/* BADGE DE PRODUTOS */}
-            {client.purchasedProducts && client.purchasedProducts.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {client.purchasedProducts.slice(0, 2).map((p, i) => (
-                  <span key={i} className="text-[9px] px-1 rounded bg-green-50 text-green-700 border border-green-200 truncate max-w-[100px]" title={p.name}>
-                    {p.sku}
-                  </span>
-                ))}
-                {client.purchasedProducts.length > 2 && (
-                  <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
-                    +{client.purchasedProducts.length - 2}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -158,188 +173,232 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
           </div>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-outline-variant/20 flex items-center justify-between gap-2">
-          <a
-            href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-primary hover:underline"
-          >
-            <ExternalLink className="w-3 h-3" /> Abrir Mapa
-          </a>
+        <div className="mt-4 pt-3 border-t border-outline-variant/30 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => openProductAssignmentModal(client)}
+              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Atribuir Produtos"
+            >
+              <ShoppingBag className="w-4 h-4" />
+            </button>
+            <a
+              href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded-lg transition-colors"
+              title="Ver rota no Google Maps"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+
           <button
             onClick={() => openEditModal(client)}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/30 rounded-full transition-colors"
+            className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg active:bg-surface-container-highest"
           >
-            <Edit2 className="w-3.5 h-3.5" /> Editar
+            <Edit2 className="w-3 h-3" /> Editar
           </button>
         </div>
       </div>
     </div>
   );
 
-  return (
-    <div className="flex flex-col h-full bg-gray-50/50">
-      {/* TOOLBAR */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm z-10 shrink-0">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+  // Mobile Card
+  const MobileClientCard = ({ client }: { client: EnrichedClient }) => (
+    <div className="p-4 border-b border-gray-100 last:border-0 bg-white">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 className="font-bold text-gray-900">{client.companyName}</h3>
+          <p className="text-xs text-gray-500">{client.category.join(', ')}</p>
 
-          {/* Filters Group */}
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            <div className="relative group w-full md:w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-              <input
-                type="text"
-                placeholder="Razão Social ou Proprietário..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none w-full transition-all"
-              />
-            </div>
-
-            <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
-
-            <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              <option value="Todos">Todas Regiões</option>
-              {REGIONS.map(reg => <option key={reg} value={reg}>{reg}</option>)}
-            </select>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              {CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat === 'Todos' ? 'Todos Segmentos' : cat}</option>
+          {/* BADGE DE PRODUTOS MOBILE */}
+          {client.purchasedProducts && client.purchasedProducts.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {client.purchasedProducts.slice(0, 3).map((p, i) => (
+                <span key={i} className="text-[9px] px-1 rounded bg-green-50 text-green-700 border border-green-200 truncate max-w-[100px]" title={p.name}>
+                  {p.sku}
+                </span>
               ))}
-            </select>
-          </div>
+              {client.purchasedProducts.length > 3 && (
+                <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                  +{client.purchasedProducts.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
-          {/* Actions Group */}
-          <div className="flex items-center gap-3">
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
+              ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
+            client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
+              client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
+                client.region === 'Norte' ? 'bg-green-100 text-green-800' :
+                  'bg-yellow-100 text-yellow-800'}
+           `}>
+          {client.region}
+        </span>
+      </div>
+
+      <div className="space-y-1 mb-3">
+        <p className="flex items-center gap-2 text-sm text-gray-600">
+          <Store className="w-4 h-4 text-gray-400" /> {client.ownerName}
+        </p>
+        <p className="flex items-center gap-2 text-sm text-gray-600">
+          <MapPin className="w-4 h-4 text-gray-400" /> <span className="truncate">{client.cleanAddress}</span>
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => openEditModal(client)}
+          className="flex-1 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg text-center"
+        >
+          Editar
+        </button>
+        <button
+          onClick={() => openProductAssignmentModal(client)}
+          className="flex-1 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-lg text-center flex items-center justify-center gap-1"
+        >
+          <ShoppingBag className="w-4 h-4" /> Produtos
+        </button>
+        <a
+          href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
+          target="_blank"
+          className="flex-none p-2 text-gray-600 bg-gray-100 rounded-lg flex items-center justify-center"
+        >
+          <ExternalLink className="w-5 h-5" />
+        </a>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full bg-white relative">
+      {/* ... Filters Header ... */}
+      <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none">
+        {/* Search */}
+        <div className="relative w-full md:max-w-xs group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary transition-colors" />
+          <input
+            type="text"
+            placeholder="Razão Social ou Proprietário..."
+            className="w-full pl-10 pr-4 py-2 bg-surface-container-highest border-none rounded-full text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant/50"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        {/* Filters and Actions */}
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+          <select
+            value={regionFilter}
+            onChange={e => setRegionFilter(e.target.value)}
+            className="px-3 py-2 bg-surface-container-highest border-none rounded-lg text-sm font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
+          >
+            <option value="Todos">Todas Regiões</option>
+            {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 bg-surface-container-highest border-none rounded-lg text-sm font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
+          >
+            <option value="Todos">Todos Segmentos</option>
+            {CATEGORIES.filter(c => c !== 'Todos').map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+
+          <div className="md:ml-auto flex items-center gap-2 pl-2 border-l border-gray-200">
             {currentUserRole && isSalesTeam(currentUserRole) && onAddClient && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-200 hover:shadow-lg active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-200 hover:shadow-lg active:scale-95 whitespace-nowrap"
               >
-                <Plus className="w-5 h-5" />
-                Novo Cliente
+                <Plus className="w-4 h-4" /> Novo
               </button>
             )}
 
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 hover:text-green-600 hover:border-green-200 transition-all shadow-sm"
-              title="Baixar lista em Excel/CSV"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest rounded-lg text-sm font-bold transition-colors shadow-sm whitespace-nowrap"
             >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Exportar</span>
+              <Download className="w-4 h-4" /> Exportar
             </button>
           </div>
         </div>
-
-        {/* Results Counter */}
-        <div className="mt-2 text-xs text-gray-400 font-medium">
-          Exibindo {filteredClients.length} de {clients.length} clientes
-        </div>
       </div>
 
-      {/* MD3 LIST/CARDS */}
-      <div className="overflow-x-auto bg-surface flex-1 custom-scrollbar relative p-4">
-        {filteredClients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center text-on-surface-variant animate-fade-in">
-            <div className="bg-surface-container-highest p-4 rounded-full mb-3">
-              <Search className="w-8 h-8 opacity-50" />
-            </div>
-            <p className="text-sm">Nenhum cliente encontrado com os filtros atuais.</p>
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-            {filteredClients.map((client) => (
-              <div key={client.id} className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-0">
-                  <span className={`px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider
-                        ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
-                      client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
-                        client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
-                          client.region === 'Norte' ? 'bg-green-100 text-green-800' :
-                            'bg-yellow-100 text-yellow-800'}
-                      `}>
-                    {client.region}
-                  </span>
-                </div>
+      <div className="p-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+        Exibindo {filteredClients.length} de {clients.length} clientes
+      </div>
 
-                <div className="flex items-start gap-4 pr-12">
-                  <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg shrink-0">
-                    {client.companyName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-on-surface truncate pr-2">{client.companyName}</h3>
-                    <div className="flex items-center gap-1 text-xs text-on-surface-variant mt-0.5">
-                      <Tag className="w-3 h-3" />
-                      <span className="truncate">{client.category.join(', ')}</span>
-                    </div>
-                  </div>
-                </div>
+      {/* Grid Content */}
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-gray-50">
 
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                    <Store className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{client.ownerName}</span>
-                  </div>
-                  <a
-                    href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors group/link"
-                  >
-                    <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2 group-hover/link:underline">{client.cleanAddress}</span>
-                    <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity ml-auto" />
-                  </a>
-                </div>
+        {/* Mobile View - List */}
+        <div className="md:hidden flex flex-col gap-0 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {filteredClients.map(client => (
+            <MobileClientCard key={client.id} client={client} />
+          ))}
+        </div>
 
-                <div className="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => openEditModal(client)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/30 rounded-full transition-colors"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" /> Editar
-                  </button>
-                </div>
-              </div>
-            ))}
+        {/* Desktop View - Grid */}
+        <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredClients.map((client) => (
+            <ClientCard
+              key={client.id}
+              client={client}
+              style={{}}
+            />
+          ))}
+        </div>
+
+        {filteredClients.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+            <Filter className="w-12 h-12 mb-2 opacity-20" />
+            <p className="text-lg font-medium">Nenhum cliente encontrado</p>
+            <p className="text-sm">Tente ajustar seus filtros de busca</p>
           </div>
         )}
       </div>
 
-      {/* EDIT MODAL */}
-      {selectedClient && (
+      {/* Modals */}
+      {selectedClient && isEditModalOpen && (
         <EditClientModal
           isOpen={isEditModalOpen}
-          client={selectedClient}
           onClose={() => setIsEditModalOpen(false)}
+          client={selectedClient}
           onSave={(updated) => {
             onUpdateClient(updated);
-            setSelectedClient(null);
+            setIsEditModalOpen(false);
           }}
+          currentUserRole={currentUserRole}
         />
       )}
 
-      {/* ADD CLIENT MODAL */}
-      {onAddClient && currentUserId && (
+      {isAddModalOpen && onAddClient && (
         <AddClientModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
-          onAdd={onAddClient}
-          salespersonId={currentUserId}
-          ownerName={currentUserName || 'Vendedor'}
+          onSave={(newClient) => {
+            onAddClient(newClient);
+            setIsAddModalOpen(false);
+          }}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
         />
       )}
+
+      {/* Product Assignment Modal */}
+      <ClientProductAssignmentModal
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        client={clientForProductAssignment}
+        products={products}
+        productCategories={productCategories}
+        onSave={handleSaveProductAssignment}
+      />
     </div>
   );
 };

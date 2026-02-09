@@ -628,17 +628,7 @@ const App: React.FC = () => {
 
 
 
-  const handleSimulateSales = () => {
-    if (products.length === 0) {
-      alert("Não há produtos cadastrados para distribuir.");
-      return;
-    }
 
-    if (window.confirm(`Isso atribuirá aleatoriamente de 1 a 5 produtos para clientes que ainda NÃO possuem histórico de compras.\n\nDeseja continuar?`)) {
-      distributeProductsToClients(masterClientList, products);
-      alert("Simulação de vendas concluída! Verifique os filtros.");
-    }
-  };
 
   const handleProductFileUpload = async (file: File) => {
     // Generate File ID
@@ -987,7 +977,6 @@ const App: React.FC = () => {
                   onClearProducts={handleClearProducts}
                   onSaveProducts={handleSaveProducts}
                   apiKey={activeApiKey}
-                  onSimulateSales={handleSimulateSales}
                 />
               </div>
             ) : activeView === 'admin_files' && isAdminUser ? (
@@ -1217,6 +1206,8 @@ const App: React.FC = () => {
                           currentUserRole={currentUser?.role}
                           currentUserId={currentUser?.id}
                           currentUserName={currentUser?.name}
+                          products={products}
+                          productCategories={productCategories}
                         />
                       )}
                     </div>
