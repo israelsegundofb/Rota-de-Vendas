@@ -82,8 +82,17 @@ export const isAdmin = (role: UserRole): boolean => {
 };
 
 /**
- * Verifica se é da área de Vendas (Managers pra baixo)
+ * Verifica se é da área de Vendas (Managers pra baixo -> Nível 3+)
  */
 export const isSalesTeam = (role: UserRole): boolean => {
     return ROLE_HIERARCHY[role] >= 3;
+};
+
+/**
+ * Verifica se tem visibilidade total dos dados (Todos os pinos/clientes).
+ * Inclui: Admin DEV, Admin Geral, Gerente Geral, Gerente de Vendas, Supervisor de Vendas.
+ * (Níveis 1 a 5)
+ */
+export const hasFullDataVisibility = (role: UserRole): boolean => {
+    return ROLE_HIERARCHY[role] <= 5;
 };

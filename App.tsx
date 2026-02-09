@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
-import { isAdmin, isSalesTeam } from './utils/authUtils';
+import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
 import { parseCSV, parseProductCSV } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
@@ -707,6 +707,7 @@ const App: React.FC = () => {
   }
 
   const isAdminUser = isAdmin(currentUser.role);
+  const canViewAllData = hasFullDataVisibility(currentUser.role);
   const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
 
   return (
@@ -1009,24 +1010,24 @@ const App: React.FC = () => {
                       <span className="text-sm font-bold hidden md:inline">Filtros:</span>
                     </div>
 
-                    <div className={`flex items-center gap-2 px-2 py-1 rounded-md border mr-2 transition-colors ${isAdminUser ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isAdminUser ? 'text-purple-600' : 'text-gray-500'}`}>
-                        {isAdminUser ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                        {isAdminUser ? 'Admin' : 'Vendedor'}
+                    <div className={`flex items-center gap-2 px-2 py-1 rounded-md border mr-2 transition-colors ${canViewAllData ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}>
+                        {canViewAllData ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                        {isAdminUser ? 'Admin' : (canViewAllData ? 'Gestão' : 'Vendedor')}
                       </span>
 
                       <div className="relative">
-                        <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${isAdminUser ? 'text-purple-400' : 'text-gray-400'}`} />
+                        <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${canViewAllData ? 'text-purple-400' : 'text-gray-400'}`} />
                         <select
-                          value={isAdminUser ? filterSalespersonId : currentUser?.id || ''}
-                          onChange={(e) => isAdminUser && setFilterSalespersonId(e.target.value)}
-                          disabled={!isAdminUser}
-                          className={`text-sm rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium appearance-none ${isAdminUser ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
-                          title={!isAdminUser ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
+                          value={canViewAllData ? filterSalespersonId : currentUser?.id || ''}
+                          onChange={(e) => canViewAllData && setFilterSalespersonId(e.target.value)}
+                          disabled={!canViewAllData}
+                          className={`text-sm rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium appearance-none ${canViewAllData ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
+                          title={!canViewAllData ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
                         >
-                          {isAdminUser && <option value="Todos">Todos Vendedores</option>}
-                          {/* Show all salespersons for Admin to choose. For User, show THEMSELVES even if not in 'users' list yet (fallback) */}
-                          {isAdminUser
+                          {canViewAllData && <option value="Todos">Todos Vendedores</option>}
+                          {/* Show all salespersons for Admin/Managers to choose. For User, show THEMSELVES even if not in 'users' list yet (fallback) */}
+                          {canViewAllData
                             ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
                               <option key={u.id} value={u.id}>{u.name}</option>
                             ))
@@ -1035,7 +1036,7 @@ const App: React.FC = () => {
                         </select>
                       </div>
 
-                      {isAdminUser && (
+                      {canViewAllData && (
                         <div className="relative animate-fade-in">
                           <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
                           <select
