@@ -157,6 +157,11 @@ export const processClientsWithAI = async (
     let result: EnrichedClient | null = null;
     let success = false;
 
+    let aiData: any = {};
+    let googleMapsUri = "";
+
+    // 1. ATTEMPT AI ENRICHMENT (with Retries)
+    // If this fails (e.g. 403 Key Leaked), we catch the error but CONTINUE to geocoding.
     while (!success && retries <= MAX_RETRIES) {
       try {
         const response = await ai.models.generateContent({
@@ -171,7 +176,6 @@ export const processClientsWithAI = async (
         let text = response.text || "{}";
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        let aiData: any = {};
         try {
           aiData = JSON.parse(text);
         } catch (parseError) {
@@ -182,94 +186,13 @@ export const processClientsWithAI = async (
         }
 
         // Extract Google Maps Grounding URI
-        let googleMapsUri = "";
         const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
         if (chunks && Array.isArray(chunks)) {
           const mapChunk = chunks.find((c: any) => c.maps?.uri);
           if (mapChunk) googleMapsUri = mapChunk.maps.uri;
         }
 
-        // --- GEOCODING ENHANCEMENT ---
-        // 1. Initialize with AI data or existing data
-        let finalLat = client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
-        let finalLng = client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
-        let finalAddress = aiData.cleanAddress || address;
-        let finalCity = aiData.city || 'Desconhecido';
-        let finalState = aiData.state || 'BR';
-        let finalRegion = aiData.region || 'Indefinido';
-
-        // 2. Check if we need to force geocoding (Missing coords or (0,0))
-        // We strictly trust the "Endereço Completo" (rawAddress) from the CSV as the source of truth if AI fails to pin it.
-        const hasValidCoords = finalLat !== 0 && finalLng !== 0;
-        const needsGeocoding = !hasValidCoords || finalCity === 'Desconhecido' || finalState === 'BR';
-
-        if (needsGeocoding) {
-          // Prioritize the raw address from CSV for geocoding to ensure we find "where the pin is" based on input
-          const addressToGeocode = rawAddress || finalAddress;
-
-          if (addressToGeocode && addressToGeocode.length > 5 && mapsApiKey) {
-            try {
-              const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey);
-
-              if (geocodeResult) {
-                // Always update coordinates if we didn't have them or if they were 0,0
-                if (!hasValidCoords) {
-                  finalLat = geocodeResult.lat;
-                  finalLng = geocodeResult.lng;
-                }
-
-                // Always update location details from the authoritative geocoding result
-                if (geocodeResult.addressComponents) {
-                  const parsed = parseAddressComponents(geocodeResult.addressComponents);
-                  finalCity = parsed.city;
-                  finalState = parsed.state;
-                  finalRegion = parsed.region as any;
-                }
-
-                // Fallback to CEP if region is still undefined
-                if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
-                  finalRegion = getRegionFromCEP(extractedCEP);
-                }
-
-                // Update formatted address if available
-                if (geocodeResult.formattedAddress) {
-                  finalAddress = geocodeResult.formattedAddress;
-                }
-              }
-            } catch (geoError) {
-              console.warn(`Geocoding failed for ${company}`, geoError);
-            }
-          }
-        }
-
-        const NormalizeCategory = (cat: any): string[] => {
-          if (Array.isArray(cat)) return cat;
-          if (typeof cat === 'string') return [cat];
-          return ['Outros'];
-        };
-
-        let finalContact = contact;
-        if (aiData.phone) finalContact = finalContact ? `${finalContact} | Maps: ${aiData.phone}` : aiData.phone;
-        if (aiData.website) finalContact = finalContact ? `${finalContact} | Site: ${aiData.website}` : `Site: ${aiData.website}`;
-
-        result = {
-          id: id,
-          salespersonId: salespersonId,
-          companyName: company,
-          ownerName: owner,
-          contact: finalContact,
-          originalAddress: rawAddress,
-          cleanAddress: finalAddress,
-          category: NormalizeCategory(aiData.category),
-          region: finalRegion,
-          state: finalState,
-          city: finalCity,
-          lat: finalLat,
-          lng: finalLng,
-          googleMapsUri: client.googleMapsLink || googleMapsUri
-        };
-
-        success = true;
+        success = true; // AI succeeded
 
       } catch (error: any) {
         const isRateLimit = error.status === 429 || error.code === 429 ||
@@ -278,32 +201,116 @@ export const processClientsWithAI = async (
 
         if ((isRateLimit || isServerBusy) && retries < MAX_RETRIES) {
           retries++;
-          const waitTime = 2000 * Math.pow(2, retries); // Increased base backoff
+          const waitTime = 2000 * Math.pow(2, retries);
           console.warn(`Retry ${retries}/${MAX_RETRIES} for client ${index}`);
           await delay(waitTime);
         } else {
-          console.error(`Failed to process client ${index}`, error);
-
-          // Fallback Strategy
-          result = {
-            id: id,
-            salespersonId: salespersonId,
-            companyName: company,
-            ownerName: owner,
-            contact: contact,
-            originalAddress: rawAddress,
-            cleanAddress: rawAddress, // Keep raw address if process fails
-            category: ['Outros'],
-            region: 'Indefinido',
-            state: 'BR',
-            city: 'Erro Proc.',
-            lat: 0,
-            lng: 0,
-            googleMapsUri: client.googleMapsLink
-          };
-          success = true; // Mark as "success" in terms of loop continuation (using fallback)
+          console.error(`Failed to process client with AI ${index} (continuing to manual geocode)`, error);
+          break; // Exit retry loop, proceed with empty aiData
         }
       }
+    }
+
+    // 2. GEOCODING & FINALIZATION (Runs regardless of AI success)
+    try {
+      // --- GEOCODING ENHANCEMENT ---
+      // Initialize with AI data OR existing client data
+      let finalLat = client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
+      let finalLng = client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
+      let finalAddress = aiData.cleanAddress || address;
+      let finalCity = aiData.city || 'Desconhecido';
+      let finalState = aiData.state || 'BR';
+      let finalRegion = aiData.region || 'Indefinido';
+
+      // Check if we need to force geocoding (Missing coords or (0,0))
+      // We strictly trust the "Endereço Completo" (rawAddress) from the CSV as the source of truth if AI fails.
+      const hasValidCoords = finalLat !== 0 && finalLng !== 0;
+      const needsGeocoding = !hasValidCoords || finalCity === 'Desconhecido' || finalState === 'BR';
+
+      if (needsGeocoding) {
+        // Prioritize the raw address from CSV for geocoding to ensure we find "where the pin is" based on input
+        const addressToGeocode = rawAddress || finalAddress;
+
+        if (addressToGeocode && addressToGeocode.length > 5 && mapsApiKey) {
+          try {
+            const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey);
+
+            if (geocodeResult) {
+              // Always update coordinates if we didn't have them or if they were 0,0
+              if (!hasValidCoords) {
+                finalLat = geocodeResult.lat;
+                finalLng = geocodeResult.lng;
+              }
+
+              // Always update location details from the authoritative geocoding result
+              if (geocodeResult.addressComponents) {
+                const parsed = parseAddressComponents(geocodeResult.addressComponents);
+                finalCity = parsed.city;
+                finalState = parsed.state;
+                finalRegion = parsed.region as any;
+              }
+
+              // Fallback to CEP if region is still undefined
+              if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
+                finalRegion = getRegionFromCEP(extractedCEP);
+              }
+
+              // Update formatted address if available
+              if (geocodeResult.formattedAddress) {
+                finalAddress = geocodeResult.formattedAddress;
+              }
+            }
+          } catch (geoError) {
+            console.warn(`Geocoding failed for ${company}`, geoError);
+          }
+        }
+      }
+
+      const NormalizeCategory = (cat: any): string[] => {
+        if (Array.isArray(cat)) return cat;
+        if (typeof cat === 'string') return [cat];
+        return ['Outros'];
+      };
+
+      let finalContact = contact;
+      if (aiData.phone) finalContact = finalContact ? `${finalContact} | Maps: ${aiData.phone}` : aiData.phone;
+      if (aiData.website) finalContact = finalContact ? `${finalContact} | Site: ${aiData.website}` : `Site: ${aiData.website}`;
+
+      result = {
+        id: id,
+        salespersonId: salespersonId,
+        companyName: company,
+        ownerName: owner,
+        contact: finalContact,
+        originalAddress: rawAddress,
+        cleanAddress: finalAddress,
+        category: NormalizeCategory(aiData.category),
+        region: finalRegion,
+        state: finalState,
+        city: finalCity,
+        lat: finalLat,
+        lng: finalLng,
+        googleMapsUri: client.googleMapsLink || googleMapsUri
+      };
+    } catch (finalError) {
+      console.error("Critical error in client finalization", finalError);
+      // Absolute fallback if even the sync logic creates an exception
+      result = {
+        id: id,
+        salespersonId: salespersonId,
+        companyName: company,
+        ownerName: owner,
+        contact: contact,
+        originalAddress: rawAddress,
+        cleanAddress: rawAddress,
+        category: ['Outros'],
+        region: 'Indefinido',
+        state: 'BR',
+        city: 'Erro Critico',
+        lat: 0,
+        lng: 0,
+        googleMapsUri: client.googleMapsLink
+      };
     }
 
     processedCount++;
