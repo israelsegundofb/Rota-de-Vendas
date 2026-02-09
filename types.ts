@@ -1,13 +1,13 @@
 export interface RawClient {
-  'Razão Social': string;
-  'Nome do Proprietário': string;
-  'Contato': string;
-  'Endereço': string;
-  'CNPJ'?: string;
-  'CPF'?: string;
-  'GoogleMapsLink'?: string; // Extracted from =HYPERLINK if present
-  'extractedLat'?: number;
-  'extractedLng'?: number;
+  companyName: string;
+  ownerName: string;
+  phone: string;
+  address: string;
+  cnpj?: string;
+  cpf?: string;
+  googleMapsLink?: string; // Extracted from =HYPERLINK if present
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Product {

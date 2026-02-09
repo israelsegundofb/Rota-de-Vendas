@@ -236,7 +236,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
           // Actually RawClient in types.ts likely lacks lat/lng or has different names.
           // Let's stick to the mapped object but ensure it's robust.
 
-          if (rawClient.companyName || rawClient.address) {
+          if (rawClient.companyName || rawClient.address || rawClient.cnpj || rawClient.cpf) {
             normalizedData.push(rawClient as any);
           }
         });
