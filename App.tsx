@@ -682,7 +682,7 @@ const App: React.FC = () => {
   };
 
 
-  const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6Lc5JWUsAAAAAKysoFirSOJTvWfOXYAVRJyoVqnJ";
+  const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LcyKmUsAAAAAC-uUPRRD2ZMZRJu_dBPUH5Gp4gm";
 
   // Debug: Log da chave configurada (apenas primeros caracteres por segurança)
   console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
