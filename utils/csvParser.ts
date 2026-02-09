@@ -223,8 +223,6 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
             companyName: map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
             ownerName: map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
             phone: map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || '',
-            cnpj: map['cnpj'] || map['documento'] || '', // Parsing CNPJ
-            cpf: map['cpf'] || '', // Parsing CPF
             address: address,
             googleMapsLink: link,
             latitude: lat,
@@ -236,7 +234,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
           // Actually RawClient in types.ts likely lacks lat/lng or has different names.
           // Let's stick to the mapped object but ensure it's robust.
 
-          if (rawClient.companyName || rawClient.address || rawClient.cnpj || rawClient.cpf) {
+          if (rawClient.companyName || rawClient.address) {
             normalizedData.push(rawClient as any);
           }
         });

@@ -178,7 +178,6 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                   onChange={handleImageUpload}
                   className="hidden"
                   ref={fileInputRef}
-                  aria-label="Upload profile photo"
                 />
               </label>
               {photoURL && (

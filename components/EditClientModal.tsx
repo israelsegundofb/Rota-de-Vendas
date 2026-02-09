@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { X, Save, User, Store, Phone, MapPin, Tag, Globe, Search } from 'lucide-react';
+import { X, Save, User, Store, Phone, MapPin, Tag, Globe } from 'lucide-react';
 import { EnrichedClient } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
-import { consultarCNPJ } from '../services/cnpjService';
 
 interface EditClientModalProps {
     client: EnrichedClient;
@@ -12,15 +11,12 @@ interface EditClientModalProps {
 }
 
 const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave }) => {
-    const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
         category: Array.isArray(client.category)
             ? client.category
             : (typeof client.category === 'string' ? [client.category] : ['Outros'])
     }));
-
-    // ... (useEffect remains same) ...
 
     React.useEffect(() => {
         setFormData({
@@ -30,36 +26,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 : (typeof client.category === 'string' ? [client.category] : ['Outros'])
         });
     }, [client]);
-
-    const handleSearchCNPJ = async () => {
-        if (!formData.cnpj || formData.cnpj.length < 14) {
-            alert('Digite um CNPJ válido para buscar.');
-            return;
-        }
-
-        setIsLoadingCNPJ(true);
-        try {
-            const data = await consultarCNPJ(formData.cnpj);
-            if (data) {
-                const cleanAddress = `${data.logradouro}, ${data.numero} ${data.complemento} - ${data.bairro}, ${data.cep}`;
-                setFormData(prev => ({
-                    ...prev,
-                    companyName: data.nome_fantasia || data.razao_social,
-                    ownerName: data.razao_social,
-                    contact: data.ddd_telefone_1 || prev.contact,
-                    state: data.uf,
-                    city: data.municipio,
-                    originalAddress: cleanAddress,
-                    cleanAddress: cleanAddress,
-                    region: getRegionByUF(data.uf) as any
-                }));
-            }
-        } catch (err: any) {
-            alert(err.message || 'Erro ao buscar CNPJ.');
-        } finally {
-            setIsLoadingCNPJ(false);
-        }
-    };
 
     if (!isOpen) return null;
 
@@ -75,9 +41,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             const updates: any = { [name]: value };
             if (name === 'state') {
                 updates.region = getRegionByUF(value);
-            }
-            if (name === 'cnpj') {
-                updates.cnpj = value.replace(/\D/g, '');
             }
             return { ...prev, ...updates };
         });
@@ -133,49 +96,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                                 required
                             />
-                        </div>
-
-                        {/* CPF/CNPJ Section */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="text-xs font-medium text-on-surface-variant ml-1">
-                                    CNPJ (Somente Números)
-                                </label>
-                                <div className="relative flex items-center">
-                                    <input
-                                        type="text"
-                                        name="cnpj"
-                                        value={formData.cnpj || ''}
-                                        onChange={handleChange} // handleChange handles digits only now
-                                        placeholder="00000000000000"
-                                        className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 pr-10 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all font-mono text-sm"
-                                        maxLength={14}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleSearchCNPJ}
-                                        disabled={isLoadingCNPJ || (formData.cnpj?.length || 0) < 14}
-                                        className="absolute right-0 top-0 bottom-0 px-3 text-primary hover:bg-primary-container/20 rounded-tr-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                        title="Buscar dados na Receita Federal"
-                                    >
-                                        {isLoadingCNPJ ? <span className="animate-spin text-xs">↻</span> : <Search className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-medium text-on-surface-variant ml-1">
-                                    CPF
-                                </label>
-                                <input
-                                    type="text"
-                                    name="cpf"
-                                    value={formData.cpf || ''}
-                                    onChange={handleChange}
-                                    placeholder="000.000.000-00"
-                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all font-mono text-sm"
-                                    maxLength={14}
-                                />
-                            </div>
                         </div>
 
                         {/* Contato */}

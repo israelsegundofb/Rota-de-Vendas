@@ -107,19 +107,11 @@ export const processClientsWithAI = async (
       return null;
     }
 
-    const rawAddress = client.address || "";
-    // @ts-ignore - Handle potential mapped key access if raw is loose
+    const rawAddress = client['Endereço'] || "";
     const address = cleanAddress(rawAddress);
-    const company = client.companyName || "Empresa Desconhecida";
-    const owner = client.ownerName || "";
-    const contact = client.phone || "";
-    const cnpj = client.cnpj || "";
-    const cpf = client.cpf || "";
-
-    // DEBUG: Log para verificar se CNPJ está sendo recebido
-    if (cnpj || cpf) {
-      console.log(`[DEBUG] Cliente ${index}: CNPJ='${cnpj}', CPF='${cpf}'`);
-    }
+    const company = client['Razão Social'] || "Empresa Desconhecida";
+    const owner = client['Nome do Proprietário'] || "";
+    const contact = client['Contato'] || "";
 
     // Extract CEP from address for region fallback
     const cepMatch = address.match(/\d{5}[-]?\d{3}/);
@@ -127,36 +119,35 @@ export const processClientsWithAI = async (
 
     const id = `${salespersonId}-${Date.now()}-${index}`;
 
-    // Skip completely empty rows (updated to allow CNPJ/CPF only rows)
-    if (!address && company === "Empresa Desconhecida" && !cnpj && !cpf) {
+    // Skip completely empty rows
+    if (!address && company === "Empresa Desconhecida") {
       processedCount++;
       if (onProgress) onProgress(processedCount, total);
       return null;
     }
 
-    // Enhance prompt if CNPJ is available
-    const searchContext = cnpj ? `CNPJ ${cnpj}` : (cpf ? `CPF ${cpf}` : `"${address}"`);
-
     const prompt = `
       Atue como especialista em logística e análise de dados.
       
       TAREFA: 
-      1. Pesquise no Google Maps a empresa "${company}" localizada em ou vinculada a: ${searchContext}.
-      2. Se não encontrar exatamente, procure melhor correspondência nos arredores.
-      3. Obtenha a localização exata (latitude/longitude), endereço formatado, telefone, website e link do Maps.
+      1. Pesquise no Google Maps a empresa "${company}" localizada EXATAMENTE em "${address}".
+      2. Se não encontrar exatamente nesse local, procure nos arredores imediatos.
+      3. Obtenha a localização exata (latitude/longitude), o endereço formatado oficial, telefone oficial, website e o link do Maps.
       4. Classifique a empresa em uma destas opções: ${categoryListString} | "Outros".
+
+      IMPORTANTE: Use o endereço "${address}" como âncora principal para a busca.
 ` + `
-      Retorne APENAS um objeto JSON válido:
+      Retorne APENAS um objeto JSON válido com os dados encontrados:
       {
         "category": "Categoria Selecionada",
         "region": "Norte" | "Nordeste" | "Centro-Oeste" | "Sudeste" | "Sul" | "Indefinido",
-        "state": "UF",
-        "city": "Cidade",
+        "state": "UF (Sigla)",
+        "city": "Nome da Cidade",
         "lat": number,
         "lng": number,
-        "cleanAddress": "Endereço completo oficial",
-        "phone": "Telefone",
-        "website": "Website"
+        "cleanAddress": "Endereço completo oficial encontrado",
+        "phone": "Telefone encontrado ou null",
+        "website": "Website encontrado ou null"
       }
     `;
 
@@ -198,8 +189,8 @@ export const processClientsWithAI = async (
         }
 
         // --- GEOCODING ENHANCEMENT ---
-        let finalLat = client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
-        let finalLng = client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
+        let finalLat = client['extractedLat'] || (typeof aiData.lat === 'number' ? aiData.lat : 0);
+        let finalLng = client['extractedLng'] || (typeof aiData.lng === 'number' ? aiData.lng : 0);
         let finalAddress = aiData.cleanAddress || address;
         let finalCity = aiData.city || 'Desconhecido';
         let finalState = aiData.state || 'BR';
@@ -209,16 +200,15 @@ export const processClientsWithAI = async (
           finalRegion = getRegionFromCEP(extractedCEP);
         }
 
-        const needsGeocoding = !finalLat || finalCity === 'Desconhecido' || finalState === 'BR';
+        const needsGeocoding = !client['extractedLat'] || finalCity === 'Desconhecido' || finalState === 'BR';
 
         if (needsGeocoding) {
-          // ... (Geocoding fallback kept same, assuming geocodeAddress handles empty address gracefully)
           const addressToGeocode = finalAddress || rawAddress;
           if (addressToGeocode && addressToGeocode.length > 5 && apiKey) {
             try {
               const geocodeResult = await geocodeAddress(addressToGeocode, apiKey);
               if (geocodeResult) {
-                if (!finalLat) {
+                if (!client['extractedLat']) {
                   finalLat = geocodeResult.lat;
                   finalLng = geocodeResult.lng;
                 }
@@ -228,9 +218,16 @@ export const processClientsWithAI = async (
                   finalState = parsed.state;
                   finalRegion = parsed.region as any;
                 }
-                if (geocodeResult.formattedAddress) finalAddress = geocodeResult.formattedAddress;
+                if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
+                  finalRegion = getRegionFromCEP(extractedCEP);
+                }
+                if (geocodeResult.formattedAddress) {
+                  finalAddress = geocodeResult.formattedAddress;
+                }
               }
-            } catch (e) { }
+            } catch (geoError) {
+              console.warn(`Geocoding failed for ${company}`, geoError);
+            }
           }
         }
 
@@ -250,8 +247,6 @@ export const processClientsWithAI = async (
           companyName: company,
           ownerName: owner,
           contact: finalContact,
-          cnpj: cnpj,
-          cpf: cpf,
           originalAddress: rawAddress,
           cleanAddress: finalAddress,
           category: NormalizeCategory(aiData.category),
@@ -260,18 +255,8 @@ export const processClientsWithAI = async (
           city: finalCity,
           lat: finalLat,
           lng: finalLng,
-          googleMapsUri: client.googleMapsLink || googleMapsUri
+          googleMapsUri: client['GoogleMapsLink'] || googleMapsUri
         };
-
-        // DEBUG: Log resultado final
-        console.log(`[DEBUG] Cliente ${index} processado:`, {
-          company,
-          cnpj,
-          cpf,
-          lat: finalLat,
-          lng: finalLng,
-          city: finalCity
-        });
 
         success = true;
 

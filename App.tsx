@@ -100,7 +100,6 @@ const App: React.FC = () => {
   // API Key State
   // Default to the provided key if process.env.API_KEY is missing
   const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || getStoredFirebaseConfig()?.apiKey || "");
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(process.env.GOOGLE_MAPS_API_KEY || "AIzaSyDPYoP6OyjFVwRmQ-mlUqc25xcHfoz4o1o");
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
@@ -1194,7 +1193,7 @@ const App: React.FC = () => {
                     <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
                       {activeView === 'map' ? (
                         <ClientMap
-                          key={`${googleMapsApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
+                          key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
                           clients={filteredClients}
                           apiKey={googleMapsApiKey}
                           onInvalidKey={handleInvalidKey}
