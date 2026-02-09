@@ -140,12 +140,7 @@ const App: React.FC = () => {
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    // If env var exists, it takes precedence
-    if (process.env.API_KEY) {
-      setActiveApiKey(process.env.API_KEY);
-    }
-  }, []);
+  // API key is now loaded from import.meta.env.VITE_GOOGLE_API_KEY via useState initializer
 
 
   // --- Handlers ---

@@ -29,9 +29,8 @@ export default defineConfig(({ mode }) => {
       // })
     ],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GOOGLE_MAPS_API_KEY': JSON.stringify(env.GOOGLE_MAPS_API_KEY)
+      // Vite automatically exposes VITE_* env vars via import.meta.env
+      // No manual defines needed for API keys
     },
     resolve: {
       alias: {
