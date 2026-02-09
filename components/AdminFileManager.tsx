@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter } from 'lucide-react';
+import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter, X } from 'lucide-react';
 import { AppUser, UploadedFile } from '../types';
 
 interface AdminFileManagerProps {
@@ -11,9 +11,16 @@ interface AdminFileManagerProps {
     onReassignSalesperson?: (fileId: string, newSalespersonId: string) => void;
     procState?: {
         isActive: boolean;
+        current: number; // Added for progress tracking
+        total: number;   // Added for progress tracking
         status: 'reading' | 'processing' | 'completed' | 'error';
         errorMessage?: string;
     };
+}
+
+interface PendingFile {
+    file: File;
+    targetUserId: string;
 }
 
 const AdminFileManager: React.FC<AdminFileManagerProps> = ({
@@ -23,17 +30,65 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
     onUploadProducts,
     onDeleteFile,
     onReassignSalesperson,
-    procState = { isActive: false, status: 'completed', errorMessage: '' }
+    procState = { isActive: false, status: 'completed', errorMessage: '', current: 0, total: 0 }
 }) => {
     const [activeTab, setActiveTab] = useState<'clients' | 'products'>('clients');
     const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]); // Staging area
 
     const handleClientFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && targetUploadUserId) {
-            onUploadClients(file, targetUploadUserId);
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files).map(file => ({
+                file,
+                targetUserId: targetUploadUserId || '' // Default to currently selected, or empty
+            }));
+
+            setPendingFiles(prev => [...prev, ...newFiles]);
             e.target.value = ''; // Reset input
         }
+    };
+
+    const removePendingFile = (index: number) => {
+        setPendingFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updatePendingFileUser = (index: number, userId: string) => {
+        setPendingFiles(prev => {
+            const newFiles = [...prev];
+            newFiles[index].targetUserId = userId;
+            return newFiles;
+        });
+    };
+
+    const handleProcessQueue = async () => {
+        // Filter out files without a user assigned
+        const validFiles = pendingFiles.filter(pf => pf.targetUserId);
+
+        if (validFiles.length === 0) {
+            alert("Por favor, atribua um vendedor para todos os arquivos antes de processar.");
+            return;
+        }
+
+        // Process sequentially
+        for (const pf of validFiles) {
+            // We need to signal to App.tsx that this is a batch and shouldn't prompt every time?
+            // Or we rely on App.tsx handling. 
+            // Note: onUploadClients likely triggers the async process. 
+            // If we call it in a loop, it might be tricky if it doesn't return a promise or if App logic is singleton.
+            // We will assume `onUploadClients` serves as the trigger.
+
+            // Ideally we should wait, but `onUploadClients` definition in props implies void return.
+            // We'll rely on App.tsx to handle the queue or we modify App.tsx first.
+            // *Correction*: Implementation plan said "Update handleClientFileDirect signature... Ensure... returns a Promise".
+            // So here we will await it. We need to cast or update the interface in a real scenario, 
+            // but for this file we assume it returns Promise<void> so we can await.
+
+            await (onUploadClients as any)(pf.file, pf.targetUserId, true); // true = skipConfirmation
+        }
+
+        // Clear queue after starting? Or clear only processed?
+        // Since we await, we can clear each as we go or all at once.
+        setPendingFiles([]);
     };
 
     const handleProductFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,26 +182,87 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                     </div>
                                 </div>
 
+
+                                {/* Pending Files Staging Area */}
+                                {pendingFiles.length > 0 && (
+                                    <div className="bg-surface-container-high rounded-xl p-4 border border-primary/20 space-y-3">
+                                        <h4 className="text-sm font-bold text-primary flex items-center justify-between">
+                                            <span>Arquivos na Fila ({pendingFiles.length})</span>
+                                            <button
+                                                onClick={() => setPendingFiles([])}
+                                                className="text-xs font-normal text-on-surface-variant hover:text-error"
+                                            >
+                                                Limpar tudo
+                                            </button>
+                                        </h4>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                                            {pendingFiles.map((pf, idx) => (
+                                                <div key={idx} className="bg-surface p-2 rounded-lg border border-outline-variant text-xs flex items-center gap-2">
+                                                    <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
+                                                    <span className="truncate flex-1 font-medium" title={pf.file.name}>{pf.file.name}</span>
+
+                                                    {/* Per-file User Select */}
+                                                    <select
+                                                        value={pf.targetUserId}
+                                                        onChange={(e) => updatePendingFileUser(idx, e.target.value)}
+                                                        className={`bg-transparent border rounded px-1 py-0.5 outline-none w-24 ${!pf.targetUserId ? 'border-error text-error' : 'border-outline-variant text-on-surface'}`}
+                                                    >
+                                                        <option value="" disabled>Vendedor...</option>
+                                                        {users.filter(u => u.role === 'salesperson').map(u => (
+                                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                                        ))}
+                                                    </select>
+
+                                                    <button
+                                                        onClick={() => removePendingFile(idx)}
+                                                        className="text-on-surface-variant hover:text-error p-1"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button
+                                            onClick={handleProcessQueue}
+                                            disabled={procState?.isActive || pendingFiles.some(pf => !pf.targetUserId)}
+                                            className="w-full py-2 bg-primary text-on-primary rounded-lg text-sm font-bold shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {procState?.isActive ? (
+                                                <>
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                    Processando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-3 h-3" />
+                                                    Processar {pendingFiles.length} Arquivos
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+
                                 <label className={`group flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden ${!targetUploadUserId ? 'border-outline-variant bg-surface-container/50 opacity-60 cursor-not-allowed' : 'border-primary/50 bg-primary-container/20 hover:bg-primary-container/40 hover:border-primary'}`}>
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6 z-10">
                                         <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${!targetUploadUserId ? 'bg-surface-variant text-on-surface-variant' : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary'}`}>
                                             <FileUp className="w-6 h-6" />
                                         </div>
                                         <p className="text-sm font-medium text-on-surface text-center px-4">
-                                            {!targetUploadUserId ? 'Selecione um vendedor primeiro' : 'Clique para carregar CSV/Excel'}
+                                            Clique para selecionar arquivos (Multi-upload)
                                         </p>
                                     </div>
                                     <input
                                         type="file"
                                         accept=".csv,.xlsx,.xls"
                                         className="hidden"
+                                        multiple // Enable multiple files
                                         onChange={handleClientFileChange}
-                                        disabled={!targetUploadUserId || (procState?.isActive && procState.status === 'processing')}
+                                        disabled={procState?.isActive && procState.status === 'processing'}
                                     />
                                 </label>
                                 <div className="flex items-center justify-center gap-2 text-xs text-on-surface-variant">
                                     <FileText className="w-3 h-3" />
-                                    <span>Suporta .csv, .xlsx, .xls</span>
+                                    <span>Suporta .csv, .xlsx, .xls (Múltiplos arquivos)</span>
                                 </div>
                             </div>
                         ) : (

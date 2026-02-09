@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
@@ -19,6 +19,7 @@ import AdminProductManagement from './components/AdminProductManagement';
 import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
 import AdminFileManager from './components/AdminFileManager';
+import { getStoredFirebaseConfig } from './firebaseConfig';
 
 
 // Initial Mock Data
@@ -87,7 +88,7 @@ const App: React.FC = () => {
 
   // API Key State
   // Default to the provided key if process.env.API_KEY is missing
-  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || "AIzaSyDa-6pfscyrTFV5VpzyRRNxudBrsNVLppM");
+  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || getStoredFirebaseConfig()?.apiKey || "AIzaSyDa-6pfscyrTFV5VpzyRRNxudBrsNVLppM");
   // Version tracker to force remount of Map component on key update attempts
   const [keyVersion, setKeyVersion] = useState(0);
 
@@ -98,6 +99,27 @@ const App: React.FC = () => {
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
+
+  // Ref for cancellation
+  const isUploadCancelled = useRef(false);
+
+  // Handle View Navigation with Confirmation
+  const handleViewNavigation = (newView: string) => {
+    if (procState.isActive && procState.status === 'processing') {
+      const shouldStop = window.confirm("Gostaria de Parar de Enviar o Arquivo?\n\nClique em OK para PARAR o envio.\nClique em Cancelar para CONTINUAR o envio.");
+      if (shouldStop) {
+        // User chose "Sim" (OK) -> Stop Upload
+        isUploadCancelled.current = true;
+        // Allow navigation
+        setActiveView(newView);
+      } else {
+        // User chose "Não" (Cancel) -> Continue Upload
+        return;
+      }
+    } else {
+      setActiveView(newView); // @ts-ignore
+    }
+  };
   // Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterRegion, setFilterRegion] = useState<string>('Todas');
@@ -146,13 +168,20 @@ const App: React.FC = () => {
       if (connected) {
         console.log("Loading data from Cloud...");
         const cloudData = await loadFromCloud();
-        if (cloudData) {
-          console.log("Cloud data found.", cloudData);
+
+        // CHECK IF CLOUD DATA IS ACTUALLY POPULATED
+        if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
+          console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
           if (cloudData.clients) setMasterClientList(cloudData.clients);
           if (cloudData.products) setProducts(cloudData.products);
           if (cloudData.categories) setCategories(cloudData.categories);
           if (cloudData.users) setUsers(cloudData.users);
+          if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
           return; // Stop here, use cloud data
+        } else {
+          console.log("Cloud data found but EMPTY. Ignoring Cloud to preserve Local data.");
+          // We do NOT return here, we fall through to LocalStorage loading.
+          // And crucially, the auto-save effect will trigger later to upload our Local data to the Cloud.
         }
       }
 
@@ -181,6 +210,9 @@ const App: React.FC = () => {
 
       const savedProducts = localStorage.getItem('vendas_ai_products');
       if (savedProducts) setProducts(JSON.parse(savedProducts));
+
+      const savedFiles = localStorage.getItem('vendas_ai_files');
+      if (savedFiles) setUploadedFiles(JSON.parse(savedFiles));
     };
 
     initData();
@@ -188,14 +220,14 @@ const App: React.FC = () => {
 
   // Save changes to Cloud whenever critical data changes (Debounced ideally, but direct for MVP)
   useEffect(() => {
-    if (isFirebaseConnected && masterClientList.length > 0) {
+    if (isFirebaseConnected && (masterClientList.length > 0 || users.length > 0 || uploadedFiles.length > 0)) {
       const timeout = setTimeout(() => {
-        saveToCloud(masterClientList, products, categories, users)
+        saveToCloud(masterClientList, products, categories, users, uploadedFiles)
           .catch(err => console.error("Auto-save failed", err));
       }, 2000); // 2s debounce
       return () => clearTimeout(timeout);
     }
-  }, [masterClientList, products, categories, users, isFirebaseConnected]);
+  }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected]);
 
   useEffect(() => {
     // If env var exists, it takes precedence
@@ -609,7 +641,7 @@ const App: React.FC = () => {
     setFilterSalespersonId('Todos');
     setFilterSalesCategory('Todos');
     setFilterSalesCategory('Todos');
-    setActiveView('map');
+    handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
     if (user.role === 'admin') {
       const firstSeller = users.find(u => u.role === 'salesperson');
@@ -618,19 +650,27 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    if (procState.isActive && procState.status === 'processing') {
+      if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
+        isUploadCancelled.current = true;
+        // Continue logout
+      } else {
+        return;
+      }
+    }
     setCurrentUser(null);
     setFilterSalespersonId('Todos');
     setFilterSalesCategory('Todos');
   };
 
-  const handleClientFileDirect = async (file: File, ownerId: string, ownerName: string) => {
-    // CONFIRMATION ALERT (Only if called directly, but maybe we skip for direct calls if UI handles it? 
-    // Let's keep it for safety or rely on caller? 
-    // AdminFileManager might have its own confirm? No, it just calls onUpload.
-    // Let's keep the confirm logic but maybe we need to check if it's already confirmed?
-    // For now, let's keep it simple.
+  const handleClientFileDirect = async (file: File, ownerId: string, skipConfirmation = false) => {
+    // Determine owner name (if not passed, though we change signature to not require it as param)
+    // Actually, ownerName was a param but ownerId allows us to lookup.
+    // We will derive ownerName inside.
+    const owner = users.find(u => u.id === ownerId);
+    const ownerName = owner ? owner.name : 'Desconhecido';
 
-    if (masterClientList.length > 0) {
+    if (masterClientList.length > 0 && !skipConfirmation) {
       const confirmUpdate = window.confirm(
         "O sistema já possui dados de clientes carregados.\n\n" +
         "Deseja ADICIONAR os novos dados à lista existente?\n" +
@@ -652,6 +692,9 @@ const App: React.FC = () => {
       ownerName: ownerName,
       status: 'reading'
     });
+
+    // Reset Cancellation Flag
+    isUploadCancelled.current = false;
 
     try {
       let rawData: any[] = [];
@@ -696,6 +739,7 @@ const App: React.FC = () => {
         activeApiKey,
         categories,
         (processed, total) => {
+          if (isUploadCancelled.current) throw new Error("CANCELLED_BY_USER");
           setProcState(prev => ({ ...prev, current: processed, total: total }));
         }
       );
@@ -724,10 +768,24 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      setProcState(prev => ({ ...prev, status: 'error', errorMessage: err.message || "Erro desconhecido" }));
 
-      // Update file status to error instead of removing
-      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: err.message || "Erro desconhecido" } : f));
+      const isCancelled = err.message === 'CANCELLED_BY_USER';
+      const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (err.message || "Erro desconhecido");
+
+      // Update procState. If cancelled, we might want to hide it or show "Cancelled" state.
+      // User said "para de processar na tela", implying the box should close or stop showing progress.
+      // Setting isActive: false hides the toast.
+      const shouldHide = isCancelled;
+
+      setProcState(prev => ({
+        ...prev,
+        status: 'error',
+        errorMessage: errorMsg,
+        isActive: !shouldHide
+      }));
+
+      // Update file status
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
     }
   };
 
@@ -793,7 +851,7 @@ const App: React.FC = () => {
 
     // Auto-navigate to map and apply filter
     if (newSalespersonId) {
-      setActiveView('map');
+      handleViewNavigation('map');
       setFilterSalespersonId(newSalespersonId);
       alert(`Arquivo e ${filteredClients.filter(c => c.sourceFileId === fileId).length} clientes reatribuídos para: ${newSalespersonName}\n\nMapa filtrado automaticamente.`);
     } else {
@@ -950,7 +1008,7 @@ const App: React.FC = () => {
             <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
 
             <button
-              onClick={() => { setActiveView('admin_users'); setIsMobileMenuOpen(false); }}
+              onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
                 ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
                 : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
@@ -961,7 +1019,7 @@ const App: React.FC = () => {
             </button>
 
             <button
-              onClick={() => { setActiveView('admin_categories'); setIsMobileMenuOpen(false); }}
+              onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
                 ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
                 : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
@@ -972,7 +1030,7 @@ const App: React.FC = () => {
             </button>
 
             <button
-              onClick={() => { setActiveView('admin_products'); setIsMobileMenuOpen(false); }}
+              onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
                 ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
                 : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
@@ -983,7 +1041,7 @@ const App: React.FC = () => {
             </button>
 
             <button
-              onClick={() => { setActiveView('admin_files'); setIsMobileMenuOpen(false); }}
+              onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
                 ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
                 : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
@@ -1399,7 +1457,17 @@ const App: React.FC = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => setProcState(prev => ({ ...prev, isActive: false }))}
+                    onClick={() => {
+                      if (procState.isActive && procState.status === 'processing') {
+                        // Trigger cancellation confirmation
+                        if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
+                          isUploadCancelled.current = true;
+                          setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
+                        }
+                      } else {
+                        setProcState(prev => ({ ...prev, isActive: false }));
+                      }
+                    }}
                     className="text-gray-400 hover:text-gray-600"
                   >
                     <X className="w-4 h-4" />

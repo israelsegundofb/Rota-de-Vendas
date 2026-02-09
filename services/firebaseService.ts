@@ -33,12 +33,13 @@ export const isFirebaseInitialized = () => !!db;
 
 // -- DATA SYNC FUNCTIONS --
 
-// Save Master Data (Clients, Products, Users, Categories)
+// Save Master Data (Clients, Products, Users, Categories, UploadedFiles)
 export const saveToCloud = async (
     clients: EnrichedClient[],
     products: Product[],
     categories: string[],
-    users: AppUser[]
+    users: AppUser[],
+    uploadedFiles: any[] = [] // uploadedFiles
 ) => {
     if (!db) return;
 
@@ -48,6 +49,7 @@ export const saveToCloud = async (
             products,
             categories,
             users,
+            uploadedFiles,
             lastUpdated: new Date().toISOString(),
             updatedBy: 'App Sync'
         };

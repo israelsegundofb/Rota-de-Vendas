@@ -94,6 +94,16 @@ const getRegionColor = (region: string) => {
   }
 };
 
+// Helper to generate consistent color from string
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+  return '#' + '00000'.substring(0, 6 - c.length) + c;
+};
+
 // Helper determines color based on Salesperson
 const getPinColor = (client: EnrichedClient, users: AppUser[] = [], productFilterActive: boolean) => {
   if (productFilterActive) {
@@ -101,13 +111,24 @@ const getPinColor = (client: EnrichedClient, users: AppUser[] = [], productFilte
   }
 
   const seller = users.find(u => u.id === client.salespersonId);
-  if (seller && seller.color) {
-    // Darken color for border approx
-    return { bg: seller.color, border: 'black', glyph: '#fff' };
-  } else if (seller) {
-    console.warn(`User found but no color: ${seller.name} (ID: ${seller.id})`);
-  } else {
-    // console.warn(`Salesperson ID not found in users: ${client.salespersonId}`);
+
+  // DEBUG LOGGING (Throttle this effectively in console by only logging unique sellers or first few)
+  // if (Math.random() < 0.001) console.log('Pin Color Debug:', { clientOwner: client.ownerName, sellerFound: !!seller, sellerColor: seller?.color });
+
+  if (seller) {
+    // 1. Use assigned color
+    if (seller.color) {
+      return { bg: seller.color, border: 'black', glyph: '#fff' };
+    }
+    // 2. Generate color from ID or Name if no explicit color
+    const generatedColor = stringToColor(seller.id + seller.name);
+    return { bg: generatedColor, border: 'black', glyph: '#fff' };
+  }
+
+  // If we have an ownerName but no linked user (e.g. legacy data), try to generate color from name
+  if (client.ownerName) {
+    const generatedColor = stringToColor(client.ownerName);
+    return { bg: generatedColor, border: 'black', glyph: '#fff' };
   }
 
   return getRegionColor(client.region);
@@ -264,14 +285,15 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   const defaultCenter = { lat: -14.235, lng: -51.9253 };
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isClusteringEnabled, setIsClusteringEnabled] = useState(true); // Default to true
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   useEffect(() => {
     // Reset error when key changes (optimistic)
     if (apiKey) setAuthError(false);
-
-    // Explicitly define the handler on the window object for global auth failure interception
+    // ... rest of useEffect
     (window as any).gm_authFailure = () => {
       console.error("Google Maps Auth Failure detected via gm_authFailure.");
       setAuthError(true);
@@ -338,6 +360,10 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
     });
   }, [selectedClient, highlightProductTerm, activeProductCategory]);
 
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+
   if (!apiKey) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-blue-200 p-8 text-center">
@@ -368,13 +394,6 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
       </div>
     );
   }
-
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isClusteringEnabled, setIsClusteringEnabled] = useState(true); // Default to true
-
-  const toggleFullScreen = () => {
-    setIsFullScreen(!isFullScreen);
-  };
 
   const containerClass = isFullScreen
     ? "fixed inset-0 z-50 bg-white h-screen w-screen"

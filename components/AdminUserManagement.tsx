@@ -26,6 +26,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'salesperson' | 'admin'>('salesperson');
   const [salesCategory, setSalesCategory] = useState<SalesCategory>('Externo');
+  const [color, setColor] = useState('#3B82F6'); // Default Blue
 
   // Filter State
   const [filterType, setFilterType] = useState<'Todos' | SalesCategory>('Todos');
@@ -37,6 +38,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     setPassword('');
     setRole('salesperson');
     setSalesCategory('Externo');
+    setColor('#3B82F6');
   };
 
   const handleEditClick = (user: AppUser) => {
@@ -46,6 +48,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     setPassword(user.password || '');
     setRole(user.role);
     setSalesCategory(user.salesCategory || 'N/A');
+    setColor(user.color || '#3B82F6');
 
     // Scroll to form top
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -61,7 +64,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
       username,
       role,
       password,
-      salesCategory: role === 'salesperson' ? salesCategory : 'N/A'
+      salesCategory: role === 'salesperson' ? salesCategory : 'N/A',
+      color: role === 'salesperson' ? color : undefined
     };
 
     if (editingId) {
@@ -146,18 +150,41 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
           </div>
 
           {role === 'salesperson' && (
-            <div className="animate-fade-in">
-              <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Categoria de Venda</label>
-              <select
-                value={salesCategory}
-                onChange={e => setSalesCategory(e.target.value as SalesCategory)}
-                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none cursor-pointer"
-              >
-                <option value="Externo">Externo</option>
-                <option value="Interno">Interno</option>
-                <option value="Mercado Livre">Mercado Livre</option>
-              </select>
-            </div>
+            <>
+              <div className="animate-fade-in">
+                <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Categoria de Venda</label>
+                <select
+                  value={salesCategory}
+                  onChange={e => setSalesCategory(e.target.value as SalesCategory)}
+                  className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none cursor-pointer"
+                >
+                  <option value="Externo">Externo</option>
+                  <option value="Interno">Interno</option>
+                  <option value="Mercado Livre">Mercado Livre</option>
+                </select>
+              </div>
+
+              <div className="animate-fade-in">
+                <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Cor do Vendedor (Mapa)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={e => setColor(e.target.value)}
+                    className="h-10 w-16 p-0 border-0 rounded overflow-hidden cursor-pointer"
+                    title="Escolher cor"
+                  />
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={e => setColor(e.target.value)}
+                    className="flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors uppercase"
+                    placeholder="#000000"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div className="lg:col-span-3 pt-2 flex justify-end">
@@ -231,7 +258,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                 <th className="px-6 py-4 font-medium">Usuário</th>
                 <th className="px-6 py-4 font-medium">Função</th>
                 <th className="px-6 py-4 font-medium">Categoria</th>
-                <th className="px-6 py-4 font-medium">Senha</th>
+                <th className="px-6 py-4 font-medium">Cor</th>
                 <th className="px-6 py-4 font-medium text-right">Ações</th>
               </tr>
             </thead>
@@ -258,8 +285,14 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                       <span className="text-outline-variant">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 font-mono text-on-surface-variant/70 text-xs">
-                    {user.password || '***'}
+                  <td className="px-6 py-4">
+                    {user.role === 'salesperson' && user.color ? (
+                      <div className="flex items-center gap-2" title={user.color}>
+                        <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: user.color }}></div>
+                      </div>
+                    ) : (
+                      <span className="text-outline-variant">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
