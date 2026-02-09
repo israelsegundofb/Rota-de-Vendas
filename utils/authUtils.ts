@@ -63,6 +63,14 @@ export const getAvailableRoles = (currentUserRole: UserRole): UserRole[] => {
 export const canManageRole = (currentUserRole: UserRole, targetUserRole: UserRole): boolean => {
     const currentLevel = ROLE_HIERARCHY[currentUserRole];
     const targetLevel = ROLE_HIERARCHY[targetUserRole];
+
+    // Regra Exceção Admin DEV:
+    // Se o alvo é Admin DEV (nível 1), APENAS outro Admin DEV (nível 1) pode editar.
+    if (targetLevel === 1) {
+        return currentLevel === 1;
+    }
+
+    // Regra Geral: Pode gerenciar se tiver nível hierárquico SUPERIOR (menor número)
     return currentLevel < targetLevel;
 };
 
