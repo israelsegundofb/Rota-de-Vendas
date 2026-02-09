@@ -44,6 +44,21 @@ const loadInitialFiles = (): UploadedFile[] => {
     } catch (e) { return []; }
 };
 
+// Helper to migrate legacy roles and enforce Admin DEV
+const migrateUsers = (users: AppUser[]): AppUser[] => {
+    return users.map(u => {
+        // Enforce Admin DEV properties for the main admin
+        if (u.id === 'admin' || u.username === 'admin') {
+            return { ...u, role: 'admin_dev', name: 'Admin DEV', salesCategory: 'N/A' };
+        }
+        // Migrate legacy roles
+        if (u.role === 'admin') return { ...u, role: 'admin_dev' };
+        if (u.role === 'salesperson') return { ...u, role: 'sales_external' };
+
+        return u;
+    });
+};
+
 export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]) => void) => {
     const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
     const [products, setProducts] = useState<Product[]>(loadInitialProducts);
@@ -71,7 +86,10 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (cloudData.clients) setMasterClientList(cloudData.clients);
                         if (cloudData.products) setProducts(cloudData.products);
                         if (cloudData.categories) setCategories(cloudData.categories);
-                        if (cloudData.users && setUsers) setUsers(cloudData.users);
+                        if (cloudData.users && setUsers) {
+                            // Migrate users before setting
+                            setUsers(migrateUsers(cloudData.users));
+                        }
                         if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
 
                         setIsDataLoaded(true);
@@ -89,6 +107,9 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                             const { INITIAL_USERS } = await import('./useAuth');
                             usersToSave = INITIAL_USERS;
                         }
+
+                        // Apply migration to initial/saved data
+                        usersToSave = migrateUsers(usersToSave);
 
                         // Save to cloud for first time
                         if (setUsers) setUsers(usersToSave);
@@ -117,11 +138,11 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
             const savedUsers = localStorage.getItem('vendas_ai_users');
             if (savedUsers && setUsers) {
-                setUsers(JSON.parse(savedUsers));
+                setUsers(migrateUsers(JSON.parse(savedUsers)));
             } else if (setUsers) {
                 // If no users exist, use INITIAL_USERS
                 const { INITIAL_USERS } = await import('./useAuth');
-                setUsers(INITIAL_USERS);
+                setUsers(migrateUsers(INITIAL_USERS));
             }
 
             setIsDataLoaded(true);
@@ -146,6 +167,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
     useEffect(() => { localStorage.setItem('vendas_ai_categories', JSON.stringify(categories)); }, [categories]);
     useEffect(() => { localStorage.setItem('vendas_ai_products', JSON.stringify(products)); }, [products]);
     useEffect(() => { localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles)); }, [uploadedFiles]);
+    useEffect(() => { localStorage.setItem('vendas_ai_users', JSON.stringify(users)); }, [users]);
 
     return {
         masterClientList,
