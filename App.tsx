@@ -766,8 +766,12 @@ const App: React.FC = () => {
               <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
               <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
               <div className="flex items-center gap-3 relative z-10">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md ${isAdminUser ? 'bg-tertiary' : 'bg-secondary'}`}>
-                  {currentUser.name.charAt(0)}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md overflow-hidden ${isAdminUser ? 'bg-tertiary' : 'bg-secondary'}`}>
+                  {currentUser.photoURL ? (
+                    <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{currentUser.name.charAt(0)}</span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>

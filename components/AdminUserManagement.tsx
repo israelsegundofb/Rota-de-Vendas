@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase, AlertCircle, Camera, Upload } from 'lucide-react';
 import { AppUser, SalesCategory, UserRole } from '../types';
 import { getRoleLabel, getAvailableRoles, canManageRole, normalizeRole, ROLE_HIERARCHY, ROLE_LABELS } from '../utils/authUtils';
+import { resizeImageToBase64 } from '../utils/imageUtils';
 
 interface AdminUserManagementProps {
   currentUser: AppUser;
@@ -35,6 +36,9 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
   const [role, setRole] = useState<UserRole>(defaultRole);
   const [salesCategory, setSalesCategory] = useState<SalesCategory>('Externo');
   const [color, setColor] = useState('#3B82F6'); // Default Blue
+  const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filter State
   const [filterType, setFilterType] = useState<'Todos' | SalesCategory>('Todos');
@@ -47,6 +51,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     setRole(defaultRole);
     setSalesCategory('Externo');
     setColor('#3B82F6');
+    setPhotoURL(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleEditClick = (user: AppUser) => {
@@ -62,9 +68,35 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     setRole(normalizeRole(user.role)); // Normalize old roles if any
     setSalesCategory(user.salesCategory || 'N/A');
     setColor(user.color || '#3B82F6');
+    setPhotoURL(user.photoURL);
 
     // Scroll to form top
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      alert('Apenas imagens JPEG ou PNG são permitidas.');
+      return;
+    }
+
+    // Validate size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 2MB.');
+      return;
+    }
+
+    try {
+      const base64 = await resizeImageToBase64(file);
+      setPhotoURL(base64);
+    } catch (error) {
+      console.error("Erro ao processar imagem:", error);
+      alert("Erro ao processar a imagem. Tente novamente.");
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -81,7 +113,8 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
       role,
       password,
       salesCategory: isSalesRole ? salesCategory : 'N/A',
-      color: isSalesRole ? color : undefined
+      color: isSalesRole ? color : undefined,
+      photoURL
     };
 
     if (editingId) {
@@ -121,6 +154,49 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+          {/* Profile Picture Upload - Prominent */}
+          <div className="lg:col-span-3 flex justify-center mb-4">
+            <div className="relative group">
+              <div className={`w-24 h-24 rounded-full overflow-hidden border-2 flex items-center justify-center bg-surface-container-highest ${photoURL ? 'border-primary' : 'border-dashed border-outline-variant'}`}>
+                {photoURL ? (
+                  <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-10 h-10 text-on-surface-variant/50" />
+                )}
+              </div>
+              <label
+                htmlFor="photo-upload"
+                className="absolute bottom-0 right-0 p-1.5 bg-primary text-on-primary rounded-full shadow-md cursor-pointer hover:bg-primary/90 transition-colors"
+                title="Alterar foto"
+              >
+                <Camera className="w-4 h-4" />
+                <input
+                  id="photo-upload"
+                  type="file"
+                  accept="image/jpeg, image/png"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  ref={fileInputRef}
+                />
+              </label>
+              {photoURL && (
+                <button
+                  type="button"
+                  onClick={() => { setPhotoURL(undefined); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                  className="absolute -top-1 -right-1 p-1 bg-error text-white rounded-full shadow-md hover:bg-error/90 transition-colors"
+                  title="Remover foto"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            <div className="ml-4 flex flex-col justify-center">
+              <span className="text-sm font-medium text-on-surface">Foto de Perfil</span>
+              <span className="text-xs text-on-surface-variant">JPG ou PNG até 2MB.</span>
+            </div>
+          </div>
+
           <div className="lg:col-span-2">
             <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Nome Completo</label>
             <input
@@ -288,12 +364,23 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
             <tbody className="divide-y divide-outline-variant/30">
               {filteredUsers.map(user => (
                 <tr key={user.id} className={`hover:bg-surface-container-highest/30 transition-colors ${editingId === user.id ? 'bg-primary-container/30' : ''}`}>
-                  <td className="px-6 py-4 font-medium text-on-surface">{user.name}</td>
+                  <td className="px-6 py-4 font-medium text-on-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border border-outline-variant/30">
+                        {user.photoURL ? (
+                          <img src={user.photoURL} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                      {user.name}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-on-surface-variant">{user.username}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${ROLE_HIERARCHY[user.role] <= 2
-                        ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
-                        : 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                      ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                      : 'bg-secondary-container text-on-secondary-container border-secondary-container'
                       }`}>
                       {getRoleLabel(user.role)}
                     </span>
@@ -362,13 +449,22 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
           {filteredUsers.map(user => (
             <div key={user.id} className={`bg-surface-container-highest/30 rounded-xl p-4 border border-outline-variant/30 ${editingId === user.id ? 'bg-primary-container/30 border-primary/30' : ''}`}>
               <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-bold text-on-surface">{user.name}</h3>
-                  <p className="text-xs text-on-surface-variant">@{user.username}</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border border-outline-variant/30 flex-shrink-0">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-on-surface">{user.name}</h3>
+                    <p className="text-xs text-on-surface-variant">@{user.username}</p>
+                  </div>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${ROLE_HIERARCHY[user.role] <= 2
-                    ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
-                    : 'bg-secondary-container text-on-secondary-container border-secondary-container'
+                  ? 'bg-tertiary-container text-on-tertiary-container border-tertiary-container'
+                  : 'bg-secondary-container text-on-secondary-container border-secondary-container'
                   }`}>
                   {getRoleLabel(user.role)}
                 </span>

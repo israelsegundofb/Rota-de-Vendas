@@ -58,6 +58,7 @@ export interface AppUser {
   name: string;
   username: string;
   email?: string; // Added for recovery flow
+  photoURL?: string; // Base64 profile picture
   role: UserRole;
   password?: string; // For mock auth management
   salesCategory?: SalesCategory;
