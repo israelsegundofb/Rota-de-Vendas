@@ -87,6 +87,7 @@ export const processClientsWithAI = async (
   rawClients: RawClient[],
   salespersonId: string,
   apiKey: string,
+  mapsApiKey: string, // New Param
   categories: string[],
   onProgress?: (processed: number, total: number) => void
 ): Promise<EnrichedClient[]> => {
@@ -204,9 +205,9 @@ export const processClientsWithAI = async (
 
         if (needsGeocoding) {
           const addressToGeocode = finalAddress || rawAddress;
-          if (addressToGeocode && addressToGeocode.length > 5 && apiKey) {
+          if (addressToGeocode && addressToGeocode.length > 5 && mapsApiKey) { // Use mapsApiKey
             try {
-              const geocodeResult = await geocodeAddress(addressToGeocode, apiKey);
+              const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey); // Use mapsApiKey
               if (geocodeResult) {
                 if (!client['extractedLat']) {
                   finalLat = geocodeResult.lat;

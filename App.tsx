@@ -505,6 +505,7 @@ const App: React.FC = () => {
         rawData,
         ownerId,
         activeApiKey,
+        googleMapsApiKey, // Pass Google Maps Key explicitly
         categories,
         (processed, total) => {
           if (isUploadCancelled.current) throw new Error("CANCELLED_BY_USER");
