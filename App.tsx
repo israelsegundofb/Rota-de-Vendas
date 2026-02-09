@@ -682,9 +682,31 @@ const App: React.FC = () => {
   };
 
 
+  const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6Lc5JWUsAAAAAKysoFirSOJTvWfOXYAVRJyoVqnJ";
+
+  // Debug: Log da chave configurada (apenas primeros caracteres por segurança)
+  console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
+  console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
+  console.log('[APP] Environment:', import.meta.env.MODE);
+
   if (!currentUser) {
-    return <LoginScreen users={users} onLogin={handleLogin} />;
+    return (
+      <GoogleReCaptchaProvider
+        reCaptchaKey={recaptchaKey}
+        language="pt-BR"
+        scriptProps={{
+          async: true,
+          defer: true,
+          appendTo: 'body'
+        }}
+      >
+        <LoginScreen users={users} onLogin={handleLogin} />
+      </GoogleReCaptchaProvider>
+    );
   }
+
+  const isAdmin = currentUser.role === 'admin';
+  const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
 
   const isAdmin = currentUser.role === 'admin';
   const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
