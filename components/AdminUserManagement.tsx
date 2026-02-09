@@ -90,7 +90,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     <div className="p-6 max-w-5xl mx-auto space-y-8 animate-fade-in pb-20">
 
       {/* Create/Edit User Section */}
-      <div className={`bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 transition-all border ${editingId ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}>
+      <div className={`bg-white rounded-[28px] shadow-elevation-1 p-6 transition-all border ${editingId ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}>
         <div className="flex items-center justify-between mb-6">
           <h2 className={`text-xl font-normal flex items-center gap-2 ${editingId ? 'text-primary' : 'text-on-surface'}`}>
             {editingId ? <Pencil className="w-5 h-5" /> : <UserPlus className="w-5 h-5 text-primary" />}
@@ -204,9 +204,9 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
       </div>
 
       {/* List Users Section */}
-      <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 overflow-hidden">
+      <div className="bg-white rounded-[28px] shadow-elevation-1 overflow-hidden">
         {/* User List - Filtered by Sales Category */}
-        <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 space-y-4">
+        <div className="bg-white rounded-[28px] shadow-elevation-1 p-6 space-y-4">
           <h2 className="text-xl font-normal flex items-center gap-2 text-on-surface">
             <User className="w-5 h-5 text-primary" />
             Usuários Cadastrados ({filteredUsers.length})

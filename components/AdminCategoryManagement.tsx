@@ -24,7 +24,7 @@ const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 animate-fade-in pb-20">
-      <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 border border-transparent">
+      <div className="bg-white rounded-[28px] shadow-elevation-1 p-6 border border-transparent">
         <h2 className="text-xl font-normal text-on-surface mb-2 flex items-center gap-2">
           <Layers className="w-5 h-5 text-primary" />
           Gerenciar Categorias de Produtos

@@ -173,7 +173,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in h-full flex flex-col pb-20">
 
-      <div className="bg-surface-container-high rounded-[28px] shadow-elevation-1 p-6 flex flex-col h-full overflow-hidden">
+      <div className="bg-white rounded-[28px] shadow-elevation-1 p-6 flex flex-col h-full overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
           <div>
             <h2 className="text-xl font-normal text-on-surface flex items-center gap-2">
