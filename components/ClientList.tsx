@@ -120,10 +120,10 @@ const ClientList: React.FC<ClientListProps> = ({
 
   // Card Component for Grid
   const ClientCard = ({ client, style }: { client: EnrichedClient, style: React.CSSProperties }) => (
-    <div style={style} className="p-2">
-      <div className="h-full bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden flex flex-col">
+    <div style={style} className="p-1">
+      <div className="h-full bg-surface-container-low border border-outline-variant/30 rounded-lg p-3 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden flex flex-col">
         <div className="absolute top-0 right-0 p-0">
-          <span className={`px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider
+          <span className={`px-3 py-1 rounded-bl-lg text-[10px] font-bold uppercase tracking-wider
                         ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
               client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
                 client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
@@ -290,25 +290,25 @@ const ClientList: React.FC<ClientListProps> = ({
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* ... Filters Header ... */}
-      <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none">
+      <div className="px-3 py-2.5 border-b border-gray-200 flex flex-col md:flex-row gap-3 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none">
         {/* Search */}
         <div className="relative w-full md:max-w-xs group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
             placeholder="Razão Social ou Proprietário..."
-            className="w-full pl-10 pr-4 py-2 bg-surface-container-highest border-none rounded-full text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant/50"
+            className="w-full pl-10 pr-4 py-1.5 bg-surface-container-highest border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant/50"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         {/* Filters and Actions */}
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
           <select
             value={regionFilter}
             onChange={e => setRegionFilter(e.target.value)}
-            className="px-3 py-2 bg-surface-container-highest border-none rounded-lg text-sm font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
+            className="px-2 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
           >
             <option value="Todos">Todas Regiões</option>
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -317,7 +317,7 @@ const ClientList: React.FC<ClientListProps> = ({
           <select
             value={categoryFilter}
             onChange={e => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 bg-surface-container-highest border-none rounded-lg text-sm font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
+            className="px-2 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
           >
             <option value="Todos">Todos Segmentos</option>
             {CATEGORIES.filter(c => c !== 'Todos').map(c => <option key={c} value={c}>{c}</option>)}
@@ -327,7 +327,7 @@ const ClientList: React.FC<ClientListProps> = ({
             {currentUserRole && isSalesTeam(currentUserRole) && onAddClient && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-200 hover:shadow-lg active:scale-95 whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-200 hover:shadow-lg active:scale-95 whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" /> Novo
               </button>
@@ -335,7 +335,7 @@ const ClientList: React.FC<ClientListProps> = ({
 
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest rounded-lg text-sm font-bold transition-colors shadow-sm whitespace-nowrap"
+              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest rounded-lg text-xs font-bold transition-colors shadow-sm whitespace-nowrap"
             >
               <Download className="w-4 h-4" /> Exportar
             </button>
@@ -343,22 +343,22 @@ const ClientList: React.FC<ClientListProps> = ({
         </div>
       </div>
 
-      <div className="p-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+      <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
         Exibindo {filteredClients.length} de {clients.length} clientes
       </div>
 
       {/* Grid Content */}
-      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-gray-50">
 
         {/* Mobile View - List */}
-        <div className="md:hidden flex flex-col gap-0 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="md:hidden flex flex-col gap-0 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {filteredClients.map(client => (
             <MobileClientCard key={client.id} client={client} />
           ))}
         </div>
 
         {/* Desktop View - Grid */}
-        <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {filteredClients.map((client) => (
             <ClientCard
               key={client.id}

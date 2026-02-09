@@ -20,6 +20,7 @@ interface ClientMapProps {
   highlightProductTerm?: string;
   activeProductCategory?: string;
   users?: AppUser[]; // Added users prop
+  filterContent?: React.ReactNode;
 }
 
 const MapBoundsUpdater: React.FC<{ clients: EnrichedClient[] }> = ({ clients }) => {
@@ -312,7 +313,7 @@ const ClientMapContent: React.FC<{
   return <MapBoundsUpdater clients={clients} />;
 };
 
-const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, activeProductCategory, users }) => {
+const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, activeProductCategory, users, filterContent }) => {
   const defaultCenter = { lat: -14.235, lng: -51.9253 };
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
@@ -428,7 +429,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
   const containerClass = isFullScreen
     ? "fixed inset-0 z-50 bg-white h-screen w-screen"
-    : "h-full w-full rounded-xl overflow-hidden shadow-sm border border-gray-200 relative z-0";
+    : "h-full w-full rounded-lg overflow-hidden shadow-sm border border-gray-200 relative z-0";
 
   return (
     <div className={containerClass}>
@@ -456,7 +457,14 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
           <MapZoomControls />
 
-          <div className="absolute top-4 right-16 flex gap-2 z-10">
+          {/* Fullscreen Filter Overlay */}
+          {isFullScreen && filterContent && (
+            <div className="absolute top-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm shadow-md border-b border-gray-200">
+              {filterContent}
+            </div>
+          )}
+
+          <div className="absolute top-4 right-4 flex gap-2 z-10">
             {/* Clustering Toggle */}
             <button
               onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
