@@ -11,6 +11,7 @@ interface AdminProductManagementProps {
   onClearProducts: () => void;
   onSaveProducts?: (products: Product[]) => void;
   apiKey?: string;
+  onSimulateSales?: () => void;
 }
 
 type SortKey = 'sku' | 'brand' | 'factoryCode' | 'name' | 'price' | 'category' | 'discount';
@@ -25,7 +26,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
   onUploadProducts,
   onClearProducts,
   onSaveProducts,
-  apiKey
+  apiKey,
+  onSimulateSales
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState('');
@@ -185,13 +187,23 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center flex-wrap">
             {hasChanges && (
               <button
                 onClick={handleSaveChanges}
                 className="px-6 py-2 bg-tertiary-container text-on-tertiary-container hover:bg-tertiary-container/80 rounded-full text-sm font-medium flex items-center gap-2 transition-all shadow-elevation-1 animate-pulse"
               >
                 <Save className="w-4 h-4" /> Salvar Alterações
+              </button>
+            )}
+
+            {products.length > 0 && onSimulateSales && (
+              <button
+                onClick={onSimulateSales}
+                className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-full text-xs font-medium flex items-center gap-2 transition-colors"
+                title="Atribuir produtos aleatórios para testes"
+              >
+                🎲 Simular Vendas
               </button>
             )}
 

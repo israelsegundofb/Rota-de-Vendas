@@ -19,6 +19,7 @@ export const useFilters = (
 
     // Product Filters
     const [filterProductCategory, setFilterProductCategory] = useState<string>('Todos');
+    const [filterProductSku, setFilterProductSku] = useState<string>('Todos');
     const [searchProductQuery, setSearchProductQuery] = useState<string>('');
 
     // --- Derived Data ---
@@ -67,7 +68,7 @@ export const useFilters = (
             let matchProduct = true;
             const prodQuery = searchProductQuery.toLowerCase();
 
-            if (filterProductCategory !== 'Todos' || prodQuery !== '') {
+            if (filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || prodQuery !== '') {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
@@ -75,7 +76,10 @@ export const useFilters = (
                     // Check Category (Brand often used as category in this context)
                     const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => p.category === filterProductCategory);
 
-                    // Check SKU, Brand, Factory Code, Description (Name), or Price
+                    // Check Specific SKU
+                    const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => p.sku === filterProductSku);
+
+                    // Check Search Query
                     const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
                         p.name.toLowerCase().includes(prodQuery) ||
                         p.sku.toLowerCase().includes(prodQuery) ||
@@ -84,13 +88,13 @@ export const useFilters = (
                         p.price.toString().includes(prodQuery)
                     );
 
-                    matchProduct = hasCat && hasMatch;
+                    matchProduct = hasCat && hasSku && hasMatch;
                 }
             }
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, searchProductQuery, filterSalesCategory, users, currentUser]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, users, currentUser]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
@@ -129,6 +133,7 @@ export const useFilters = (
         setFilterSalespersonId('Todos');
         setFilterSalesCategory('Todos');
         setFilterProductCategory('Todos');
+        setFilterProductSku('Todos');
         setSearchProductQuery('');
     };
 
@@ -142,6 +147,7 @@ export const useFilters = (
         filterSalespersonId, setFilterSalespersonId,
         filterSalesCategory, setFilterSalesCategory,
         filterProductCategory, setFilterProductCategory,
+        filterProductSku, setFilterProductSku,
         searchProductQuery, setSearchProductQuery,
 
         // Computed

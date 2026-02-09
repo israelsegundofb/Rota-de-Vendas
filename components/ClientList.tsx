@@ -114,6 +114,36 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
               <Tag className="w-3 h-3" />
               <span className="truncate">{client.category.join(', ')}</span>
             </div>
+            {/* BADGE DE PRODUTOS */}
+            {client.purchasedProducts && client.purchasedProducts.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {client.purchasedProducts.slice(0, 2).map((p, i) => (
+                  <span key={i} className="text-[9px] px-1 rounded bg-green-50 text-green-700 border border-green-200 truncate max-w-[100px]" title={p.name}>
+                    {p.sku}
+                  </span>
+                ))}
+                {client.purchasedProducts.length > 2 && (
+                  <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                    +{client.purchasedProducts.length - 2}
+                  </span>
+                )}
+              </div>
+            )}
+            {/* BADGE DE PRODUTOS */}
+            {client.purchasedProducts && client.purchasedProducts.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {client.purchasedProducts.slice(0, 2).map((p, i) => (
+                  <span key={i} className="text-[9px] px-1 rounded bg-green-50 text-green-700 border border-green-200 truncate max-w-[100px]" title={p.name}>
+                    {p.sku}
+                  </span>
+                ))}
+                {client.purchasedProducts.length > 2 && (
+                  <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                    +{client.purchasedProducts.length - 2}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

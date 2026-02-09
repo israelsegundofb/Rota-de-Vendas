@@ -77,6 +77,7 @@ const App: React.FC = () => {
     filterSalespersonId, setFilterSalespersonId,
     filterSalesCategory, setFilterSalesCategory,
     filterProductCategory, setFilterProductCategory,
+    filterProductSku, setFilterProductSku,
     searchProductQuery, setSearchProductQuery,
     filteredClients,
     visibleClients, // Exposed if needed for counts
@@ -627,6 +628,18 @@ const App: React.FC = () => {
 
 
 
+  const handleSimulateSales = () => {
+    if (products.length === 0) {
+      alert("Não há produtos cadastrados para distribuir.");
+      return;
+    }
+
+    if (window.confirm(`Isso atribuirá aleatoriamente de 1 a 5 produtos para clientes que ainda NÃO possuem histórico de compras.\n\nDeseja continuar?`)) {
+      distributeProductsToClients(masterClientList, products);
+      alert("Simulação de vendas concluída! Verifique os filtros.");
+    }
+  };
+
   const handleProductFileUpload = async (file: File) => {
     // Generate File ID
     const fileId = crypto.randomUUID();
@@ -708,7 +721,7 @@ const App: React.FC = () => {
 
   const isAdminUser = isAdmin(currentUser.role);
   const canViewAllData = hasFullDataVisibility(currentUser.role);
-  const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
+  const isProductFilterActive = filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || searchProductQuery !== '';
 
   return (
     <GoogleReCaptchaProvider
@@ -974,6 +987,7 @@ const App: React.FC = () => {
                   onClearProducts={handleClearProducts}
                   onSaveProducts={handleSaveProducts}
                   apiKey={activeApiKey}
+                  onSimulateSales={handleSimulateSales}
                 />
               </div>
             ) : activeView === 'admin_files' && isAdminUser ? (
@@ -1110,6 +1124,24 @@ const App: React.FC = () => {
                       <option value="Todos">Todas Marcas / Categorias</option>
                       {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
+
+                    <div className="relative animate-fade-in">
+                      <ShoppingBag className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${filterProductSku !== 'Todos' ? 'text-green-600' : 'text-gray-400'}`} />
+                      <select
+                        value={filterProductSku}
+                        onChange={e => setFilterProductSku(e.target.value)}
+                        className={`text-sm rounded-md pl-7 pr-3 py-1.5 border appearance-none transition-colors max-w-[200px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                      >
+                        <option value="Todos">Todos Produtos</option>
+                        {products
+                          .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map(p => (
+                            <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
+                          ))
+                        }
+                      </select>
+                    </div>
 
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
