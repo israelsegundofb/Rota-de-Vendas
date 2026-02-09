@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, Mail, ArrowLeft, Check, Send } from 'lucide-react';
+import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, Mail, ArrowLeft, Check, Send, Shield } from 'lucide-react';
 import { AppUser } from '../types';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface LoginScreenProps {
   users: AppUser[];
@@ -23,16 +24,42 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // CAPTCHA Hook
+  const { executeRecaptcha } = useGoogleReCaptcha();
+  const [isVerifying, setIsVerifying] = useState(false);
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    setError('');
 
-    if (user && user.password === password) {
-      onLogin(user);
-    } else {
-      setError('Credenciais inválidas. Tente novamente.');
+    // Verificar se o reCAPTCHA está pronto
+    if (!executeRecaptcha) {
+      setError('Verificação de segurança ainda carregando. Aguarde...');
+      return;
+    }
+
+    setIsVerifying(true);
+
+    try {
+      // Executar verificação CAPTCHA
+      const token = await executeRecaptcha('login');
+      console.log('reCAPTCHA token obtained:', token ? 'Success' : 'Failed');
+
+      // Proceder com validação de credenciais
+      const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+
+      if (user && user.password === password) {
+        onLogin(user);
+      } else {
+        setError('Credenciais inválidas. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('reCAPTCHA error:', error);
+      setError('Falha na verificação de segurança. Tente novamente.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -175,9 +202,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
 
               <button
                 type="submit"
-                className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md"
+                disabled={isVerifying}
+                className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 disabled:cursor-wait text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md"
               >
-                Entrar <ArrowRight className="w-4 h-4" />
+                {isVerifying ? (
+                  <>
+                    <Shield className="w-4 h-4 animate-pulse" />
+                    Verificando segurança...
+                  </>
+                ) : (
+                  <>
+                    Entrar <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
           )}

@@ -32,6 +32,7 @@ import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 
 
 // Initial Mock Data
@@ -688,576 +689,588 @@ const App: React.FC = () => {
   const isAdmin = currentUser.role === 'admin';
   const isProductFilterActive = filterProductCategory !== 'Todos' || searchProductQuery !== '';
 
+  const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6Lc5JWUsAAAAAKysoFirSOJTvWfOXYAVRJyoVqnJ";
+
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
+    <GoogleReCaptchaProvider
+      reCaptchaKey={recaptchaKey}
+      language="pt-BR"
+      scriptProps={{
+        async: true,
+        defer: true,
+        appendTo: 'body'
+      }}
+    >
+      <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
 
-      {/* MOBILE OVERLAY */}
-      {isMobileMenuOpen && (
-        <div
-          className="absolute inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm transition-opacity"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+        {/* MOBILE OVERLAY */}
+        {isMobileMenuOpen && (
+          <div
+            className="absolute inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
 
-      {/* SIDEBAR */}
-      <aside
-        className={`
+        {/* SIDEBAR */}
+        <aside
+          className={`
           w-72 bg-surface-container-low text-on-surface shadow-elevation-2 z-30 
           fixed md:relative h-full transition-transform duration-300 ease-in-out
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           flex flex-col border-r border-outline-variant/30
         `}
-      >
-        <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2 text-primary">
-            <LayoutDashboard className="w-6 h-6" />
-            Vendas A.I.
-          </h1>
-          <button
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="md:hidden text-on-surface-variant hover:text-primary"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="px-6 py-2">
-          <p className="text-xs font-medium text-on-surface-variant/80 uppercase tracking-wider">
-            {isAdmin ? 'Painel Administrativo' : 'Portal do Vendedor'}
-          </p>
-        </div>
-
-        <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-          <div className="bg-surface-container-highest rounded-2xl p-4 mb-6 border border-outline-variant/30 shadow-sm relative overflow-hidden group">
-            <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
-            <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
-            <div className="flex items-center gap-3 relative z-10">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md ${isAdmin ? 'bg-tertiary' : 'bg-secondary'}`}>
-                {currentUser.name.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>
-                <p className="text-xs text-on-surface-variant truncate opacity-80">{currentUser.email}</p>
-              </div>
-            </div>
-          </div>
-
-          <nav className="space-y-1 mb-8">
-            <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
-            <button
-              onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
-                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                }`}
-            >
-              <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
-              Mapa da Carteira
-            </button>
-            <button
-              onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
-                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                }`}
-            >
-              <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
-              Listagem de Dados
-            </button>
-          </nav>
-
-          <nav className="space-y-1 mb-8">
-            <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
-
-            <button
-              onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
-                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                }`}
-            >
-              <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
-              Gerenciar Usuários
-            </button>
-
-            <button
-              onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
-                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                }`}
-            >
-              <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
-              Categorias
-            </button>
-
-            <button
-              onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
-                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                }`}
-            >
-              <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
-              Produtos
-            </button>
-
-            <button
-              onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
-                ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                }`}
-            >
-              <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
-              Arquivos
-            </button>
-
-            <button
-              onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
-            >
-              <Cloud className="w-5 h-5" />
-              Backup & Cloud
-            </button>
-          </nav>
-        </div>
-
-        <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
-          >
-            <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
-          </button>
-
-          <div className="text-center mt-4">
-            <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
-          </div>
-        </div>
-      </aside>
-
-      {/* TOP BAR FOR MOBILE */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-surface-container-low shadow-sm z-10 flex items-center justify-between px-4 border-b border-outline-variant/30">
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-on-surface hover:bg-surface-container-highest rounded-full transition-colors"
         >
-          <Menu className="w-6 h-6" />
-        </button>
-        <span className="font-bold text-lg text-primary flex items-center gap-2">
-          <LayoutDashboard className="w-5 h-5" /> Vendas A.I.
-        </span>
-        <div className="w-10"></div> {/* Spacer for center alignment */}
-      </header>
-
-
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-surface transition-all duration-300 md:pt-0 pt-16">
-
-        {/* Floating Add Button for Mobile (when not in admin views) */}
-        {!isAdmin && activeView === 'table' && (
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-elevation-2 flex items-center justify-center z-50 animate-bounce-in"
-          >
-            <UsersIcon className="w-6 h-6" />
-          </button>
-        )}
-        {/* MODALS */}
-        <CloudConfigModal
-          isOpen={isCloudConfigOpen}
-          onClose={() => setIsCloudConfigOpen(false)}
-          onSaveToCloud={() => {
-            saveToCloud(masterClientList, products, categories, users);
-            alert('✅ Dados salvos na nuvem com sucesso!');
-          }}
-          onClearDatabase={handleClearAllClients}
-          isFirebaseConnected={isFirebaseConnected}
-        />
-
-        <CookieConsent
-          onAccept={() => {
-            console.log("Cookie consent accepted. Storage enabled.");
-          }}
-          onDecline={() => {
-            console.warn("Cookie consent declined. Storage should be minimized.");
-          }}
-        />
-
-        <header className="bg-white border-b border-gray-200 h-16 px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Portal</span>
-            <ChevronRight className="w-4 h-4" />
-            <span className="font-semibold text-blue-600">
-              {activeView === 'map' ? 'Mapa da Carteira' :
-                activeView === 'table' ? 'Listagem de Clientes' :
-                  activeView === 'admin_categories' ? 'Categorias de Clientes' :
-                    activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
-            </span>
+          <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
+            <h1 className="text-xl font-bold flex items-center gap-2 text-primary">
+              <LayoutDashboard className="w-6 h-6" />
+              Vendas A.I.
+            </h1>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden text-on-surface-variant hover:text-primary"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-gray-400">
-                {isAdmin ? 'Clientes Visualizados' : 'Meus Clientes'}
-              </p>
-              <p className="text-lg font-bold leading-none">{visibleClients.length}</p>
-            </div>
-            {isAdmin && (
-              <div className="text-right border-l pl-6 border-gray-200">
-                <p className="text-xs text-gray-400">Total Sistema</p>
-                <p className="text-lg font-bold leading-none text-purple-600">{masterClientList.length}</p>
+
+          <div className="px-6 py-2">
+            <p className="text-xs font-medium text-on-surface-variant/80 uppercase tracking-wider">
+              {isAdmin ? 'Painel Administrativo' : 'Portal do Vendedor'}
+            </p>
+          </div>
+
+          <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
+            <div className="bg-surface-container-highest rounded-2xl p-4 mb-6 border border-outline-variant/30 shadow-sm relative overflow-hidden group">
+              <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
+              <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
+              <div className="flex items-center gap-3 relative z-10">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md ${isAdmin ? 'bg-tertiary' : 'bg-secondary'}`}>
+                  {currentUser.name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>
+                  <p className="text-xs text-on-surface-variant truncate opacity-80">{currentUser.email}</p>
+                </div>
               </div>
-            )}
+            </div>
+
+            <nav className="space-y-1 mb-8">
+              <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
+              <button
+                onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
+                Mapa da Carteira
+              </button>
+              <button
+                onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
+                Listagem de Dados
+              </button>
+            </nav>
+
+            <nav className="space-y-1 mb-8">
+              <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
+
+              <button
+                onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
+                Gerenciar Usuários
+              </button>
+
+              <button
+                onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
+                Categorias
+              </button>
+
+              <button
+                onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
+                Produtos
+              </button>
+
+              <button
+                onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
+                Arquivos
+              </button>
+
+              <button
+                onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
+              >
+                <Cloud className="w-5 h-5" />
+                Backup & Cloud
+              </button>
+            </nav>
           </div>
+
+          <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
+            >
+              <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
+            </button>
+
+            <div className="text-center mt-4">
+              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
+            </div>
+          </div>
+        </aside>
+
+        {/* TOP BAR FOR MOBILE */}
+        <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-surface-container-low shadow-sm z-10 flex items-center justify-between px-4 border-b border-outline-variant/30">
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 text-on-surface hover:bg-surface-container-highest rounded-full transition-colors"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <span className="font-bold text-lg text-primary flex items-center gap-2">
+            <LayoutDashboard className="w-5 h-5" /> Vendas A.I.
+          </span>
+          <div className="w-10"></div> {/* Spacer for center alignment */}
         </header>
 
-        {
-          activeView === 'admin_users' && isAdmin ? (
-            <div className="flex-1 overflow-y-auto bg-gray-50">
-              <AdminUserManagement
-                users={users}
-                onAddUser={handleAddUser}
-                onUpdateUser={handleUpdateUser}
-                onDeleteUser={handleDeleteUser}
-                onCleanupDuplicates={handleCleanupDuplicates}
-                totalClients={masterClientList.length}
-              />
+
+        {/* MAIN CONTENT AREA */}
+        <main className="flex-1 flex flex-col relative overflow-hidden bg-surface transition-all duration-300 md:pt-0 pt-16">
+
+          {/* Floating Add Button for Mobile (when not in admin views) */}
+          {!isAdmin && activeView === 'table' && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-elevation-2 flex items-center justify-center z-50 animate-bounce-in"
+            >
+              <UsersIcon className="w-6 h-6" />
+            </button>
+          )}
+          {/* MODALS */}
+          <CloudConfigModal
+            isOpen={isCloudConfigOpen}
+            onClose={() => setIsCloudConfigOpen(false)}
+            onSaveToCloud={() => {
+              saveToCloud(masterClientList, products, categories, users);
+              alert('✅ Dados salvos na nuvem com sucesso!');
+            }}
+            onClearDatabase={handleClearAllClients}
+            isFirebaseConnected={isFirebaseConnected}
+          />
+
+          <CookieConsent
+            onAccept={() => {
+              console.log("Cookie consent accepted. Storage enabled.");
+            }}
+            onDecline={() => {
+              console.warn("Cookie consent declined. Storage should be minimized.");
+            }}
+          />
+
+          <header className="bg-white border-b border-gray-200 h-16 px-6 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>Portal</span>
+              <ChevronRight className="w-4 h-4" />
+              <span className="font-semibold text-blue-600">
+                {activeView === 'map' ? 'Mapa da Carteira' :
+                  activeView === 'table' ? 'Listagem de Clientes' :
+                    activeView === 'admin_categories' ? 'Categorias de Clientes' :
+                      activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
+              </span>
             </div>
-          ) : activeView === 'admin_categories' && isAdmin ? (
-            <div className="flex-1 overflow-y-auto bg-gray-50">
-              <AdminCategoryManagement
-                categories={categories}
-                onAddCategory={handleAddCategory}
-                onDeleteCategory={handleDeleteCategory}
-              />
-            </div>
-          ) : activeView === 'admin_products' && isAdmin ? (
-            <div className="flex-1 overflow-y-auto bg-gray-50">
-              <AdminProductManagement
-                products={products}
-                onUploadProducts={handleUploadProducts}
-                onClearProducts={handleClearProducts}
-                onSaveProducts={handleSaveProducts} // Pass save handler
-                apiKey={activeApiKey}
-              />
-            </div>
-          ) : activeView === 'admin_files' && isAdmin ? (
-            <div className="flex-1 overflow-y-auto bg-gray-50">
-              <AdminFileManager
-                users={users}
-                uploadedFiles={uploadedFiles}
-                onUploadClients={(file, targetId) => {
-                  // Initial wrapper to adapt to handleFileUpload structure
-                  // We need to set targetUploadUserId state temporarily or refactor handleFileUpload
-                  setTargetUploadUserId(targetId);
-                  // Simulate event
-                  // Check if handleFileUpload uses targetUploadUserId state or if we can pass it?
-                  // handleFileUpload uses state `targetUploadUserId`.
-                  // So we set it, then call. But setState is async.
-                  // Better: Refactor handleFileUpload to accept optional targetOverride.
-                  // For now, let's call it directly with a small hack or verify if AdminFileManager sets the state?
-                  // Actually AdminFileManager UI has the dropdown. 
-                  // App.tsx's handleFileUpload (via input) relies on App.tsx state.
-                  // AdminFileManager has its OWN input and state.
-                  // If AdminFileManager calls this prop, it passes the file and targetId.
-
-                  // Helper to trigger logic:
-                  // We can't easily reuse handleFileUpload as is without refactoring.
-                  // Let's assume for this step I will Refactor handleFileUpload to take args in next step or use a workaround.
-                  // Workaround: 
-                  const fakeEvent = { target: { files: [file], value: '' } } as any;
-                  // We need to force targetUploadUserId to be targetId.
-                  // Since state update is async, this might fail.
-
-                  // CORRECT APPROACH: Refactor handleFileUpload to accept (file, userId).
-                  // But I can't do that inside this replacement string.
-
-                  // SAFE APPROACH FOR NOW: Just pass the file and rely on App.state? 
-                  // NO, AdminFileManager passes `targetId`.
-
-                  // I will implement a bridge function in App.tsx body later.
-                  // For now, I'll pass a placeholder or try to use handleFileUpload if I update it.
-                  // I will call `handleClientFileDirect(file, targetId)` which I will add.
-                  const targetUser = users.find(u => u.id === targetId);
-                  const targetName = targetUser?.name || 'Unknown';
-                  handleClientFileDirect(file, targetId);
-                }}
-                onUploadProducts={handleProductFileUpload}
-                onDeleteFile={handleDeleteFile}
-                onReassignSalesperson={handleReassignFileSalesperson}
-                procState={procState}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="bg-gray-100 p-4 border-b border-gray-200 flex flex-col gap-3">
-                {/* Primary Filters Row */}
-                <div className="flex flex-wrap gap-3 items-center">
-                  <div className="relative mr-2">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar cliente ou empresa..."
-                      className="pl-9 pr-4 py-1.5 text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 w-56 border outline-none"
-                    />
-                  </div>
-
-                  <div className="h-6 w-px bg-gray-300 mx-2 hidden sm:block"></div>
-                  <div className="flex items-center gap-2 text-gray-600 mr-2">
-                    <Filter className="w-4 h-4" />
-                    <span className="text-sm font-bold hidden md:inline">Filtros:</span>
-                  </div>
-
-                  {isAdmin && (
-                    <div className="flex items-center gap-2 bg-purple-50 px-2 py-1 rounded-md border border-purple-100 mr-2">
-                      <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1">
-                        <Shield className="w-3 h-3" /> Admin
-                      </span>
-
-                      <div className="relative">
-                        <UserIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
-                        <select
-                          value={filterSalespersonId}
-                          onChange={(e) => setFilterSalespersonId(e.target.value)}
-                          className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
-                        >
-                          <option value="Todos">Todos Vendedores</option>
-                          {users.filter(u => u.role === 'salesperson').map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="relative">
-                        <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
-                        <select
-                          value={filterSalesCategory}
-                          onChange={(e) => setFilterSalesCategory(e.target.value)}
-                          className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
-                        >
-                          <option value="Todos">Todas Equipes</option>
-                          <option value="Externo">Externo</option>
-                          <option value="Interno">Interno</option>
-                          <option value="Mercado Livre">Mercado Livre</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  <select
-                    value={filterRegion}
-                    onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
-                    className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5"
-                  >
-                    <option value="Todas">Todas Regiões</option>
-                    {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-
-                  <select
-                    value={filterState}
-                    onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
-                    className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5"
-                    disabled={availableStates.length === 0}
-                  >
-                    <option value="Todos">Todos Estados {filterRegion !== 'Todas' ? `(${filterRegion})` : ''}</option>
-                    {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-
-                  <select
-                    value={filterCity}
-                    onChange={(e) => setFilterCity(e.target.value)}
-                    className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5 min-w-[120px]"
-                    disabled={filterState === 'Todos' || availableCities.length === 0}
-                  >
-                    <option value="Todas">Todas Cidades</option>
-                    {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-
-                  <div className="flex items-center gap-1 relative ml-2">
-                    <ShoppingBag className="w-4 h-4 text-gray-400 absolute left-2 pointer-events-none" />
-                    <select
-                      value={filterCategory}
-                      onChange={(e) => setFilterCategory(e.target.value)}
-                      className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-8 pr-3 py-1.5"
-                    >
-                      <option value="Todos">Todas Cat. Clientes</option>
-                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Secondary Filters Row: Products */}
-                <div className="flex flex-wrap gap-3 items-center bg-white border border-gray-200 p-2 rounded-lg shadow-sm">
-                  <div className="flex items-center gap-2 px-2 text-sm font-semibold text-green-700">
-                    <Package className="w-4 h-4" />
-                    Vendas:
-                  </div>
-
-                  <select
-                    value={filterProductCategory}
-                    onChange={e => setFilterProductCategory(e.target.value)}
-                    className={`text-sm rounded-md px-3 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                  >
-                    <option value="Todos">Todas Marcas / Categorias</option>
-                    {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
-                    <input
-                      type="text"
-                      value={searchProductQuery}
-                      onChange={e => setSearchProductQuery(e.target.value)}
-                      placeholder="SKU, Marca, Código ou Descrição..."
-                      className={`pl-8 pr-3 py-1.5 text-sm border rounded-md focus:ring-green-500 focus:border-green-500 outline-none w-64 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
-                    />
-                  </div>
-
-                  {isProductFilterActive && (
-                    <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Exibindo onde foi vendido
-                    </span>
-                  )}
-                  {!isProductFilterActive && (
-                    <span className="ml-auto text-xs text-gray-400">
-                      {products.length === 0 ? "Nenhum produto cadastrado no admin." : `${products.length} produtos no catálogo.`}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex justify-end">
-                  <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    {filteredClients.length} resultados encontrados
-                  </span>
-                </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-xs text-gray-400">
+                  {isAdmin ? 'Clientes Visualizados' : 'Meus Clientes'}
+                </p>
+                <p className="text-lg font-bold leading-none">{visibleClients.length}</p>
               </div>
+              {isAdmin && (
+                <div className="text-right border-l pl-6 border-gray-200">
+                  <p className="text-xs text-gray-400">Total Sistema</p>
+                  <p className="text-lg font-bold leading-none text-purple-600">{masterClientList.length}</p>
+                </div>
+              )}
+            </div>
+          </header>
 
-              <div className="flex-1 overflow-hidden p-4 bg-gray-100">
-
-                {/* Visual Placeholder when empty */}
-                {visibleClients.length === 0 && !procState.isActive ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white rounded-xl border border-dashed border-gray-300">
-                    {isAdmin ? (
-                      <>
-                        <FileUp className="w-12 h-12 mb-2 opacity-20" />
-                        <p className="text-lg font-medium text-gray-500">Nenhum dado cadastrado.</p>
-                        <p className="text-sm mt-1">Selecione um vendedor ao lado e carregue a planilha de clientes.</p>
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-12 h-12 mb-2 opacity-20" />
-                        <p className="text-lg font-medium text-gray-500">Carteira Vazia</p>
-                        <p className="text-sm mt-1 max-w-md text-center">
-                          Seus clientes ainda não foram carregados pelo administrador.
-                          Solicite o cadastro da sua rota.
-                        </p>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
-                    {activeView === 'map' ? (
-                      <ClientMap
-                        key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
-                        clients={filteredClients}
-                        apiKey={activeApiKey}
-                        onInvalidKey={handleInvalidKey}
-                        productFilterActive={isProductFilterActive}
-                        highlightProductTerm={searchProductQuery}
-                        activeProductCategory={filterProductCategory}
-                        users={users} // Pass users for color coding
-                      />
-                    ) : (
-                      <ClientList
-                        clients={filteredClients}
-                        onUpdateClient={handleUpdateClient}
-                        onAddClient={handleAddClient}
-                        currentUserRole={currentUser?.role}
-                        currentUserId={currentUser?.id}
-                        currentUserName={currentUser?.name}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            </>
-          )
-        }
-
-        {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
-        {
-          procState.isActive && (
-            <div className="absolute bottom-6 right-6 z-50 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden animate-slide-up">
-              <div className={`h-1.5 w-full ${procState.status === 'error' ? 'bg-red-200' : 'bg-blue-100'}`}>
-                <div
-                  className={`h-full transition-all duration-300 ${procState.status === 'completed' ? 'bg-green-500 w-full' :
-                    procState.status === 'error' ? 'bg-red-500 w-full' :
-                      'bg-blue-600'
-                    }`}
-                  style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
+          {
+            activeView === 'admin_users' && isAdmin ? (
+              <div className="flex-1 overflow-y-auto bg-gray-50">
+                <AdminUserManagement
+                  users={users}
+                  onAddUser={handleAddUser}
+                  onUpdateUser={handleUpdateUser}
+                  onDeleteUser={handleDeleteUser}
+                  onCleanupDuplicates={handleCleanupDuplicates}
+                  totalClients={masterClientList.length}
                 />
               </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                      {procState.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-                      {procState.status === 'processing' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                      {procState.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
+            ) : activeView === 'admin_categories' && isAdmin ? (
+              <div className="flex-1 overflow-y-auto bg-gray-50">
+                <AdminCategoryManagement
+                  categories={categories}
+                  onAddCategory={handleAddCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                />
+              </div>
+            ) : activeView === 'admin_products' && isAdmin ? (
+              <div className="flex-1 overflow-y-auto bg-gray-50">
+                <AdminProductManagement
+                  products={products}
+                  onUploadProducts={handleUploadProducts}
+                  onClearProducts={handleClearProducts}
+                  onSaveProducts={handleSaveProducts} // Pass save handler
+                  apiKey={activeApiKey}
+                />
+              </div>
+            ) : activeView === 'admin_files' && isAdmin ? (
+              <div className="flex-1 overflow-y-auto bg-gray-50">
+                <AdminFileManager
+                  users={users}
+                  uploadedFiles={uploadedFiles}
+                  onUploadClients={(file, targetId) => {
+                    // Initial wrapper to adapt to handleFileUpload structure
+                    // We need to set targetUploadUserId state temporarily or refactor handleFileUpload
+                    setTargetUploadUserId(targetId);
+                    // Simulate event
+                    // Check if handleFileUpload uses targetUploadUserId state or if we can pass it?
+                    // handleFileUpload uses state `targetUploadUserId`.
+                    // So we set it, then call. But setState is async.
+                    // Better: Refactor handleFileUpload to accept optional targetOverride.
+                    // For now, let's call it directly with a small hack or verify if AdminFileManager sets the state?
+                    // Actually AdminFileManager UI has the dropdown. 
+                    // App.tsx's handleFileUpload (via input) relies on App.tsx state.
+                    // AdminFileManager has its OWN input and state.
+                    // If AdminFileManager calls this prop, it passes the file and targetId.
 
-                      {procState.status === 'reading' ? 'Lendo Arquivo...' :
-                        procState.status === 'processing' ? 'Processando Planilha' :
-                          procState.status === 'completed' ? 'Processamento Concluído' :
-                            'Erro no Processamento'}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {procState.fileName} <span className="mx-1">•</span> {procState.ownerName}
-                    </p>
+                    // Helper to trigger logic:
+                    // We can't easily reuse handleFileUpload as is without refactoring.
+                    // Let's assume for this step I will Refactor handleFileUpload to take args in next step or use a workaround.
+                    // Workaround: 
+                    const fakeEvent = { target: { files: [file], value: '' } } as any;
+                    // We need to force targetUploadUserId to be targetId.
+                    // Since state update is async, this might fail.
+
+                    // CORRECT APPROACH: Refactor handleFileUpload to accept (file, userId).
+                    // But I can't do that inside this replacement string.
+
+                    // SAFE APPROACH FOR NOW: Just pass the file and rely on App.state? 
+                    // NO, AdminFileManager passes `targetId`.
+
+                    // I will implement a bridge function in App.tsx body later.
+                    // For now, I'll pass a placeholder or try to use handleFileUpload if I update it.
+                    // I will call `handleClientFileDirect(file, targetId)` which I will add.
+                    const targetUser = users.find(u => u.id === targetId);
+                    const targetName = targetUser?.name || 'Unknown';
+                    handleClientFileDirect(file, targetId);
+                  }}
+                  onUploadProducts={handleProductFileUpload}
+                  onDeleteFile={handleDeleteFile}
+                  onReassignSalesperson={handleReassignFileSalesperson}
+                  procState={procState}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="bg-gray-100 p-4 border-b border-gray-200 flex flex-col gap-3">
+                  {/* Primary Filters Row */}
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <div className="relative mr-2">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Buscar cliente ou empresa..."
+                        className="pl-9 pr-4 py-1.5 text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 w-56 border outline-none"
+                      />
+                    </div>
+
+                    <div className="h-6 w-px bg-gray-300 mx-2 hidden sm:block"></div>
+                    <div className="flex items-center gap-2 text-gray-600 mr-2">
+                      <Filter className="w-4 h-4" />
+                      <span className="text-sm font-bold hidden md:inline">Filtros:</span>
+                    </div>
+
+                    {isAdmin && (
+                      <div className="flex items-center gap-2 bg-purple-50 px-2 py-1 rounded-md border border-purple-100 mr-2">
+                        <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1">
+                          <Shield className="w-3 h-3" /> Admin
+                        </span>
+
+                        <div className="relative">
+                          <UserIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
+                          <select
+                            value={filterSalespersonId}
+                            onChange={(e) => setFilterSalespersonId(e.target.value)}
+                            className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
+                          >
+                            <option value="Todos">Todos Vendedores</option>
+                            {users.filter(u => u.role === 'salesperson').map(u => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="relative">
+                          <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
+                          <select
+                            value={filterSalesCategory}
+                            onChange={(e) => setFilterSalesCategory(e.target.value)}
+                            className="text-sm border-purple-300 bg-white text-purple-900 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-3 py-1 font-medium"
+                          >
+                            <option value="Todos">Todas Equipes</option>
+                            <option value="Externo">Externo</option>
+                            <option value="Interno">Interno</option>
+                            <option value="Mercado Livre">Mercado Livre</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    <select
+                      value={filterRegion}
+                      onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
+                      className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5"
+                    >
+                      <option value="Todas">Todas Regiões</option>
+                      {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+
+                    <select
+                      value={filterState}
+                      onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
+                      className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5"
+                      disabled={availableStates.length === 0}
+                    >
+                      <option value="Todos">Todos Estados {filterRegion !== 'Todas' ? `(${filterRegion})` : ''}</option>
+                      {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+
+                    <select
+                      value={filterCity}
+                      onChange={(e) => setFilterCity(e.target.value)}
+                      className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-1.5 min-w-[120px]"
+                      disabled={filterState === 'Todos' || availableCities.length === 0}
+                    >
+                      <option value="Todas">Todas Cidades</option>
+                      {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <div className="flex items-center gap-1 relative ml-2">
+                      <ShoppingBag className="w-4 h-4 text-gray-400 absolute left-2 pointer-events-none" />
+                      <select
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-8 pr-3 py-1.5"
+                      >
+                        <option value="Todos">Todas Cat. Clientes</option>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (procState.isActive && procState.status === 'processing') {
-                        // Trigger cancellation confirmation
-                        if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
-                          isUploadCancelled.current = true;
-                          setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
-                        }
-                      } else {
-                        setProcState(prev => ({ ...prev, isActive: false }));
-                      }
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+
+                  {/* Secondary Filters Row: Products */}
+                  <div className="flex flex-wrap gap-3 items-center bg-white border border-gray-200 p-2 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2 px-2 text-sm font-semibold text-green-700">
+                      <Package className="w-4 h-4" />
+                      Vendas:
+                    </div>
+
+                    <select
+                      value={filterProductCategory}
+                      onChange={e => setFilterProductCategory(e.target.value)}
+                      className={`text-sm rounded-md px-3 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                    >
+                      <option value="Todos">Todas Marcas / Categorias</option>
+                      {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchProductQuery}
+                        onChange={e => setSearchProductQuery(e.target.value)}
+                        placeholder="SKU, Marca, Código ou Descrição..."
+                        className={`pl-8 pr-3 py-1.5 text-sm border rounded-md focus:ring-green-500 focus:border-green-500 outline-none w-64 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
+                      />
+                    </div>
+
+                    {isProductFilterActive && (
+                      <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Exibindo onde foi vendido
+                      </span>
+                    )}
+                    {!isProductFilterActive && (
+                      <span className="ml-auto text-xs text-gray-400">
+                        {products.length === 0 ? "Nenhum produto cadastrado no admin." : `${products.length} produtos no catálogo.`}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      {filteredClients.length} resultados encontrados
+                    </span>
+                  </div>
                 </div>
 
-                {procState.status === 'processing' && (
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Progresso (IA + Maps)</span>
-                      <span className="font-mono">{procState.current} / {procState.total}</span>
+                <div className="flex-1 overflow-hidden p-4 bg-gray-100">
+
+                  {/* Visual Placeholder when empty */}
+                  {visibleClients.length === 0 && !procState.isActive ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white rounded-xl border border-dashed border-gray-300">
+                      {isAdmin ? (
+                        <>
+                          <FileUp className="w-12 h-12 mb-2 opacity-20" />
+                          <p className="text-lg font-medium text-gray-500">Nenhum dado cadastrado.</p>
+                          <p className="text-sm mt-1">Selecione um vendedor ao lado e carregue a planilha de clientes.</p>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-12 h-12 mb-2 opacity-20" />
+                          <p className="text-lg font-medium text-gray-500">Carteira Vazia</p>
+                          <p className="text-sm mt-1 max-w-md text-center">
+                            Seus clientes ainda não foram carregados pelo administrador.
+                            Solicite o cadastro da sua rota.
+                          </p>
+                        </>
+                      )}
                     </div>
-                    <p className="text-[10px] text-gray-400">Você pode continuar usando o sistema.</p>
+                  ) : (
+                    <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
+                      {activeView === 'map' ? (
+                        <ClientMap
+                          key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
+                          clients={filteredClients}
+                          apiKey={activeApiKey}
+                          onInvalidKey={handleInvalidKey}
+                          productFilterActive={isProductFilterActive}
+                          highlightProductTerm={searchProductQuery}
+                          activeProductCategory={filterProductCategory}
+                          users={users} // Pass users for color coding
+                        />
+                      ) : (
+                        <ClientList
+                          clients={filteredClients}
+                          onUpdateClient={handleUpdateClient}
+                          onAddClient={handleAddClient}
+                          currentUserRole={currentUser?.role}
+                          currentUserId={currentUser?.id}
+                          currentUserName={currentUser?.name}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )
+          }
+
+          {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
+          {
+            procState.isActive && (
+              <div className="absolute bottom-6 right-6 z-50 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden animate-slide-up">
+                <div className={`h-1.5 w-full ${procState.status === 'error' ? 'bg-red-200' : 'bg-blue-100'}`}>
+                  <div
+                    className={`h-full transition-all duration-300 ${procState.status === 'completed' ? 'bg-green-500 w-full' :
+                      procState.status === 'error' ? 'bg-red-500 w-full' :
+                        'bg-blue-600'
+                      }`}
+                    style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
+                  />
+                </div>
+                <div className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                        {procState.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                        {procState.status === 'processing' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                        {procState.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
+
+                        {procState.status === 'reading' ? 'Lendo Arquivo...' :
+                          procState.status === 'processing' ? 'Processando Planilha' :
+                            procState.status === 'completed' ? 'Processamento Concluído' :
+                              'Erro no Processamento'}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {procState.fileName} <span className="mx-1">•</span> {procState.ownerName}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (procState.isActive && procState.status === 'processing') {
+                          // Trigger cancellation confirmation
+                          if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
+                            isUploadCancelled.current = true;
+                            setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
+                          }
+                        } else {
+                          setProcState(prev => ({ ...prev, isActive: false }));
+                        }
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
 
-                {procState.status === 'error' && (
-                  <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
-                    {procState.errorMessage}
-                  </p>
-                )}
+                  {procState.status === 'processing' && (
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Progresso (IA + Maps)</span>
+                        <span className="font-mono">{procState.current} / {procState.total}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400">Você pode continuar usando o sistema.</p>
+                    </div>
+                  )}
+
+                  {procState.status === 'error' && (
+                    <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
+                      {procState.errorMessage}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        }
+            )
+          }
 
-      </main >
-    </div >
+        </main >
+      </div >
+    </GoogleReCaptchaProvider>
   );
 }; // End of App component
 
