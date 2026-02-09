@@ -978,35 +978,12 @@ const App: React.FC = () => {
                 <AdminFileManager
                   users={users}
                   uploadedFiles={uploadedFiles}
-                  onUploadClients={(file, targetId) => {
-                    // Initial wrapper to adapt to handleFileUpload structure
-                    // We need to set targetUploadUserId state temporarily or refactor handleFileUpload
-                    setTargetUploadUserId(targetId);
-                    // Simulate event
-                    // Check if handleFileUpload uses targetUploadUserId state or if we can pass it?
-                    // handleFileUpload uses state `targetUploadUserId`.
-                    // So we set it, then call. But setState is async.
-                    // Better: Refactor handleFileUpload to accept optional targetOverride.
-                    // For now, let's call it directly with a small hack or verify if AdminFileManager sets the state?
-                    // Actually AdminFileManager UI has the dropdown. 
-                    // App.tsx's handleFileUpload (via input) relies on App.tsx state.
-                    // AdminFileManager has its OWN input and state.
-                    // If AdminFileManager calls this prop, it passes the file and targetId.
-
-                    // Helper to trigger logic:
-                    // We can't easily reuse handleFileUpload as is without refactoring.
-                    // Let's assume for this step I will Refactor handleFileUpload to take args in next step or use a workaround.
-                    // Workaround: 
-                    const fakeEvent = { target: { files: [file], value: '' } } as any;
-                    // We need to force targetUploadUserId to be targetId.
-                    // Since state update is async, this might fail.
-
-                    // CORRECT APPROACH: Refactor handleFileUpload to accept (file, userId).
-                    // But I can't do that inside this replacement string.
-                    onDeleteFile = { handleDeleteFile }
-                    onReassignSalesperson = { handleReassignFileSalesperson }
-                    procState = { procState }
-                      />
+                  onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
+                  onUploadProducts={handleProductFileUpload}
+                  onDeleteFile={handleDeleteFile}
+                  onReassignSalesperson={handleReassignFileSalesperson}
+                  procState={procState}
+                />
               </div>
             ) : (
               <>
