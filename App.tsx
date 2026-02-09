@@ -99,9 +99,9 @@ const App: React.FC = () => {
 
   // API Key State
   // Default to the provided key if process.env.API_KEY is missing
-  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || getStoredFirebaseConfig()?.apiKey || "AIzaSyDa-6pfscyrTFV5VpzyRRNxudBrsNVLppM");
+  const [activeApiKey, setActiveApiKey] = useState<string>(import.meta.env.VITE_GOOGLE_API_KEY || getStoredFirebaseConfig()?.apiKey || "");
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(
-    process.env.GOOGLE_MAPS_API_KEY || "AIzaSyDPYoP6OyjFVwRmQ-mlUqc25xcHfoz4o1o"
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
   );
   const [keyVersion, setKeyVersion] = useState(0);
 

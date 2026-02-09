@@ -19,12 +19,12 @@ export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
 
     // Default Config provided by User (Auto-connect)
     return {
-        apiKey: "AIzaSyAenb2sXL1h-y9uChCwjaZoU4I_rHzBd2w",
-        authDomain: "gen-lang-client-0586123917.firebaseapp.com",
-        projectId: "gen-lang-client-0586123917",
-        storageBucket: "gen-lang-client-0586123917.firebasestorage.app",
-        messagingSenderId: "66816750674",
-        appId: "1:66816750674:web:a2ec5f3735ae90f821db8b"
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+        appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
     };
 };
 
