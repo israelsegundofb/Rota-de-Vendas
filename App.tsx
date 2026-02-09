@@ -29,6 +29,9 @@ import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
 import AdminFileManager from './components/AdminFileManager';
 import { getStoredFirebaseConfig } from './firebaseConfig';
+import { useAuth } from './hooks/useAuth';
+import { useDataPersistence } from './hooks/useDataPersistence';
+import { useFilters } from './hooks/useFilters';
 
 
 // Initial Mock Data
@@ -49,43 +52,39 @@ interface ProcessingState {
 }
 
 const App: React.FC = () => {
-  // Global App State (Simulating DB with LocalStorage Persistence)
-  const [users, setUsers] = useState<AppUser[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_users');
-      return saved ? JSON.parse(saved) : INITIAL_USERS;
-    } catch (e) {
-      console.error("Failed to load users from storage", e);
-      return INITIAL_USERS;
-    }
-  });
+  // --- Custom Hooks ---
+  const {
+    users, setUsers, currentUser, login, logout: authLogout,
+    addUser: handleAddUser, updateUser: handleUpdateUser, deleteUser: handleDeleteUser
+  } = useAuth();
 
-  const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
-  // Load from LocalStorage
-  // Init Data with Cloud Fallback
-  const [categories, setCategories] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_categories');
-      return saved ? JSON.parse(saved) : CATEGORIES.filter(c => c !== 'Todos');
-    } catch (e) {
-      return CATEGORIES.filter(c => c !== 'Todos');
-    }
-  });
+  const {
+    masterClientList, setMasterClientList,
+    products, setProducts,
+    categories, setCategories,
+    uploadedFiles, setUploadedFiles,
+    isFirebaseConnected, isDataLoaded
+  } = useDataPersistence(users, setUsers);
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_products');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load products from storage", e);
-      return [];
-    }
-  });
+  const {
+    searchQuery, setSearchQuery,
+    filterRegion, setFilterRegion,
+    filterState, setFilterState,
+    filterCity, setFilterCity,
+    filterCategory, setFilterCategory,
+    filterSalespersonId, setFilterSalespersonId,
+    filterSalesCategory, setFilterSalesCategory,
+    filterProductCategory, setFilterProductCategory,
+    searchProductQuery, setSearchProductQuery,
+    filteredClients,
+    visibleClients, // Exposed if needed for counts
+    availableStates,
+    availableCities,
+    productCategories,
+    resetFilters
+  } = useFilters(masterClientList, users, currentUser, products);
 
-  // Auth State
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
-
-  // Background Processing State
+  // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
     isActive: false,
     total: 0,
@@ -97,8 +96,7 @@ const App: React.FC = () => {
 
   // API Key State
   // Default to the provided key if process.env.API_KEY is missing
-  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || getStoredFirebaseConfig()?.apiKey || "AIzaSyDa-6pfscyrTFV5VpzyRRNxudBrsNVLppM");
-  // Version tracker to force remount of Map component on key update attempts
+  const [activeApiKey, setActiveApiKey] = useState<string>(process.env.API_KEY || getStoredFirebaseConfig()?.apiKey || "");
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
@@ -106,7 +104,7 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
-  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+  // isFirebaseConnected handled by hook
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
 
   // Ref for cancellation
@@ -120,130 +118,21 @@ const App: React.FC = () => {
         // User chose "Sim" (OK) -> Stop Upload
         isUploadCancelled.current = true;
         // Allow navigation
-        setActiveView(newView);
+        setActiveView(newView as any);
       } else {
         // User chose "Não" (Cancel) -> Continue Upload
         return;
       }
     } else {
-      setActiveView(newView); // @ts-ignore
+      setActiveView(newView as any);
     }
   };
-  // Filter State
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterRegion, setFilterRegion] = useState<string>('Todas');
-  const [filterState, setFilterState] = useState<string>('Todos');
-  const [filterCity, setFilterCity] = useState<string>('Todas');
-  const [filterCategory, setFilterCategory] = useState<string>('Todos');
-  const [filterSalespersonId, setFilterSalespersonId] = useState<string>('Todos');
-  const [filterSalesCategory, setFilterSalesCategory] = useState<string>('Todos'); // New Sales Category Filter
-
-  // Product Filters
-  const [filterProductCategory, setFilterProductCategory] = useState<string>('Todos');
-  const [searchProductQuery, setSearchProductQuery] = useState<string>('');
 
   // Admin Upload State
   const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
 
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // File Management State
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(() => {
-    try {
-      const saved = localStorage.getItem('vendas_ai_files');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  // Persist Uploaded Files
-  useEffect(() => {
-    try {
-      localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles));
-    } catch (e) {
-      console.error("Failed to save uploaded files", e);
-    }
-  }, [uploadedFiles]);
-
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
-
-  useEffect(() => {
-    const initData = async () => {
-      // 1. Try to init Firebase
-      const connected = await initializeFirebase();
-      setIsFirebaseConnected(connected);
-
-      // 2. If connected, try to load from cloud
-      if (connected) {
-        console.log("Loading data from Cloud...");
-        const cloudData = await loadFromCloud();
-
-        // CHECK IF CLOUD DATA IS ACTUALLY POPULATED
-        if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
-          console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
-          if (cloudData.clients) setMasterClientList(cloudData.clients);
-          if (cloudData.products) setProducts(cloudData.products);
-          if (cloudData.categories) setCategories(cloudData.categories);
-          if (cloudData.users) setUsers(cloudData.users);
-          if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
-
-          setIsDataLoaded(true); // Mark as loaded
-          return; // Stop here, use cloud data
-        } else {
-          console.log("Cloud data found but EMPTY. Ignoring Cloud to preserve Local data.");
-          // We do NOT return here, we fall through to LocalStorage loading.
-          // And crucially, the auto-save effect will trigger later to upload our Local data to the Cloud.
-        }
-      }
-
-      // 3. Fallback to LocalStorage if no Cloud data or not connected
-      console.log("Loading data from LocalStorage...");
-      const savedClients = localStorage.getItem('vendas_ai_clients');
-      if (savedClients) {
-        try {
-          const parsed = JSON.parse(savedClients);
-          // MIGRATION: Ensure category is string[]
-          setMasterClientList(parsed.map((c: any) => ({
-            ...c,
-            category: Array.isArray(c.category)
-              ? c.category
-              : (typeof c.category === 'string' ? [c.category] : ['Outros']),
-            region: getRegionByUF(c.state) // Force update region
-          })));
-        } catch (e) { console.error(e); }
-      }
-
-      const savedUsers = localStorage.getItem('vendas_ai_users');
-      if (savedUsers) setUsers(JSON.parse(savedUsers));
-
-      const savedCategories = localStorage.getItem('vendas_ai_categories');
-      if (savedCategories) setCategories(JSON.parse(savedCategories));
-
-      const savedProducts = localStorage.getItem('vendas_ai_products');
-      if (savedProducts) setProducts(JSON.parse(savedProducts));
-
-      const savedFiles = localStorage.getItem('vendas_ai_files');
-      if (savedFiles) setUploadedFiles(JSON.parse(savedFiles));
-
-      setIsDataLoaded(true); // Mark as loaded
-    };
-
-    initData();
-  }, []);
-
-  // Save changes to Cloud whenever critical data changes (Debounced ideally, but direct for MVP)
-  useEffect(() => {
-    // Only save if connected AND data has been initially loaded to avoid overwriting cloud with empty/partial init state
-    if (isFirebaseConnected && isDataLoaded && (masterClientList.length > 0 || users.length > 0 || uploadedFiles.length > 0)) {
-      const timeout = setTimeout(() => {
-        saveToCloud(masterClientList, products, categories, users, uploadedFiles)
-          .catch(err => console.error("Auto-save failed", err));
-      }, 2000); // 2s debounce
-      return () => clearTimeout(timeout);
-    }
-  }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
 
   useEffect(() => {
     // If env var exists, it takes precedence
@@ -252,43 +141,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
-  }, [masterClientList]);
-
-  useEffect(() => {
-    localStorage.setItem('vendas_ai_categories', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('vendas_ai_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('vendas_ai_users', JSON.stringify(users));
-  }, [users]);
 
   // --- Handlers ---
-  const handleAddUser = (newUser: User) => {
-    setUsers([...users, newUser]);
-  };
+  // User handlers are now imported from useAuth hook
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    // Update uploaded files from this user to show as orphaned
-    setUploadedFiles(prev => prev.map(f =>
-      f.salespersonId === userId
-        ? { ...f, salespersonId: '', salespersonName: 'None' }
-        : f
-    ));
-
-    // Remove the user
-    setUsers(users.filter(u => u.id !== userId));
-  };
 
   const handleCleanupDuplicates = () => {
     const confirmCleanup = window.confirm(
@@ -308,7 +164,7 @@ const App: React.FC = () => {
     let duplicateCount = 0;
 
     masterClientList.forEach((client) => {
-      const key = `${client.companyName}-${client.address}`.toLowerCase().trim();
+      const key = `${client.companyName}-${client.cleanAddress}`.toLowerCase().trim();
 
       if (seen.has(key)) {
         duplicateCount++;
@@ -541,122 +397,13 @@ const App: React.FC = () => {
   };
 
   // --- Derived Data ---
-  const visibleClients = useMemo(() => {
-    if (!currentUser) return [];
-    let baseList = [];
-    if (currentUser.role === 'admin') {
-      if (filterSalespersonId !== 'Todos') {
-        baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
-      } else {
-        baseList = masterClientList;
-      }
-    } else {
-      baseList = masterClientList.filter(c => c.salespersonId === currentUser.id);
-    }
-    return baseList;
-  }, [currentUser, masterClientList, filterSalespersonId]);
+  // Derived state (filteredClients, availableStates, etc.) is now handled by useFilters hook
 
-  const filteredClients = useMemo(() => {
-    return visibleClients.filter(c => {
-      // General Filters
-      const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
-      const matchState = filterState === 'Todos' || c.state === filterState;
-      const matchCity = filterCity === 'Todas' || c.city === filterCity;
-
-      // DEBUG LOGGING
-      // if (filterCategory !== 'Todos') console.log(`Checking ${c.companyName}`, c.category, filterCategory, c.category.includes(filterCategory));
-
-      const matchCat = filterCategory === 'Todos' || (Array.isArray(c.category) && c.category.includes(filterCategory));
-
-      // Sales Category Filter (Admin Only)
-      let matchSalesCat = true;
-      if (currentUser?.role === 'admin' && filterSalesCategory !== 'Todos') {
-        const seller = users.find(u => u.id === c.salespersonId);
-        if (!seller || seller.salesCategory !== filterSalesCategory) {
-          matchSalesCat = false;
-        }
-      }
-
-      // Text Search
-      const query = searchQuery.toLowerCase();
-      const matchSearch = searchQuery === '' ||
-        c.companyName.toLowerCase().includes(query) ||
-        (c.ownerName && c.ownerName.toLowerCase().includes(query));
-
-      // Product Filters (Where items were sold)
-      let matchProduct = true;
-      const prodQuery = searchProductQuery.toLowerCase();
-
-      if (filterProductCategory !== 'Todos' || prodQuery !== '') {
-        // If filtering by product, client MUST have purchase history
-        if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
-          matchProduct = false;
-        } else {
-          // Check Category (Brand often used as category in this context)
-          const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => p.category === filterProductCategory);
-
-          // Check SKU, Brand, Factory Code, Description (Name), or Price
-          const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
-            p.name.toLowerCase().includes(prodQuery) ||
-            p.sku.toLowerCase().includes(prodQuery) ||
-            p.brand.toLowerCase().includes(prodQuery) ||
-            p.factoryCode.toLowerCase().includes(prodQuery) ||
-            p.price.toString().includes(prodQuery)
-          );
-
-          matchProduct = hasCat && hasMatch;
-        }
-      }
-
-      return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat;
-    });
-  }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, searchProductQuery, filterSalesCategory, users, currentUser]);
-
-  const productCategories = useMemo(() => {
-    // Create unique list of categories (or brands if category absent)
-    const cats = new Set(products.map(p => p.category));
-    return Array.from(cats).sort();
-  }, [products]);
-
-  // Derived Geographic Filters - Drill Down Logic
-  const availableStates = useMemo(() => {
-    let base = visibleClients;
-    // Strict filter: If region is selected, show states only in that region.
-    if (filterRegion !== 'Todas') {
-      base = base.filter(c => c.region === filterRegion);
-    }
-    const states = new Set(base.map(c => c.state).filter(Boolean));
-    return Array.from(states).sort();
-  }, [visibleClients, filterRegion]);
-
-  const availableCities = useMemo(() => {
-    let base = visibleClients;
-    // Drill down: Filter by Region first (if selected)
-    if (filterRegion !== 'Todas') {
-      base = base.filter(c => c.region === filterRegion);
-    }
-    // Drill down: Filter by State (Must be selected to show cities effectively)
-    if (filterState !== 'Todos') {
-      base = base.filter(c => c.state === filterState);
-    } else {
-      // Optional: If no state selected, return empty or all cities? 
-      // Returning empty encourages drill-down flow.
-      return [];
-    }
-    const cities = new Set(base.map(c => c.city).filter(Boolean));
-    return Array.from(cities).sort();
-  }, [visibleClients, filterRegion, filterState]);
 
   // --- Actions ---
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    setSearchQuery('');
-    setFilterRegion('Todas');
-    setFilterState('Todos');
-    setFilterCity('Todas');
-    setFilterSalespersonId('Todos');
-    setFilterSalesCategory('Todos');
-    setFilterSalesCategory('Todos');
+  const handleLogin = (user: AppUser) => {
+    login(user);
+    resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
     if (user.role === 'admin') {
@@ -674,9 +421,8 @@ const App: React.FC = () => {
         return;
       }
     }
-    setCurrentUser(null);
-    setFilterSalespersonId('Todos');
-    setFilterSalesCategory('Todos');
+    authLogout();
+    resetFilters();
   };
 
   const handleClientFileDirect = async (file: File, ownerId: string, skipConfirmation = false) => {
@@ -823,7 +569,7 @@ const App: React.FC = () => {
       ownerName = targetUser?.name || 'Unknown';
     }
 
-    await handleClientFileDirect(file, ownerId, ownerName);
+    await handleClientFileDirect(file, ownerId);
     event.target.value = '';
   };
 
@@ -1235,7 +981,7 @@ const App: React.FC = () => {
                   // I will call `handleClientFileDirect(file, targetId)` which I will add.
                   const targetUser = users.find(u => u.id === targetId);
                   const targetName = targetUser?.name || 'Unknown';
-                  handleClientFileDirect(file, targetId, targetName);
+                  handleClientFileDirect(file, targetId);
                 }}
                 onUploadProducts={handleProductFileUpload}
                 onDeleteFile={handleDeleteFile}
@@ -1513,6 +1259,7 @@ const App: React.FC = () => {
       </main >
     </div >
   );
-};
+}; // End of App component
+
 
 export default App;

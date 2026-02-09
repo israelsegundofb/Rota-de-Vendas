@@ -5,6 +5,11 @@ import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
 
+// @ts-ignore
+import { FixedSizeGrid as Grid } from 'react-window';
+// @ts-ignore
+import { AutoSizer } from 'react-virtualized-auto-sizer';
+
 interface ClientListProps {
   clients: EnrichedClient[];
   onUpdateClient: (updatedClient: EnrichedClient) => void;
@@ -87,10 +92,70 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
     setIsEditModalOpen(true);
   };
 
+  // Card Component for Grid
+  const ClientCard = ({ client, style, openEditModal }: { client: EnrichedClient, style: React.CSSProperties, openEditModal: (c: EnrichedClient) => void }) => (
+    <div style={style} className="p-2">
+      <div className="h-full bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden flex flex-col">
+        <div className="absolute top-0 right-0 p-0">
+          <span className={`px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider
+                        ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
+              client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
+                client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
+                  client.region === 'Norte' ? 'bg-green-100 text-green-800' :
+                    'bg-yellow-100 text-yellow-800'}
+                      `}>
+            {client.region}
+          </span>
+        </div>
+
+        <div className="flex items-start gap-4 pr-12 mb-2">
+          <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg shrink-0">
+            {client.companyName.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-on-surface truncate pr-2" title={client.companyName}>{client.companyName}</h3>
+            <div className="flex items-center gap-1 text-xs text-on-surface-variant mt-0.5">
+              <Tag className="w-3 h-3" />
+              <span className="truncate">{client.category.join(', ')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 flex-grow">
+          <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+            <Store className="w-4 h-4 shrink-0" />
+            <span className="truncate">{client.ownerName}</span>
+          </div>
+          <div className="flex items-start gap-2 text-sm text-on-surface-variant group/link">
+            <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="line-clamp-2">{client.cleanAddress}</span>
+          </div>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-outline-variant/20 flex items-center justify-between gap-2">
+          <a
+            href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ExternalLink className="w-3 h-3" /> Abrir Mapa
+          </a>
+          <button
+            onClick={() => openEditModal(client)}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/30 rounded-full transition-colors"
+          >
+            <Edit2 className="w-3.5 h-3.5" /> Editar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full bg-gray-50/50">
       {/* TOOLBAR */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm z-10">
+      <div className="bg-white border-b border-gray-200 p-4 shadow-sm z-10 shrink-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 
           {/* Filters Group */}
@@ -157,72 +222,55 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onUpdateClient, onAddC
         </div>
       </div>
 
-      {/* MD3 LIST/CARDS */}
-      <div className="overflow-x-auto bg-surface flex-1 custom-scrollbar relative p-4">
+      {/* VIRTUALIZED LIST */}
+      <div className="flex-1 overflow-hidden relative p-2 md:p-4">
         {filteredClients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center text-on-surface-variant animate-fade-in">
+          <div className="flex flex-col items-center justify-center p-12 text-center text-on-surface-variant animate-fade-in h-full">
             <div className="bg-surface-container-highest p-4 rounded-full mb-3">
               <Search className="w-8 h-8 opacity-50" />
             </div>
             <p className="text-sm">Nenhum cliente encontrado com os filtros atuais.</p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-            {filteredClients.map((client) => (
-              <div key={client.id} className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-0">
-                  <span className={`px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider
-                        ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
-                      client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
-                        client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
-                          client.region === 'Norte' ? 'bg-green-100 text-green-800' :
-                            'bg-yellow-100 text-yellow-800'}
-                      `}>
-                    {client.region}
-                  </span>
-                </div>
+          <AutoSizer>
+            {({ height, width }) => {
+              // Calculate Columns
+              // xl (1280px) -> 3 cols
+              // lg (1024px) -> 2 cols
+              // < 1024px -> 1 col
+              let columnCount = 1;
+              if (width >= 1280) columnCount = 3;
+              else if (width >= 1024) columnCount = 2;
 
-                <div className="flex items-start gap-4 pr-12">
-                  <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg shrink-0">
-                    {client.companyName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-on-surface truncate pr-2">{client.companyName}</h3>
-                    <div className="flex items-center gap-1 text-xs text-on-surface-variant mt-0.5">
-                      <Tag className="w-3 h-3" />
-                      <span className="truncate">{client.category.join(', ')}</span>
-                    </div>
-                  </div>
-                </div>
+              const rowHeight = 220;
+              const rowCount = Math.ceil(filteredClients.length / columnCount);
+              const columnWidth = width / columnCount;
 
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                    <Store className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{client.ownerName}</span>
-                  </div>
-                  <a
-                    href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors group/link"
-                  >
-                    <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2 group-hover/link:underline">{client.cleanAddress}</span>
-                    <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity ml-auto" />
-                  </a>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => openEditModal(client)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container/30 rounded-full transition-colors"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" /> Editar
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              return (
+                <Grid
+                  columnCount={columnCount}
+                  columnWidth={columnWidth}
+                  height={height}
+                  rowCount={rowCount}
+                  rowHeight={rowHeight}
+                  width={width}
+                >
+                  {({ columnIndex, rowIndex, style }) => {
+                    const index = rowIndex * columnCount + columnIndex;
+                    if (index >= filteredClients.length) return null;
+                    const client = filteredClients[index];
+                    return (
+                      <ClientCard
+                        client={client}
+                        style={style}
+                        openEditModal={openEditModal}
+                      />
+                    );
+                  }}
+                </Grid>
+              );
+            }}
+          </AutoSizer>
         )}
       </div>
 

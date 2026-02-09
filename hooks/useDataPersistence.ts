@@ -1,0 +1,128 @@
+import { useState, useEffect } from 'react';
+import { EnrichedClient, Product, UploadedFile, AppUser } from '../types';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from '../services/firebaseService';
+import { CATEGORIES, getRegionByUF } from '../utils/constants';
+
+// Initial Data Loaders
+const loadInitialClients = (): EnrichedClient[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_clients');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            return parsed.map((c: any) => ({
+                ...c,
+                category: Array.isArray(c.category)
+                    ? c.category
+                    : (typeof c.category === 'string' ? [c.category] : ['Outros']),
+                region: getRegionByUF(c.state)
+            }));
+        }
+    } catch (e) {
+        console.error("Failed to load clients", e);
+    }
+    return [];
+};
+
+const loadInitialProducts = (): Product[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_products');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+};
+
+const loadInitialCategories = (): string[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_categories');
+        return saved ? JSON.parse(saved) : CATEGORIES.filter(c => c !== 'Todos');
+    } catch (e) { return CATEGORIES.filter(c => c !== 'Todos'); }
+};
+
+const loadInitialFiles = (): UploadedFile[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_files');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+};
+
+export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]) => void) => {
+    const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
+    const [products, setProducts] = useState<Product[]>(loadInitialProducts);
+    const [categories, setCategories] = useState<string[]>(loadInitialCategories);
+    const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(loadInitialFiles);
+
+    const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+    // Initialize Data
+    useEffect(() => {
+        const initData = async () => {
+            // 1. Try to init Firebase
+            const connected = await initializeFirebase();
+            setIsFirebaseConnected(connected);
+
+            // 2. If connected, try to load from cloud
+            if (connected) {
+                console.log("Loading data from Cloud...");
+                try {
+                    const cloudData = await loadFromCloud();
+
+                    if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
+                        console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
+                        if (cloudData.clients) setMasterClientList(cloudData.clients);
+                        if (cloudData.products) setProducts(cloudData.products);
+                        if (cloudData.categories) setCategories(cloudData.categories);
+                        if (cloudData.users && setUsers) setUsers(cloudData.users);
+                        if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
+
+                        setIsDataLoaded(true);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Cloud load error", e);
+                }
+            }
+
+            // 3. Fallback to LocalStorage
+            console.log("Loading data from LocalStorage...");
+            setMasterClientList(loadInitialClients());
+            // Products, Categories, Files are already init via useState lazy init, but redundant set is fine
+
+            const savedUsers = localStorage.getItem('vendas_ai_users');
+            if (savedUsers && setUsers) setUsers(JSON.parse(savedUsers));
+
+            setIsDataLoaded(true);
+        };
+
+        initData();
+    }, []); // Run once on mount
+
+    // Auto-Save to Cloud
+    useEffect(() => {
+        if (isFirebaseConnected && isDataLoaded && (masterClientList.length > 0 || users.length > 0 || uploadedFiles.length > 0)) {
+            const timeout = setTimeout(() => {
+                saveToCloud(masterClientList, products, categories, users, uploadedFiles)
+                    .catch(err => console.error("Auto-save failed", err));
+            }, 2000);
+            return () => clearTimeout(timeout);
+        }
+    }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
+
+    // Local Persistence Effects
+    useEffect(() => { localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList)); }, [masterClientList]);
+    useEffect(() => { localStorage.setItem('vendas_ai_categories', JSON.stringify(categories)); }, [categories]);
+    useEffect(() => { localStorage.setItem('vendas_ai_products', JSON.stringify(products)); }, [products]);
+    useEffect(() => { localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles)); }, [uploadedFiles]);
+
+    return {
+        masterClientList,
+        setMasterClientList,
+        products,
+        setProducts,
+        categories,
+        setCategories,
+        uploadedFiles,
+        setUploadedFiles,
+        isFirebaseConnected,
+        isDataLoaded
+    };
+};

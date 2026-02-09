@@ -81,6 +81,8 @@ const parseAddressComponents = (components: any[]) => {
   return { city, state, region };
 };
 
+import pLimit from 'p-limit';
+
 export const processClientsWithAI = async (
   rawClients: RawClient[],
   salespersonId: string,
@@ -90,17 +92,20 @@ export const processClientsWithAI = async (
 ): Promise<EnrichedClient[]> => {
 
   const ai = new GoogleGenAI({ apiKey: apiKey || process.env.API_KEY });
-
-  const allEnriched: EnrichedClient[] = [];
+  const limit = pLimit(3); // Concurrency limit of 3 requests
   const total = rawClients.length;
+  let processedCount = 0;
 
   const categoryListString = categories.map(c => `"${c}"`).join(' | ');
 
-  for (let i = 0; i < total; i += BATCH_SIZE) {
-    const client = rawClients[i];
-
+  // Task definition for a single client
+  const processSingleClient = async (client: RawClient, index: number): Promise<EnrichedClient | null> => {
     // SAFETY CHECK: Handle cases where CSV rows are empty or keys are missing
-    if (!client) continue;
+    if (!client) {
+      processedCount++;
+      if (onProgress) onProgress(processedCount, total);
+      return null;
+    }
 
     const rawAddress = client['Endereço'] || "";
     const address = cleanAddress(rawAddress);
@@ -112,12 +117,13 @@ export const processClientsWithAI = async (
     const cepMatch = address.match(/\d{5}[-]?\d{3}/);
     const extractedCEP = cepMatch ? cepMatch[0] : "";
 
-    const id = `${salespersonId}-${Date.now()}-${i}`;
+    const id = `${salespersonId}-${Date.now()}-${index}`;
 
-    // Skip completely empty rows to save tokens and prevent errors
+    // Skip completely empty rows
     if (!address && company === "Empresa Desconhecida") {
-      if (onProgress) onProgress(i + 1, total);
-      continue;
+      processedCount++;
+      if (onProgress) onProgress(processedCount, total);
+      return null;
     }
 
     const prompt = `
@@ -146,8 +152,9 @@ export const processClientsWithAI = async (
     `;
 
     let retries = 0;
-    let success = false;
     const MAX_RETRIES = 5;
+    let result: EnrichedClient | null = null;
+    let success = false;
 
     while (!success && retries <= MAX_RETRIES) {
       try {
@@ -177,91 +184,64 @@ export const processClientsWithAI = async (
         let googleMapsUri = "";
         const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
         if (chunks && Array.isArray(chunks)) {
-          // Find the first chunk that has a Maps URI
           const mapChunk = chunks.find((c: any) => c.maps?.uri);
-          if (mapChunk) {
-            googleMapsUri = mapChunk.maps.uri;
-          }
+          if (mapChunk) googleMapsUri = mapChunk.maps.uri;
         }
 
-
         // --- GEOCODING ENHANCEMENT ---
-        // Prioritize coordinates from CSV (hyperlink), then Geocoding API, then Gemini fallback.
         let finalLat = client['extractedLat'] || (typeof aiData.lat === 'number' ? aiData.lat : 0);
         let finalLng = client['extractedLng'] || (typeof aiData.lng === 'number' ? aiData.lng : 0);
         let finalAddress = aiData.cleanAddress || address;
-
-        // Default to AI data, will be refined if Geocoding is used
         let finalCity = aiData.city || 'Desconhecido';
         let finalState = aiData.state || 'BR';
         let finalRegion = aiData.region || 'Indefinido';
 
-        // Check if region is still Indefinido and we have CEP
         if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
           finalRegion = getRegionFromCEP(extractedCEP);
         }
 
-        // Check if we need to refine the location data (if AI failed or we need coords)
         const needsGeocoding = !client['extractedLat'] || finalCity === 'Desconhecido' || finalState === 'BR';
 
         if (needsGeocoding) {
-          // Prefer the address cleaned/verified by Gemini, or fallback to raw
           const addressToGeocode = finalAddress || rawAddress;
-
-          // Only geocode if we have a somewhat valid address string
           if (addressToGeocode && addressToGeocode.length > 5 && apiKey) {
             try {
               const geocodeResult = await geocodeAddress(addressToGeocode, apiKey);
               if (geocodeResult) {
-                // Only update coords if we didn't have them
                 if (!client['extractedLat']) {
                   finalLat = geocodeResult.lat;
                   finalLng = geocodeResult.lng;
                 }
-
-                // Always update metadata from official API if available
                 if (geocodeResult.addressComponents) {
                   const parsed = parseAddressComponents(geocodeResult.addressComponents);
                   finalCity = parsed.city;
                   finalState = parsed.state;
                   finalRegion = parsed.region as any;
                 }
-
-                // Final fallback for region if still undefined
                 if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
                   finalRegion = getRegionFromCEP(extractedCEP);
                 }
-
                 if (geocodeResult.formattedAddress) {
                   finalAddress = geocodeResult.formattedAddress;
                 }
               }
             } catch (geoError) {
-              console.warn(`Geocoding failed for ${client['Razão Social']}`, geoError);
+              console.warn(`Geocoding failed for ${company}`, geoError);
             }
           }
         }
-        // -----------------------------
 
-        // Use valid data or fallbacks
-
-        // Helper to normalize category to array
         const NormalizeCategory = (cat: any): string[] => {
           if (Array.isArray(cat)) return cat;
           if (typeof cat === 'string') return [cat];
           return ['Outros'];
         };
 
-        // ENRICH CONTACT INFO WITH MAPS DATA
         let finalContact = contact;
-        if (aiData.phone) {
-          finalContact = finalContact ? `${finalContact} | Maps: ${aiData.phone}` : aiData.phone;
-        }
-        if (aiData.website) {
-          finalContact = finalContact ? `${finalContact} | Site: ${aiData.website}` : `Site: ${aiData.website}`;
-        }
+        if (aiData.phone) finalContact = finalContact ? `${finalContact} | Maps: ${aiData.phone}` : aiData.phone;
+        if (aiData.website) finalContact = finalContact ? `${finalContact} | Site: ${aiData.website}` : `Site: ${aiData.website}`;
 
-        allEnriched.push({
+        result = {
           id: id,
           salespersonId: salespersonId,
           companyName: company,
@@ -269,14 +249,14 @@ export const processClientsWithAI = async (
           contact: finalContact,
           originalAddress: rawAddress,
           cleanAddress: finalAddress,
-          category: NormalizeCategory(aiData.category), // Fix: Call the helper
+          category: NormalizeCategory(aiData.category),
           region: finalRegion,
           state: finalState,
           city: finalCity,
           lat: finalLat,
           lng: finalLng,
-          googleMapsUri: client['GoogleMapsLink'] || googleMapsUri // PRIORITIZE CSV EXACT LINK
-        });
+          googleMapsUri: client['GoogleMapsLink'] || googleMapsUri
+        };
 
         success = true;
 
@@ -287,70 +267,51 @@ export const processClientsWithAI = async (
 
         if ((isRateLimit || isServerBusy) && retries < MAX_RETRIES) {
           retries++;
-          const waitTime = 1000 * Math.pow(2, retries);
-          console.warn(`Retry ${retries}/${MAX_RETRIES} for client ${i}`);
+          const waitTime = 2000 * Math.pow(2, retries); // Increased base backoff
+          console.warn(`Retry ${retries}/${MAX_RETRIES} for client ${index}`);
           await delay(waitTime);
         } else {
-          console.error(`Failed to process client ${i}`, error);
+          console.error(`Failed to process client ${index}`, error);
 
           // Fallback Strategy
-          let fallbackLat = 0;
-          let fallbackLng = 0;
-          let fallbackAddress = rawAddress;
-          let fallbackCity = 'Erro Proc.';
-          let fallbackState = 'BR';
-          let fallbackRegion = 'Indefinido';
-
-          if (rawAddress && apiKey) {
-            try {
-              console.log(`Attempting fallback geocoding for failed client ${i}...`);
-              const geoResult = await geocodeAddress(rawAddress, apiKey);
-              if (geoResult) {
-                fallbackLat = geoResult.lat;
-                fallbackLng = geoResult.lng;
-                if (geoResult.formattedAddress) fallbackAddress = geoResult.formattedAddress;
-
-                if (geoResult.addressComponents) {
-                  const parsed = parseAddressComponents(geoResult.addressComponents);
-                  fallbackCity = parsed.city;
-                  fallbackState = parsed.state;
-                  fallbackRegion = parsed.region;
-                }
-              }
-            } catch (e) {
-              // Ignore fallback error
-            }
-          }
-
-          allEnriched.push({
+          result = {
             id: id,
             salespersonId: salespersonId,
             companyName: company,
             ownerName: owner,
             contact: contact,
             originalAddress: rawAddress,
-            cleanAddress: fallbackAddress,
+            cleanAddress: rawAddress, // Keep raw address if process fails
             category: ['Outros'],
-            region: fallbackRegion as any,
-            state: fallbackState,
-            city: fallbackCity,
-            lat: fallbackLat,
-            lng: fallbackLng
-          });
-          success = true;
+            region: 'Indefinido',
+            state: 'BR',
+            city: 'Erro Proc.',
+            lat: 0,
+            lng: 0,
+            googleMapsUri: client['GoogleMapsLink']
+          };
+          success = true; // Mark as "success" in terms of loop continuation (using fallback)
         }
       }
     }
 
-    if (onProgress) {
-      onProgress(i + 1, total);
-    }
+    processedCount++;
+    if (onProgress) onProgress(processedCount, total);
 
-    // Throttle slightly to avoid aggressive rate limiting
-    await delay(300);
-  }
+    // Slight delay between successful requests to be polite to the API even within limits
+    await delay(500);
 
-  return allEnriched;
+    return result;
+  };
+
+  // Map all clients to limited promises
+  const promises = rawClients.map((client, index) => limit(() => processSingleClient(client, index)));
+
+  // Wait for all to complete
+  const results = await Promise.all(promises);
+
+  // Filter out nulls (skipped rows)
+  return results.filter((c): c is EnrichedClient => c !== null);
 };
 
 export const categorizeProductsWithAI = async (

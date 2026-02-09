@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   APIProvider,
-  Map,
+  Map as GoogleMap,
   InfoWindow,
   useMap
 } from '@vis.gl/react-google-maps';
@@ -164,6 +165,23 @@ const ClientMapContent: React.FC<{
     return el;
   }, []);
 
+  // Optimization: Pre-calculate user colors in a Map for O(1) lookup
+  const userColorMap = useMemo(() => {
+    const map = new Map<string, { bg: string, border: string, glyph: string }>();
+    if (!users) return map;
+    users.forEach(u => {
+      let color = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
+      if (u.color) {
+        color = { bg: u.color, border: 'black', glyph: '#fff' };
+      } else {
+        const genColor = stringToColor(u.id + u.name);
+        color = { bg: genColor, border: 'black', glyph: '#fff' };
+      }
+      map.set(u.id, color);
+    });
+    return map;
+  }, [users]);
+
   useEffect(() => {
     if (!map) return;
 
@@ -187,14 +205,14 @@ const ClientMapContent: React.FC<{
 
     // 2. Init Clusterer (Only if enabled)
     if (isClusteringEnabled) {
-      clustererRef.current = new MarkerClusterer({
+      clustererRef.current = new (MarkerClusterer as any)({
         map,
         markers: [],
-        algorithm: new SuperClusterAlgorithm({
-          maxZoom: 13,
+        algorithm: new (SuperClusterAlgorithm as any)({
+          maxZoom: 13, // Aggressive clustering for performance (User Request)
           radius: 80,
         })
-      });
+      }) as MarkerClusterer;
     } else {
       // Ensure clusterer is null/inactive
       clustererRef.current = null;
@@ -203,7 +221,7 @@ const ClientMapContent: React.FC<{
     // 3. Async Batch Processing (Optimization)
     let isActive = true;
     let index = 0;
-    const BATCH_SIZE = 500;
+    const BATCH_SIZE = 200; // Smaller batch size to prevent frame drops
 
     const processBatch = () => {
       if (!isActive) return;
@@ -213,7 +231,22 @@ const ClientMapContent: React.FC<{
       if (batch.length === 0) return;
 
       const newMarkers = batch.map(client => {
-        const colors = getPinColor(client, users, !!productFilterActive);
+        // Optimized Color Lookup
+        let colors = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
+
+        if (productFilterActive) {
+          colors = { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
+        } else {
+          const userColor = userColorMap.get(client.salespersonId);
+          if (userColor) {
+            colors = userColor;
+          } else if (client.ownerName) {
+            const genColor = stringToColor(client.ownerName);
+            colors = { bg: genColor, border: 'black', glyph: '#fff' };
+          } else {
+            colors = getRegionColor(client.region);
+          }
+        }
 
         let glyphElement: HTMLElement | null = null;
         if (productFilterActive) {
@@ -276,7 +309,7 @@ const ClientMapContent: React.FC<{
         m.map = null;
       });
     };
-  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, users, isClusteringEnabled]); // Added dependency
+  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, userColorMap, isClusteringEnabled]); // Added dependency
 
   return <MapBoundsUpdater clients={clients} />;
 };
@@ -406,7 +439,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
         libraries={['marker']}
         onLoad={() => console.log('Maps API loaded')}
       >
-        <Map
+        <GoogleMap
           defaultCenter={defaultCenter}
           defaultZoom={4}
           mapId="DEMO_MAP_ID"
@@ -541,7 +574,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
               </div>
             </InfoWindow>
           )}
-        </Map>
+        </GoogleMap>
       </APIProvider>
     </div>
   );

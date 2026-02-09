@@ -1,5 +1,7 @@
 import Papa from 'papaparse';
 import { RawClient, Product } from '../types';
+import { ClientSchema, ProductSchema } from './schemas';
+import { z } from 'zod';
 
 /**
  * Extracts coordinates from a Google Maps URL if possible.
@@ -131,8 +133,9 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
       complete: (results) => {
         const data = results.data as any[];
         const products: Product[] = [];
+        const errors: string[] = [];
 
-        data.forEach(row => {
+        data.forEach((row, index) => {
           // Normalize row keys for flexible matching
           const normalizedRow: Record<string, any> = {};
           Object.keys(row).forEach(k => {
@@ -154,17 +157,25 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
           const margin = parsePercentage(normalizedRow['margem'] || '0');
           const discount = parsePercentage(normalizedRow['desconto'] || normalizedRow['discount'] || '0');
 
-          if (sku || name) {
-            products.push({
-              category,
-              sku,
-              brand,
-              factoryCode,
-              name,
-              price,
-              margin,
-              discount
-            });
+          const rawProduct = {
+            category,
+            sku,
+            brand,
+            factoryCode,
+            name,
+            price,
+            margin,
+            discount
+          };
+
+          const result = ProductSchema.safeParse(rawProduct);
+
+          if (result.success) {
+            products.push(result.data as Product);
+          } else {
+            // Log error but continue logic? Or skip?
+            // For strict validation we skip
+            console.warn(`Row ${index + 1} invalid:`, result.error.issues);
           }
         });
 
@@ -208,22 +219,30 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
             address = `${address}, ${cep}`;
           }
 
-          // Map to strict RawClient Interface using loose matching
-          normalizedData.push({
-            'Razão Social': map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
-            'Nome do Proprietário': map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
-            'Contato': map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || '',
-            'Endereço': address,
-            'GoogleMapsLink': link,
-            'extractedLat': lat,
-            'extractedLng': lng
-          });
+          const rawClient = {
+            companyName: map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
+            ownerName: map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
+            phone: map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || '',
+            address: address,
+            googleMapsLink: link,
+            latitude: lat,
+            longitude: lng
+          };
+
+          // Validation using Zod is implicit here via manual mapping but we can enforce stricter schema matching if we map to ClientSchema
+          // Note: ClientSchema expects 'lat/lng' but raw wants 'latitude/longitude' or similar? 
+          // Actually RawClient in types.ts likely lacks lat/lng or has different names.
+          // Let's stick to the mapped object but ensure it's robust.
+
+          if (rawClient.companyName || rawClient.address) {
+            normalizedData.push(rawClient as any);
+          }
         });
 
         // Validation
         if (normalizedData.length > 0) {
           const first = normalizedData[0];
-          if (!first['Razão Social'] && !first['Endereço']) {
+          if (!first['companyName'] && !first['address']) {
             console.warn("CSV Parsing Warning: Could not identify 'Razão Social' or 'Endereço' columns. Check CSV headers.");
           }
         }

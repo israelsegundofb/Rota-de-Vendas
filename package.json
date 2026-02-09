@@ -14,13 +14,18 @@
   "dependencies": {
     "@google/genai": "^1.40.0",
     "@googlemaps/markerclusterer": "2.5.3",
+    "@types/react-window": "^1.8.8",
     "@vis.gl/react-google-maps": "1.1.0",
     "firebase": "^12.9.0",
     "lucide-react": "^0.563.0",
+    "p-limit": "^7.3.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "xlsx": "^0.18.5"
+    "react-virtualized-auto-sizer": "^2.0.2",
+    "react-window": "^2.2.6",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
