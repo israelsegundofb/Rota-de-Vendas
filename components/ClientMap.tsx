@@ -516,6 +516,19 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                     <Phone className="w-3 h-3 text-gray-400" />
                     <span className="font-medium text-gray-700">{selectedClient.contact || "Sem contato"}</span>
                   </p>
+
+                  {/* PRODUCT STATS */}
+                  {selectedClient.purchasedProducts && selectedClient.purchasedProducts.length > 0 && (
+                    <div className="flex items-center gap-2 mt-1 mb-1 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100 w-fit">
+                      <span className="flex items-center gap-1" title="Total de itens comprados">
+                        <span className="font-bold text-gray-800">{selectedClient.purchasedProducts.length}</span> Prod.
+                      </span>
+                      <div className="h-3 w-px bg-gray-300"></div>
+                      <span className="flex items-center gap-1" title="Quantidade de SKUs únicos">
+                        <span className="font-bold text-gray-800">{new Set(selectedClient.purchasedProducts.map(p => p.sku)).size}</span> SKUs
+                      </span>
+                    </div>
+                  )}
                   <p className="flex items-start gap-2">
                     <MapPin className="w-3 h-3 mt-0.5 text-gray-400 flex-shrink-0" />
                     <span className="leading-tight">{selectedClient.cleanAddress}</span>
