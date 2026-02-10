@@ -1,6 +1,9 @@
 {
   "name": "rota-de-vendas-inteligente",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "version": "0.0.0",
   "type": "module",
   "homepage": "https://israelsegundofb.github.io/Rota-de-Vendas/",
