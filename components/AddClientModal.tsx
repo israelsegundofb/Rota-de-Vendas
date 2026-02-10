@@ -24,7 +24,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         state: 'CE',
         city: 'Fortaleza',
         originalAddress: '',
-        cleanAddress: ''
+        cleanAddress: '',
+        plusCode: ''
     });
 
     const [error, setError] = useState('');
@@ -43,7 +44,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 state: 'CE',
                 city: 'Fortaleza',
                 originalAddress: '',
-                cleanAddress: ''
+                cleanAddress: '',
+                plusCode: ''
             });
             setSelectedSalespersonId(salespersonId);
             setError('');
@@ -111,7 +113,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
             state: formData.state,
             city: formData.city,
             originalAddress: fullAddress,
-            cleanAddress: fullAddress, // Pass this to trigger geocoding
+            cleanAddress: fullAddress,
+            plusCode: formData.plusCode, // New field
             salespersonId: selectedSalespersonId,
             googleMapsUri: ''
         });
@@ -145,7 +148,6 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 {/* Body */}
                 <div className="px-6 py-4 overflow-y-auto custom-scrollbar flex-1">
                     <form id="add-client-form" onSubmit={handleSubmit} className="space-y-6">
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Company Name */}
                             <div>
@@ -312,12 +314,24 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                             </p>
                         </div>
 
-                        {error && (
-                            <div className="bg-error-container text-on-error-container p-4 rounded-xl text-sm flex items-center gap-3">
-                                <AlertCircle className="w-5 h-5" />
-                                {error}
-                            </div>
-                        )}
+                        {/* Plus Code */}
+                        <div>
+                            <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1 flex items-center gap-1">
+                                Plus Code (Google Maps)
+                                <span className="text-[10px] bg-primary/10 text-primary px-1.5 rounded-full">Localização Exata</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.plusCode}
+                                onChange={e => handleChange('plusCode', e.target.value)}
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
+                                placeholder="Ex: C6PH+9J Fortaleza, CE"
+                                title="Google Plus Code"
+                            />
+                            <p className="text-[10px] text-on-surface-variant mt-1 ml-1">
+                                Use para locais sem endereço formal ou para maior precisão.
+                            </p>
+                        </div>
 
                         <div className="bg-secondary-container/50 p-4 rounded-xl border border-secondary-container">
                             <p className="text-xs text-on-secondary-container flex gap-2">
@@ -326,6 +340,12 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                             </p>
                         </div>
 
+                        {error && (
+                            <div className="bg-error-container text-on-error-container p-4 rounded-xl text-sm flex items-center gap-3">
+                                <AlertCircle className="w-5 h-5" />
+                                {error}
+                            </div>
+                        )}
                     </form>
                 </div>
 
@@ -352,7 +372,6 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                         )}
                     </button>
                 </div>
-
             </div>
         </div>
     );

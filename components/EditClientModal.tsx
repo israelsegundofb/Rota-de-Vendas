@@ -259,7 +259,28 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                             value={formData.cleanAddress}
                             onChange={handleChange}
                             className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                            title="Endereço Limpo"
                         />
+                    </div>
+
+                    {/* Plus Code */}
+                    <div className="space-y-1 pt-2">
+                        <label className="text-xs font-medium text-on-surface-variant ml-1 flex items-center gap-1">
+                            Plus Code (Google Maps)
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 rounded-full">Localização Exata</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="plusCode"
+                            value={formData.plusCode || ''}
+                            onChange={handleChange}
+                            className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                            placeholder="Ex: C6PH+9J Fortaleza, CE"
+                            title="Google Plus Code"
+                        />
+                        <p className="text-[10px] text-on-surface-variant mt-1 ml-1">
+                            Use para locais sem endereço formal ou para maior precisão nos pinos.
+                        </p>
                     </div>
                 </form>
 

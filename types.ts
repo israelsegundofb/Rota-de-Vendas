@@ -37,6 +37,7 @@ export interface EnrichedClient {
   googleMapsUri?: string;
   purchasedProducts?: Product[]; // History of products bought by this client
   sourceFileId?: string; // ID of the file this client was imported from
+  plusCode?: string; // Google Plus Code for precise location
 }
 
 // Roles com hierarquia (1 = maior poder)

@@ -253,13 +253,19 @@ const App: React.FC = () => {
 
 
   const handleUpdateClient = async (updatedClient: EnrichedClient) => {
-    // Check if address changed to re-geocode
+    // Check if address or plusCode changed to re-geocode
     const original = masterClientList.find(c => c.id === updatedClient.id);
     let finalClient = { ...updatedClient };
 
-    if (original && original.cleanAddress !== updatedClient.cleanAddress) {
+    const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
+    const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
+
+    if (addressChanged || plusCodeChanged) {
+      // Prioritize Plus Code if available/changed
+      const addrToGeocode = updatedClient.plusCode || updatedClient.cleanAddress;
+
       try {
-        const geoResult = await geocodeAddress(updatedClient.cleanAddress, activeApiKey || '');
+        const geoResult = await geocodeAddress(addrToGeocode, activeApiKey || '');
         if (geoResult) {
           finalClient.lat = geoResult.lat;
           finalClient.lng = geoResult.lng;
