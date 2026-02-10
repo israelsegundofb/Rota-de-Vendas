@@ -65,18 +65,20 @@ const MapZoomControls: React.FC = () => {
   if (!map) return null;
 
   return (
-    <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-10 shadow-lg bg-transparent">
+    <div className="absolute bottom-[100px] sm:bottom-[90px] right-4 flex flex-row gap-2 z-10">
       <button
         onClick={() => map.setZoom((map.getZoom() || 0) + 1)}
-        className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
-        title="Zoom In"
+        className="bg-white p-2.5 rounded-xl border border-outline-variant shadow-elevation-2 text-on-surface hover:bg-primary-container hover:text-primary transition-all active:scale-95 focus:outline-none"
+        title="Aproximar (Zoom In)"
+        aria-label="Aproximar zoom"
       >
         <Plus className="w-5 h-5" />
       </button>
       <button
         onClick={() => map.setZoom((map.getZoom() || 0) - 1)}
-        className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
-        title="Zoom Out"
+        className="bg-white p-2.5 rounded-xl border border-outline-variant shadow-elevation-2 text-on-surface hover:bg-primary-container hover:text-primary transition-all active:scale-95 focus:outline-none"
+        title="Afastar (Zoom Out)"
+        aria-label="Afastar zoom"
       >
         <Minus className="w-5 h-5" />
       </button>
