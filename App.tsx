@@ -16,7 +16,7 @@ import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
 import { parseCSV, parseProductCSV } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
-import { geocodeAddress } from './services/geocodingService';
+import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges } from './services/firebaseService';
 import ClientMap from './components/ClientMap';
 import ClientList from './components/ClientList';
@@ -267,6 +267,56 @@ const App: React.FC = () => {
     return null;
   };
 
+  const handleBulkGeneratePlusCodes = async () => {
+    const clientsMissingPlusCode = masterClientList.filter(c => !c.plusCode && c.lat && c.lng && c.lat !== 0);
+
+    if (clientsMissingPlusCode.length === 0) {
+      alert('✅ Todos os clientes com coordenadas já possuem Plus Code!');
+      return;
+    }
+
+    const confirm = window.confirm(`Deseja gerar Plus Codes para ${clientsMissingPlusCode.length} clientes? \nIsso utilizará a cota da API de Geocoding do Google.`);
+    if (!confirm) return;
+
+    setProcState({
+      isActive: true,
+      current: 0,
+      total: clientsMissingPlusCode.length,
+      status: 'processing',
+      fileName: 'Geração de Plus Codes',
+      ownerName: currentUser?.name || 'Sistema'
+    });
+
+    let updatedCount = 0;
+    const newList = [...masterClientList];
+
+    for (let i = 0; i < clientsMissingPlusCode.length; i++) {
+      if (isUploadCancelled.current) break;
+
+      const client = clientsMissingPlusCode[i];
+      try {
+        const plusCode = await reverseGeocodePlusCode(client.lat, client.lng, googleMapsApiKey || '');
+        if (plusCode) {
+          const index = newList.findIndex(c => c.id === client.id);
+          if (index !== -1) {
+            newList[index] = { ...newList[index], plusCode };
+            updatedCount++;
+          }
+        }
+      } catch (e) {
+        console.error(`Error generating Plus Code for ${client.companyName}:`, e);
+      }
+
+      setProcState(prev => ({ ...prev, current: i + 1 }));
+    }
+
+    setMasterClientList(newList);
+    setProcState(prev => ({ ...prev, status: 'completed', isActive: true }));
+    isUploadCancelled.current = false;
+
+    alert(`✅ Processo concluído! ${updatedCount} Plus Codes gerados.`);
+  };
+
   const handleUpdateClient = async (updatedClient: EnrichedClient) => {
     // Check if address or plusCode changed to re-geocode
     const original = masterClientList.find(c => c.id === updatedClient.id);
@@ -287,7 +337,17 @@ const App: React.FC = () => {
         finalClient.lat = geoResult.lat;
         finalClient.lng = geoResult.lng;
         if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
+
+        // Auto-generate Plus Code if missing
+        if (!finalClient.plusCode) {
+          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+          if (plusCode) finalClient.plusCode = plusCode;
+        }
       }
+    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
+      // Coordinates exist but Plus Code is missing (e.g. manual edit with just coords)
+      const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+      if (plusCode) finalClient.plusCode = plusCode;
     }
 
     setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
@@ -314,9 +374,19 @@ const App: React.FC = () => {
         finalClient.lng = geoResult.lng;
         if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
         console.log(`[APP] Geocoding for manual client successful: ${finalClient.lat}, ${finalClient.lng}`);
+
+        // Auto-generate Plus Code if missing
+        if (!finalClient.plusCode) {
+          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+          if (plusCode) finalClient.plusCode = plusCode;
+        }
       } else {
         console.warn(`[APP] Geocoding for manual client FAILED: ${finalClient.companyName}`);
       }
+    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
+      // Coords provided but no plus code
+      const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+      if (plusCode) finalClient.plusCode = plusCode;
     }
 
     // 2. Add to list
@@ -1413,6 +1483,7 @@ const App: React.FC = () => {
                           productCategories={productCategories}
                           users={users}
                           uploadedFiles={uploadedFiles}
+                          onGeneratePlusCodes={handleBulkGeneratePlusCodes}
                         />
                       )}
                     </div>

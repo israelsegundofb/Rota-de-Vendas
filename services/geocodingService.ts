@@ -47,3 +47,28 @@ export const geocodeAddress = async (
         return null;
     }
 };
+
+export const reverseGeocodePlusCode = async (
+    lat: number,
+    lng: number,
+    apiKey: string
+): Promise<string | null> => {
+    if (!lat || !lng || !apiKey) {
+        return null;
+    }
+
+    try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.plus_code) {
+            // Favor compound_code as it often includes the city/state which matches user's preferred format
+            return data.plus_code.compound_code || data.plus_code.global_code || null;
+        }
+        return null;
+    } catch (error) {
+        console.error("Reverse geocoding error:", error);
+        return null;
+    }
+};

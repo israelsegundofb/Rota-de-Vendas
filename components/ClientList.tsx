@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
-import { isSalesTeam } from '../utils/authUtils';
+import { isAdmin, isSalesTeam } from '../utils/authUtils';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
@@ -18,6 +18,7 @@ interface ClientListProps {
   productCategories: string[];
   users?: AppUser[];
   uploadedFiles?: UploadedFile[];
+  onGeneratePlusCodes?: () => void;
 }
 
 const ClientList: React.FC<ClientListProps> = ({
@@ -30,7 +31,8 @@ const ClientList: React.FC<ClientListProps> = ({
   products = [],
   productCategories = [],
   users = [],
-  uploadedFiles = []
+  uploadedFiles = [],
+  onGeneratePlusCodes
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('Todos');
@@ -351,6 +353,16 @@ const ClientList: React.FC<ClientListProps> = ({
             >
               <Download className="w-4 h-4" /> Exportar
             </button>
+
+            {onGeneratePlusCodes && currentUserRole && isAdmin(currentUserRole) && (
+              <button
+                onClick={onGeneratePlusCodes}
+                className="flex items-center gap-2 px-3 py-1.5 bg-tertiary text-white text-xs font-bold rounded-lg hover:bg-tertiary/90 transition-all shadow-md shadow-tertiary/20 active:scale-95 whitespace-nowrap"
+                title="Gerar Plus Codes para clientes sem localização exata"
+              >
+                <MapPin className="w-4 h-4" /> Plus Code
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -390,33 +402,37 @@ const ClientList: React.FC<ClientListProps> = ({
       </div>
 
       {/* Modals */}
-      {selectedClient && isEditModalOpen && (
-        <EditClientModal
-          isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          client={selectedClient}
-          onSave={(updated) => {
-            onUpdateClient(updated);
-            setIsEditModalOpen(false);
-          }}
-          users={users}
-          uploadedFiles={uploadedFiles}
-        />
-      )}
+      {
+        selectedClient && isEditModalOpen && (
+          <EditClientModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            client={selectedClient}
+            onSave={(updated) => {
+              onUpdateClient(updated);
+              setIsEditModalOpen(false);
+            }}
+            users={users}
+            uploadedFiles={uploadedFiles}
+          />
+        )
+      }
 
-      {isAddModalOpen && onAddClient && (
-        <AddClientModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onAdd={(newClient) => {
-            onAddClient(newClient);
-            setIsAddModalOpen(false);
-          }}
-          salespersonId={currentUserId || ''}
-          ownerName={currentUserName || ''}
-          users={users}
-        />
-      )}
+      {
+        isAddModalOpen && onAddClient && (
+          <AddClientModal
+            isOpen={isAddModalOpen}
+            onClose={() => setIsAddModalOpen(false)}
+            onAdd={(newClient) => {
+              onAddClient(newClient);
+              setIsAddModalOpen(false);
+            }}
+            salespersonId={currentUserId || ''}
+            ownerName={currentUserName || ''}
+            users={users}
+          />
+        )
+      }
 
       {/* Product Assignment Modal */}
       <ClientProductAssignmentModal
@@ -427,7 +443,7 @@ const ClientList: React.FC<ClientListProps> = ({
         productCategories={productCategories}
         onSave={handleSaveProductAssignment}
       />
-    </div>
+    </div >
   );
 };
 
