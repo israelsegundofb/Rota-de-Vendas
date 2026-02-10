@@ -114,7 +114,7 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
                 </div>
 
                 {/* Sub-Filters / Quick Actions */}
-                <div className="px-4 py-2 bg-gray-50 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100">
+                <div className="p-4 bg-gray-50 flex items-center justify-center gap-3 border-b border-gray-100">
                     <button
                         onClick={() => setShowOnlyPurchased(false)}
                         className={`
