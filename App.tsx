@@ -258,7 +258,7 @@ const App: React.FC = () => {
       const candidate = addr?.trim();
       if (!candidate) continue;
       try {
-        const result = await geocodeAddress(candidate, activeApiKey || '');
+        const result = await geocodeAddress(candidate, googleMapsApiKey || '');
         if (result) return result;
       } catch (e) {
         console.warn(`Geocoding failed for ${candidate}:`, e);
@@ -295,8 +295,9 @@ const App: React.FC = () => {
 
   const handleAddClient = async (newClient: EnrichedClient) => {
     // 1. Geocode Address if coordinates are missing
-    let finalClient = {
+    let finalClient: EnrichedClient = {
       ...newClient,
+      id: (newClient as any).id || crypto.randomUUID(),
       lat: newClient.lat || 0,
       lng: newClient.lng || 0
     };
@@ -312,6 +313,9 @@ const App: React.FC = () => {
         finalClient.lat = geoResult.lat;
         finalClient.lng = geoResult.lng;
         if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
+        console.log(`[APP] Geocoding for manual client successful: ${finalClient.lat}, ${finalClient.lng}`);
+      } else {
+        console.warn(`[APP] Geocoding for manual client FAILED: ${finalClient.companyName}`);
       }
     }
 
