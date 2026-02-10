@@ -1117,6 +1117,7 @@ const App: React.FC = () => {
                         value={filterProductSku}
                         onChange={e => setFilterProductSku(e.target.value)}
                         className={`text-xs rounded-lg pl-7 pr-2 py-1.5 border appearance-none transition-colors max-w-[180px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                        title="Filtrar por produto específico"
                       >
                         <option value="Todos">Todos Produtos</option>
                         {products
@@ -1137,6 +1138,7 @@ const App: React.FC = () => {
                         onChange={e => setSearchProductQuery(e.target.value)}
                         placeholder="SKU, Marca, Código ou Descrição..."
                         className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-56 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
+                        title="Buscar produtos por SKU, Marca, Código ou Descrição"
                       />
                     </div>
 
@@ -1206,6 +1208,7 @@ const App: React.FC = () => {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Buscar cliente ou empresa..."
                                     className="pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 w-48 border outline-none"
+                                    title="Buscar cliente ou empresa"
                                   />
                                 </div>
 
@@ -1242,6 +1245,7 @@ const App: React.FC = () => {
                                         value={filterSalesCategory}
                                         onChange={(e) => setFilterSalesCategory(e.target.value)}
                                         className="text-xs border-purple-300 bg-white text-purple-900 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium"
+                                        title="Filtrar por equipe de vendas"
                                       >
                                         <option value="Todos">Todas Equipes</option>
                                         <option value="Externo">Externo</option>
@@ -1256,6 +1260,7 @@ const App: React.FC = () => {
                                   value={filterRegion}
                                   onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
                                   className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
+                                  title="Filtrar por região"
                                 >
                                   <option value="Todas">Todas Regiões</option>
                                   {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -1266,6 +1271,7 @@ const App: React.FC = () => {
                                   onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
                                   className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
                                   disabled={availableStates.length === 0}
+                                  title="Filtrar por estado"
                                 >
                                   <option value="Todos">Todos Estados</option>
                                   {availableStates.map(s => <option key={s} value={s}>{s}</option>)}

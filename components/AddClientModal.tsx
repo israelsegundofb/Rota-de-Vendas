@@ -206,6 +206,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                     onChange={e => handleChange('contact', e.target.value)}
                                     className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
                                     placeholder="(00) 00000-0000"
+                                    title="Contato"
                                 />
                             </div>
 
@@ -244,6 +245,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                         value={formData.region}
                                         onChange={e => handleChange('region', e.target.value)}
                                         className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none"
+                                        title="Região"
                                     >
                                         {REGIONS.map(reg => (
                                             <option key={reg} value={reg}>{reg}</option>
@@ -279,6 +281,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                         value={formData.state}
                                         onChange={e => handleChange('state', e.target.value)}
                                         className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none"
+                                        title="UF"
                                     >
                                         {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map(uf => (
                                             <option key={uf} value={uf}>{uf}</option>
@@ -299,8 +302,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                 required
                                 value={formData.originalAddress}
                                 onChange={e => handleChange('originalAddress', e.target.value)}
-                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none resize-none transition-colors"
-                                placeholder="Rua, Número, Bairro, CEP"
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors resize-none"
+                                placeholder="Rua, Número, Bairro, CEP..."
+                                title="Endereço Completo"
                             />
                             <p className="text-[10px] text-on-surface-variant mt-1 ml-1">
                                 * Importante para localizarmos no mapa.

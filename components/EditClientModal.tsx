@@ -71,7 +71,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         <h2 className="text-2xl font-normal text-on-surface">Dados do Cliente</h2>
                         <p className="text-xs text-on-surface-variant mt-1 font-mono">{client.id}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 text-on-surface-variant hover:bg-surface-variant/30 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2 text-on-surface-variant hover:bg-surface-variant/30 rounded-full transition-colors" title="Fechar modal">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -85,8 +85,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     </div>
                     {salespersonType && (
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${salespersonType === 'Interno' ? 'bg-blue-100 text-blue-700' :
-                                salespersonType === 'Externo' ? 'bg-orange-100 text-orange-700' :
-                                    'bg-gray-100 text-gray-600'
+                            salespersonType === 'Externo' ? 'bg-orange-100 text-orange-700' :
+                                'bg-gray-100 text-gray-600'
                             }`}>
                             {salespersonType}
                         </span>
@@ -119,6 +119,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 onChange={handleChange}
                                 className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                                 required
+                                title="Razão Social"
+                                placeholder="Razão Social"
                             />
                         </div>
 
@@ -134,6 +136,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 onChange={handleChange}
                                 className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                                 required
+                                title="Responsável / Proprietário"
+                                placeholder="Responsável / Proprietário"
                             />
                         </div>
 
@@ -148,6 +152,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 value={formData.contact}
                                 onChange={handleChange}
                                 className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                                title="Contato (Telefone/WhatsApp)"
+                                placeholder="Contato (Telefone/WhatsApp)"
                             />
                         </div>
 
@@ -178,6 +184,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                                 ? 'bg-secondary-container text-on-secondary-container border-secondary-container'
                                                 : 'bg-surface text-on-surface-variant border-outline-variant hover:border-outline'
                                                 }`}
+                                            title={`Selecionar/desselecionar segmento: ${cat}`}
                                         >
                                             {cat}
                                         </button>
@@ -197,6 +204,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                     value={formData.region}
                                     onChange={handleChange}
                                     className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all appearance-none"
+                                    title="Região"
                                 >
                                     <option value="Indefinido">Indefinido</option>
                                     {REGIONS.map(reg => (
@@ -218,6 +226,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 value={formData.city}
                                 onChange={handleChange}
                                 className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                                title="Município"
+                                placeholder="Município"
                             />
                         </div>
 
@@ -233,6 +243,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 value={formData.state}
                                 onChange={handleChange}
                                 className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all uppercase"
+                                title="UF"
+                                placeholder="UF"
                             />
                         </div>
                     </div>
