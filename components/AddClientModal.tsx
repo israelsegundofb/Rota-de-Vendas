@@ -6,7 +6,7 @@ import { X, Save, MapPin, Store, AlertCircle, Globe, User } from 'lucide-react';
 interface AddClientModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
+    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'>) => void;
     salespersonId: string;
     ownerName: string;
     users?: AppUser[];
@@ -111,6 +111,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
             state: formData.state,
             city: formData.city,
             originalAddress: fullAddress,
+            cleanAddress: fullAddress, // Pass this to trigger geocoding
             salespersonId: selectedSalespersonId,
             googleMapsUri: ''
         });

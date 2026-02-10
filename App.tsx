@@ -275,11 +275,17 @@ const App: React.FC = () => {
 
   const handleAddClient = async (newClient: EnrichedClient) => {
     // 1. Geocode Address if coordinates are missing
-    let finalClient = { ...newClient };
+    let finalClient = {
+      ...newClient,
+      lat: newClient.lat || 0,
+      lng: newClient.lng || 0
+    };
 
-    if ((!finalClient.lat || !finalClient.lng) && finalClient.cleanAddress) {
+    const addrToGeocode = finalClient.cleanAddress || finalClient.originalAddress;
+
+    if ((!finalClient.lat || !finalClient.lng) && addrToGeocode) {
       try {
-        const geoResult = await geocodeAddress(finalClient.cleanAddress, activeApiKey || '');
+        const geoResult = await geocodeAddress(addrToGeocode, activeApiKey || '');
         if (geoResult) {
           finalClient.lat = geoResult.lat;
           finalClient.lng = geoResult.lng;

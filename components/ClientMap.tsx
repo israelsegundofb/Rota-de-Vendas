@@ -229,58 +229,64 @@ const ClientMapContent: React.FC<{
       const batch = clients.slice(index, index + BATCH_SIZE);
       if (batch.length === 0) return;
 
-      const newMarkers = batch.map(client => {
-        // Optimized Color Lookup
-        let colors = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
+      const newMarkers = batch
+        .filter(client => {
+          const lat = Number(client.lat);
+          const lng = Number(client.lng);
+          return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+        })
+        .map(client => {
+          // Optimized Color Lookup
+          let colors = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
 
-        if (productFilterActive) {
-          colors = { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
-        } else {
-          const userColor = userColorMap.get(client.salespersonId);
-          if (userColor) {
-            colors = userColor;
-          } else if (client.ownerName) {
-            const genColor = stringToColor(client.ownerName);
-            colors = { bg: genColor, border: 'black', glyph: '#fff' };
+          if (productFilterActive) {
+            colors = { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
           } else {
-            colors = getRegionColor(client.region);
+            const userColor = userColorMap.get(client.salespersonId);
+            if (userColor) {
+              colors = userColor;
+            } else if (client.ownerName) {
+              const genColor = stringToColor(client.ownerName);
+              colors = { bg: genColor, border: 'black', glyph: '#fff' };
+            } else {
+              colors = getRegionColor(client.region);
+            }
           }
-        }
 
-        let glyphElement: HTMLElement | null = null;
-        if (productFilterActive) {
-          glyphElement = baseGlyphElement.cloneNode(true) as HTMLElement;
-          glyphElement.style.color = colors.glyph;
-        }
+          let glyphElement: HTMLElement | null = null;
+          if (productFilterActive) {
+            glyphElement = baseGlyphElement.cloneNode(true) as HTMLElement;
+            glyphElement.style.color = colors.glyph;
+          }
 
-        const pinOptions: any = {
-          background: colors.bg,
-          borderColor: colors.border,
-          glyphColor: colors.glyph,
-          scale: 1
-        };
+          const pinOptions: any = {
+            background: colors.bg,
+            borderColor: colors.border,
+            glyphColor: colors.glyph,
+            scale: 1
+          };
 
-        if (glyphElement) {
-          pinOptions.glyph = glyphElement;
-        }
+          if (glyphElement) {
+            pinOptions.glyph = glyphElement;
+          }
 
-        const pin = new google.maps.marker.PinElement(pinOptions);
+          const pin = new google.maps.marker.PinElement(pinOptions);
 
-        const marker = new google.maps.marker.AdvancedMarkerElement({
-          position: { lat: client.lat, lng: client.lng },
-          content: pin.element,
-          // Important: If clustering is disabled, we set the map directly.
-          // If enabled, the clusterer will set it.
-          map: isClusteringEnabled ? null : map,
-          title: client.companyName
+          const marker = new google.maps.marker.AdvancedMarkerElement({
+            position: { lat: client.lat, lng: client.lng },
+            content: pin.element,
+            // Important: If clustering is disabled, we set the map directly.
+            // If enabled, the clusterer will set it.
+            map: isClusteringEnabled ? null : map,
+            title: client.companyName
+          });
+
+          marker.addListener('click', () => {
+            onClientSelect(client.id);
+          });
+
+          return marker;
         });
-
-        marker.addListener('click', () => {
-          onClientSelect(client.id);
-        });
-
-        return marker;
-      });
 
       if (isActive) {
         if (isClusteringEnabled && clustererRef.current) {
