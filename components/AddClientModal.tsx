@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { EnrichedClient } from '../types';
+import { EnrichedClient, AppUser } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
-import { X, Save, MapPin, Store, AlertCircle, Globe } from 'lucide-react';
+import { X, Save, MapPin, Store, AlertCircle, Globe, User } from 'lucide-react';
 
 interface AddClientModalProps {
     isOpen: boolean;
@@ -9,9 +9,11 @@ interface AddClientModalProps {
     onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
     salespersonId: string;
     ownerName: string;
+    users?: AppUser[];
 }
 
-const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd, salespersonId, ownerName }) => {
+const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd, salespersonId, ownerName, users = [] }) => {
+    const [selectedSalespersonId, setSelectedSalespersonId] = useState(salespersonId);
     // State for form
     const [formData, setFormData] = useState({
         companyName: '',
@@ -43,6 +45,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 originalAddress: '',
                 cleanAddress: ''
             });
+            setSelectedSalespersonId(salespersonId);
             setError('');
 
             // Try to get current location
@@ -108,7 +111,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
             state: formData.state,
             city: formData.city,
             originalAddress: fullAddress,
-            salespersonId: salespersonId,
+            salespersonId: selectedSalespersonId,
             googleMapsUri: ''
         });
 
@@ -171,6 +174,25 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                     placeholder="Nome do responsável"
                                 />
                             </div>
+
+                            {/* Vendedor Responsável */}
+                            {users.length > 0 && (
+                                <div>
+                                    <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">
+                                        <User className="w-3 h-3 inline mr-1" />Vendedor Responsável
+                                    </label>
+                                    <select
+                                        value={selectedSalespersonId}
+                                        onChange={e => setSelectedSalespersonId(e.target.value)}
+                                        className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none"
+                                        title="Vendedor Responsável"
+                                    >
+                                        {users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                            <option key={u.id} value={u.id}>{u.name}{u.salesCategory ? ` (${u.salesCategory})` : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Contact */}
                             <div>

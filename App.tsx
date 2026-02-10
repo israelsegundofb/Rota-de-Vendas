@@ -1195,7 +1195,7 @@ const App: React.FC = () => {
                           activeProductCategory={filterProductCategory}
                           users={users} // Pass users for color coding
                           filterContent={
-                            <div className="bg-gray-100 px-3 py-2.5 flex flex-col gap-2">
+                            <div className="bg-gray-100/95 backdrop-blur-sm px-3 py-2 flex flex-col gap-1.5">
                               {/* Primary Filters Row */}
                               <div className="flex flex-wrap gap-2 items-center">
                                 <div className="relative">
@@ -1205,14 +1205,51 @@ const App: React.FC = () => {
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Buscar cliente ou empresa..."
-                                    className="pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 w-52 border outline-none"
+                                    className="pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 w-48 border outline-none"
                                   />
                                 </div>
 
-                                <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-                                <div className="flex items-center gap-1.5 text-gray-600">
-                                  <Filter className="w-4 h-4" />
-                                  <span className="text-xs font-bold hidden md:inline">Filtros:</span>
+                                <div className="h-5 w-px bg-gray-300 mx-0.5 hidden sm:block"></div>
+
+                                {/* Salesperson Filter */}
+                                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors ${canViewAllData ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
+                                  <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}>
+                                    {canViewAllData ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                                    {isAdminUser ? 'Admin' : (canViewAllData ? 'Gestão' : 'Vendedor')}
+                                  </span>
+                                  <div className="relative">
+                                    <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${canViewAllData ? 'text-purple-400' : 'text-gray-400'}`} />
+                                    <select
+                                      value={canViewAllData ? filterSalespersonId : currentUser?.id || ''}
+                                      onChange={(e) => canViewAllData && setFilterSalespersonId(e.target.value)}
+                                      disabled={!canViewAllData}
+                                      className={`text-xs rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium appearance-none ${canViewAllData ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
+                                      title={!canViewAllData ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
+                                    >
+                                      {canViewAllData && <option value="Todos">Todos Vendedores</option>}
+                                      {canViewAllData
+                                        ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                          <option key={u.id} value={u.id}>{u.name}</option>
+                                        ))
+                                        : <option value={currentUser?.id}>{currentUser?.name}</option>
+                                      }
+                                    </select>
+                                  </div>
+                                  {canViewAllData && (
+                                    <div className="relative animate-fade-in">
+                                      <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
+                                      <select
+                                        value={filterSalesCategory}
+                                        onChange={(e) => setFilterSalesCategory(e.target.value)}
+                                        className="text-xs border-purple-300 bg-white text-purple-900 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium"
+                                      >
+                                        <option value="Todos">Todas Equipes</option>
+                                        <option value="Externo">Externo</option>
+                                        <option value="Interno">Interno</option>
+                                        <option value="Mercado Livre">Mercado Livre</option>
+                                      </select>
+                                    </div>
+                                  )}
                                 </div>
 
                                 <select
@@ -1243,12 +1280,75 @@ const App: React.FC = () => {
                                   <option value="Todas">Todas Cidades</option>
                                   {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
+
+                                <div className="flex items-center gap-1 relative">
+                                  <ShoppingBag className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
+                                  <select
+                                    value={filterCategory}
+                                    onChange={(e) => setFilterCategory(e.target.value)}
+                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5"
+                                  >
+                                    <option value="Todos">Todas Cat. Clientes</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
+
+                                <span className="ml-auto text-xs font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">
+                                  {filteredClients.length} resultados
+                                </span>
                               </div>
 
-                              <div className="flex justify-end">
-                                <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">
-                                  {filteredClients.length} resultados encontrados
-                                </span>
+                              {/* Secondary Filters Row: Products */}
+                              <div className="flex flex-wrap gap-2 items-center bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm">
+                                <div className="flex items-center gap-2 px-2 text-sm font-semibold text-green-700">
+                                  <Package className="w-4 h-4" />
+                                  Vendas:
+                                </div>
+
+                                <select
+                                  value={filterProductCategory}
+                                  onChange={e => setFilterProductCategory(e.target.value)}
+                                  className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                >
+                                  <option value="Todos">Todas Marcas / Categorias</option>
+                                  {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+
+                                <div className="relative animate-fade-in">
+                                  <ShoppingBag className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${filterProductSku !== 'Todos' ? 'text-green-600' : 'text-gray-400'}`} />
+                                  <select
+                                    value={filterProductSku}
+                                    onChange={e => setFilterProductSku(e.target.value)}
+                                    className={`text-xs rounded-lg pl-7 pr-2 py-1.5 border appearance-none transition-colors max-w-[180px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                  >
+                                    <option value="Todos">Todos Produtos</option>
+                                    {products
+                                      .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
+                                      .sort((a, b) => a.name.localeCompare(b.name))
+                                      .map(p => (
+                                        <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
+                                      ))
+                                    }
+                                  </select>
+                                </div>
+
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                                  <input
+                                    type="text"
+                                    value={searchProductQuery}
+                                    onChange={e => setSearchProductQuery(e.target.value)}
+                                    placeholder="SKU, Marca, Código ou Descrição..."
+                                    className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-52 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
+                                  />
+                                </div>
+
+                                {isProductFilterActive && (
+                                  <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Exibindo onde foi vendido
+                                  </span>
+                                )}
                               </div>
                             </div>
                           }
@@ -1263,6 +1363,8 @@ const App: React.FC = () => {
                           currentUserName={currentUser?.name}
                           products={products}
                           productCategories={productCategories}
+                          users={users}
+                          uploadedFiles={uploadedFiles}
                         />
                       )}
                     </div>

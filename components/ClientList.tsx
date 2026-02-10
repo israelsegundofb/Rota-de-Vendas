@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { EnrichedClient, UserRole, Product } from '../types';
+import { EnrichedClient, UserRole, Product, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isSalesTeam } from '../utils/authUtils';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag } from 'lucide-react';
@@ -16,6 +16,8 @@ interface ClientListProps {
   currentUserName?: string;
   products: Product[];
   productCategories: string[];
+  users?: AppUser[];
+  uploadedFiles?: UploadedFile[];
 }
 
 const ClientList: React.FC<ClientListProps> = ({
@@ -26,7 +28,9 @@ const ClientList: React.FC<ClientListProps> = ({
   currentUserId,
   currentUserName,
   products = [],
-  productCategories = []
+  productCategories = [],
+  users = [],
+  uploadedFiles = []
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('Todos');
@@ -387,7 +391,8 @@ const ClientList: React.FC<ClientListProps> = ({
             onUpdateClient(updated);
             setIsEditModalOpen(false);
           }}
-          currentUserRole={currentUserRole}
+          users={users}
+          uploadedFiles={uploadedFiles}
         />
       )}
 
@@ -395,12 +400,13 @@ const ClientList: React.FC<ClientListProps> = ({
         <AddClientModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
-          onSave={(newClient) => {
+          onAdd={(newClient) => {
             onAddClient(newClient);
             setIsAddModalOpen(false);
           }}
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
+          salespersonId={currentUserId || ''}
+          ownerName={currentUserName || ''}
+          users={users}
         />
       )}
 

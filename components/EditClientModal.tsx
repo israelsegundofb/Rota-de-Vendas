@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Save, User, Store, Phone, MapPin, Tag, Globe } from 'lucide-react';
-import { EnrichedClient } from '../types';
+import { X, Save, User, Store, Phone, MapPin, Tag, Globe, Briefcase, FileText } from 'lucide-react';
+import { EnrichedClient, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 
 interface EditClientModalProps {
@@ -8,9 +8,11 @@ interface EditClientModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (updatedClient: EnrichedClient) => void;
+    users?: AppUser[];
+    uploadedFiles?: UploadedFile[];
 }
 
-const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave }) => {
+const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [] }) => {
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
         category: Array.isArray(client.category)
@@ -28,6 +30,15 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     }, [client]);
 
     if (!isOpen) return null;
+
+    // Derive salesperson info
+    const salesperson = users.find(u => u.id === client.salespersonId);
+    const salespersonName = salesperson?.name || 'Não atribuído';
+    const salespersonType = salesperson?.role === 'sales_internal' ? 'Interno' :
+        salesperson?.role === 'sales_external' || salesperson?.role === 'salesperson' ? 'Externo' :
+            salesperson?.role ? 'Equipe' : '';
+    const salespersonCategory = salesperson?.salesCategory || '';
+    const sourceFile = uploadedFiles.find(f => f.id === client.sourceFileId);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,6 +74,34 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     <button onClick={onClose} className="p-2 text-on-surface-variant hover:bg-surface-variant/30 rounded-full transition-colors">
                         <X className="w-6 h-6" />
                     </button>
+                </div>
+
+                {/* Vendor Info Banner */}
+                <div className="mx-6 mb-2 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-purple-50 border border-purple-200 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-bold text-purple-800">Vendedor Responsável:</span>
+                        <span className="text-sm font-semibold text-purple-900">{salespersonName}</span>
+                    </div>
+                    {salespersonType && (
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${salespersonType === 'Interno' ? 'bg-blue-100 text-blue-700' :
+                                salespersonType === 'Externo' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-gray-100 text-gray-600'
+                            }`}>
+                            {salespersonType}
+                        </span>
+                    )}
+                    {salespersonCategory && salespersonCategory !== 'N/A' && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                            <Briefcase className="w-3 h-3 inline mr-1" />{salespersonCategory}
+                        </span>
+                    )}
+                    {sourceFile && (
+                        <div className="flex items-center gap-1.5 ml-auto">
+                            <FileText className="w-3.5 h-3.5 text-gray-500" />
+                            <span className="text-[10px] text-gray-600 font-medium">Origem: <span className="font-bold">{sourceFile.fileName}</span></span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Form */}
