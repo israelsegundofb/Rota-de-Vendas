@@ -22,6 +22,7 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('Todos');
     const [selectedProductSkus, setSelectedProductSkus] = useState<string[]>([]);
+    const [showOnlyPurchased, setShowOnlyPurchased] = useState(false);
 
     // Initialize selected products when client changes
     React.useEffect(() => {
@@ -41,9 +42,12 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
 
             const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
 
-            return matchesSearch && matchesCategory;
+            const isSelected = selectedProductSkus.includes(product.sku);
+            const matchesPurchased = !showOnlyPurchased || isSelected;
+
+            return matchesSearch && matchesCategory && matchesPurchased;
         });
-    }, [products, searchTerm, selectedCategory]);
+    }, [products, searchTerm, selectedCategory, showOnlyPurchased, selectedProductSkus]);
 
     const handleToggleProduct = (sku: string) => {
         setSelectedProductSkus(prev => {
@@ -107,6 +111,35 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
                         <option value="Todos">Todos os Departamentos</option>
                         {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
+                </div>
+
+                {/* Sub-Filters / Quick Actions */}
+                <div className="px-4 py-2 bg-gray-50 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100">
+                    <button
+                        onClick={() => setShowOnlyPurchased(false)}
+                        className={`
+              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap
+              ${!showOnlyPurchased
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-300'
+                            }
+            `}
+                    >
+                        Ver Todos os Produtos
+                    </button>
+                    <button
+                        onClick={() => setShowOnlyPurchased(true)}
+                        className={`
+              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap
+              ${showOnlyPurchased
+                                ? 'bg-green-600 text-white shadow-sm'
+                                : 'bg-white text-gray-600 border border-gray-200 hover:border-green-300'
+                            }
+            `}
+                    >
+                        <ShoppingBag className="w-3 h-3" />
+                        Produtos Comprados
+                    </button>
                 </div>
 
                 {/* Product List */}
