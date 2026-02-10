@@ -65,7 +65,7 @@ const MapZoomControls: React.FC = () => {
   if (!map) return null;
 
   return (
-    <div className="absolute bottom-[100px] sm:bottom-[90px] right-4 flex flex-row gap-2 z-10">
+    <div className="absolute bottom-[75px] right-4 flex flex-row gap-2 z-10">
       <button
         onClick={() => map.setZoom((map.getZoom() || 0) + 1)}
         className="bg-white p-2.5 rounded-xl border border-outline-variant shadow-elevation-2 text-on-surface hover:bg-primary-container hover:text-primary transition-all active:scale-95 focus:outline-none"
