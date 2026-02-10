@@ -265,4 +265,40 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
   });
 };
 
+export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: string; sku: string; productName: string }[]> => {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: "UTF-8",
+      complete: (results) => {
+        const data = results.data as any[];
+        const records: { companyName: string; sku: string; productName: string }[] = [];
+
+        data.forEach((row) => {
+          const normalizedRow: Record<string, any> = {};
+          Object.keys(row).forEach(k => {
+            normalizedRow[normalizeHeader(k)] = row[k];
+          });
+
+          const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['empresa'] || '';
+          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || '';
+          const productName = normalizedRow['nome do produto'] || normalizedRow['produto'] || normalizedRow['descricao'] || '';
+
+          if (companyName && (sku || productName)) {
+            records.push({
+              companyName: String(companyName).trim(),
+              sku: String(sku).trim(),
+              productName: String(productName).trim()
+            });
+          }
+        });
+
+        resolve(records);
+      },
+      error: (error) => reject(error)
+    });
+  });
+};
+
 export { cleanAddress };

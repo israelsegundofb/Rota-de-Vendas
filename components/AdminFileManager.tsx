@@ -9,6 +9,7 @@ interface AdminFileManagerProps {
     uploadedFiles: UploadedFile[];
     onUploadClients: (file: File, targetUserId: string) => void;
     onUploadProducts: (file: File) => void;
+    onUploadPurchases: (file: File, targetUserId: string) => void;
     onDeleteFile: (fileId: string) => void;
     onReassignSalesperson?: (fileId: string, newSalespersonId: string) => void;
     procState?: {
@@ -30,11 +31,12 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
     uploadedFiles,
     onUploadClients,
     onUploadProducts,
+    onUploadPurchases,
     onDeleteFile,
     onReassignSalesperson,
     procState = { isActive: false, status: 'completed', errorMessage: '', current: 0, total: 0 }
 }) => {
-    const [activeTab, setActiveTab] = useState<'clients' | 'products'>('clients');
+    const [activeTab, setActiveTab] = useState<'clients' | 'products' | 'purchases'>('clients');
     const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]); // Staging area
 
@@ -132,6 +134,14 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                     <Package className="w-4 h-4" />
                     Catálogo de Produtos
                     {activeTab === 'products' && <div className="absolute bottom-0 left-0 w-full h-[3px] bg-primary rounded-t-full"></div>}
+                </button>
+                <button
+                    onClick={() => setActiveTab('purchases')}
+                    className={`pb-3 px-6 font-medium text-sm transition-colors relative flex items-center gap-2 ${activeTab === 'purchases' ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+                >
+                    <FileText className="w-4 h-4" />
+                    Atualizar Compras (Razão Social)
+                    {activeTab === 'purchases' && <div className="absolute bottom-0 left-0 w-full h-[3px] bg-primary rounded-t-full"></div>}
                 </button>
             </div>
 
@@ -262,9 +272,61 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                         disabled={procState?.isActive && procState.status === 'processing'}
                                     />
                                 </label>
-                                <div className="flex items-center justify-center gap-2 text-xs text-on-surface-variant">
+                            </div>
+                        ) : activeTab === 'purchases' ? (
+                            <div className="space-y-5">
+                                <div className="bg-blue-50 p-4 rounded-xl text-xs text-blue-800 mb-2 flex gap-3 border border-blue-100 italic">
+                                    <AlertCircle className="w-5 h-5 shrink-0 text-blue-500" />
+                                    <p>Este upload identifica o cliente pela **Razão Social** e substitui todo o histórico de compras dele pelos produtos deste arquivo.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                                        Vendedor Destino
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            className="w-full bg-surface-container border border-outline rounded-lg p-3 pr-10 text-sm text-on-surface focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                                            value={targetUploadUserId}
+                                            onChange={(e) => setTargetUploadUserId(e.target.value)}
+                                        >
+                                            <option value="" disabled>Selecione um vendedor...</option>
+                                            {users.filter(u => isSalesTeam(u.role)).map(u => (
+                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+                                            <UserIcon className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label className={`group flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden ${!targetUploadUserId ? 'border-outline-variant bg-surface-container/50 opacity-60 cursor-not-allowed' : 'border-blue-300 bg-blue-50/30 hover:bg-blue-50/50 hover:border-blue-500'}`}>
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6 z-10">
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${!targetUploadUserId ? 'bg-surface-variant text-on-surface-variant' : 'bg-blue-100 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                                            <FileUp className="w-6 h-6" />
+                                        </div>
+                                        <p className="text-sm font-medium text-on-surface text-center px-4">
+                                            Carregar Planilha de Compras
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept=".csv"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && targetUploadUserId) {
+                                                onUploadPurchases(file, targetUploadUserId);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                        disabled={procState?.isActive && procState.status === 'processing'}
+                                    />
+                                </label>
+                                <div className="flex items-center justify-center gap-2 text-xs text-on-surface-variant italic">
                                     <FileText className="w-3 h-3" />
-                                    <span>Suporta .csv, .xlsx, .xls (Múltiplos arquivos)</span>
+                                    <span>Colunas Esperadas: Razão Social, SKU, Nome do Produto</span>
                                 </div>
                             </div>
                         ) : (

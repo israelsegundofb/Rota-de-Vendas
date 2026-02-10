@@ -72,7 +72,7 @@ export interface UploadedFile {
   uploadDate: string; // ISO String
   salespersonId: string;
   salespersonName: string;
-  type: 'clients' | 'products';
+  type: 'clients' | 'products' | 'purchases';
   itemCount: number;
   status: 'processing' | 'completed' | 'error';
   errorMessage?: string;

@@ -13,7 +13,7 @@ import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
-import { parseCSV, parseProductCSV } from './utils/csvParser';
+import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
@@ -742,6 +742,119 @@ const App: React.FC = () => {
 
 
 
+  const handlePurchaseUpdateUpload = async (file: File, targetUserId: string) => {
+    const fileId = crypto.randomUUID();
+    setProcState({
+      isActive: true, total: 0, current: 0, fileName: file.name, ownerName: 'Sistema', status: 'reading'
+    });
+
+    try {
+      const records = await parsePurchaseHistoryCSV(file);
+      if (records.length === 0) throw new Error("Arquivo vazio ou sem registros válidos.");
+
+      // Group by client
+      const groupedByClient = records.reduce((acc, rec) => {
+        const name = rec.companyName.toLowerCase().trim();
+        if (!acc[name]) acc[name] = [];
+        acc[name].push(rec);
+        return acc;
+      }, {} as Record<string, typeof records>);
+
+      const clientNamesInFile = Object.keys(groupedByClient);
+
+      setProcState(prev => ({ ...prev, total: clientNamesInFile.length, status: 'processing' }));
+
+      let updatedCount = 0;
+      setMasterClientList(prevList => {
+        const newList = [...prevList];
+        clientNamesInFile.forEach((clientName, index) => {
+          setProcState(prev => ({ ...prev, current: index + 1 }));
+
+          // Find client index
+          const clientIdx = newList.findIndex(c => c.companyName.toLowerCase().trim() === clientName);
+
+          if (clientIdx !== -1) {
+            updatedCount++;
+            const clientPurchases = groupedByClient[clientName];
+
+            // Map CSV records to Product objects
+            const newPurchasedProducts: Product[] = clientPurchases.map(rec => {
+              // Try to enrich with master catalog
+              const masterProd = products.find(p =>
+                (rec.sku && p.sku === rec.sku) ||
+                (p.name && rec.productName && p.name.toLowerCase().trim() === rec.productName.toLowerCase().trim())
+              );
+
+              if (masterProd) {
+                return { ...masterProd };
+              } else {
+                // Fallback for missing product in catalog
+                return {
+                  sku: rec.sku || 'N/A',
+                  name: rec.productName || 'Produto Desconhecido',
+                  brand: 'Desconhecido',
+                  category: 'Manual',
+                  price: 0,
+                  factoryCode: ''
+                };
+              }
+            });
+
+            // UPDATE CLIENT: Clear old and set new as requested
+            newList[clientIdx] = {
+              ...newList[clientIdx],
+              purchasedProducts: newPurchasedProducts
+            };
+          }
+        });
+        return newList;
+      });
+
+      // Create File Record
+      const newFileRecord: UploadedFile = {
+        id: fileId,
+        fileName: file.name,
+        uploadDate: new Date().toISOString(),
+        salespersonId: targetUserId,
+        salespersonName: users.find(u => u.id === targetUserId)?.name || 'Vendedor',
+        type: 'purchases',
+        itemCount: records.length,
+        status: 'completed'
+      };
+
+      // Upload search file to Cloud Storage
+      try {
+        const timestamp = new Date().getTime();
+        const storagePath = `uploads/purchases/${timestamp}_${file.name}`;
+        await uploadFileToCloud(file, storagePath).then(url => {
+          if (url) (newFileRecord as any).storageUrl = url;
+        });
+      } catch (storageErr) {
+        console.error("[APP] Failed to upload purchase file to Storage:", storageErr);
+      }
+
+      setUploadedFiles(prev => [newFileRecord, ...prev]);
+      setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
+
+      alert(`✅ Atualização de Compras concluída!\n\n${updatedCount} clientes identificados e com histórico renovado.`);
+
+    } catch (e: any) {
+      console.error(e);
+      setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
+      setUploadedFiles(prev => [...prev, {
+        id: fileId,
+        fileName: file.name,
+        uploadDate: new Date().toISOString(),
+        salespersonId: targetUserId,
+        salespersonName: users.find(u => u.id === targetUserId)?.name || 'Vendedor',
+        type: 'purchases',
+        itemCount: 0,
+        status: 'error',
+        errorMessage: e.message
+      }]);
+    }
+  };
+
   const handleProductFileUpload = async (file: File) => {
     // Generate File ID
     const fileId = crypto.randomUUID();
@@ -1128,6 +1241,7 @@ const App: React.FC = () => {
                   uploadedFiles={uploadedFiles}
                   onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
                   onUploadProducts={handleProductFileUpload}
+                  onUploadPurchases={handlePurchaseUpdateUpload}
                   onDeleteFile={handleDeleteFile}
                   onReassignSalesperson={handleReassignFileSalesperson}
                   procState={procState}
