@@ -459,43 +459,107 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
           {/* Fullscreen Filter Overlay */}
           {isFullScreen && filterContent && (
-            <div className="absolute top-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm shadow-md border-b border-gray-200">
+            <div className="absolute top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm shadow-md border-b border-gray-200">
               {filterContent}
+              {/* Control buttons inside overlay, below filters */}
+              <div className="flex justify-end gap-2 px-3 py-1.5 border-t border-gray-100 bg-gray-50/80">
+                <button
+                  onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
+                  className={`p-1.5 px-3 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                  title={isClusteringEnabled ? "Desativar Agrupamento" : "Ativar Agrupamento"}
+                >
+                  {isClusteringEnabled ? (
+                    <>
+                      <div className="flex -space-x-1">
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-500/50"></div>
+                      </div>
+                      Agrupado
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="w-3 h-3" />
+                      Solto
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={toggleFullScreen}
+                  className="bg-white p-1.5 px-3 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold"
+                  title="Sair da Tela Cheia"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                  Sair
+                </button>
+              </div>
             </div>
           )}
 
-          <div className="absolute top-4 right-4 flex gap-2 z-10">
-            {/* Clustering Toggle */}
-            <button
-              onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
-              className={`p-2 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
-              title={isClusteringEnabled ? "Desativar Agrupamento" : "Ativar Agrupamento"}
-            >
-              {isClusteringEnabled ? (
-                <>
-                  <div className="flex -space-x-1">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <div className="w-2 h-2 rounded-full bg-blue-500/50"></div>
-                  </div>
-                  Agrupado
-                </>
-              ) : (
-                <>
-                  <MapPin className="w-3 h-3" />
-                  Solto
-                </>
-              )}
-            </button>
+          {/* Buttons when NOT fullscreen (original position) */}
+          {!isFullScreen && (
+            <div className="absolute top-4 right-4 flex gap-2 z-10">
+              <button
+                onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
+                className={`p-2 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                title={isClusteringEnabled ? "Desativar Agrupamento" : "Ativar Agrupamento"}
+              >
+                {isClusteringEnabled ? (
+                  <>
+                    <div className="flex -space-x-1">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-blue-500/50"></div>
+                    </div>
+                    Agrupado
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-3 h-3" />
+                    Solto
+                  </>
+                )}
+              </button>
+              <button
+                onClick={toggleFullScreen}
+                className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
+                title="Tela Cheia"
+              >
+                <Maximize2 className="w-5 h-5" />
+              </button>
+            </div>
+          )}
 
-            {/* Full Screen Toggle Button */}
-            <button
-              onClick={toggleFullScreen}
-              className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
-              title={isFullScreen ? "Sair da Tela Cheia" : "Tela Cheia"}
-            >
-              {isFullScreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-            </button>
-          </div>
+          {/* Buttons when fullscreen but NO filter content */}
+          {isFullScreen && !filterContent && (
+            <div className="absolute top-4 right-4 flex gap-2 z-10">
+              <button
+                onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
+                className={`p-2 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                title={isClusteringEnabled ? "Desativar Agrupamento" : "Ativar Agrupamento"}
+              >
+                {isClusteringEnabled ? (
+                  <>
+                    <div className="flex -space-x-1">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-blue-500/50"></div>
+                    </div>
+                    Agrupado
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-3 h-3" />
+                    Solto
+                  </>
+                )}
+              </button>
+              <button
+                onClick={toggleFullScreen}
+                className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
+                title="Sair da Tela Cheia"
+              >
+                <Minimize2 className="w-5 h-5" />
+              </button>
+            </div>
+          )}
 
           {selectedClient && (
             <InfoWindow
