@@ -1,11 +1,13 @@
 
 import { initializeApp, FirebaseApp, getApps, getApp, deleteApp } from 'firebase/app';
 import { getFirestore, Firestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
 import { EnrichedClient, Product, AppUser } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
 
 export const initializeFirebase = async (config?: FirebaseConfig): Promise<boolean> => {
     try {
@@ -14,14 +16,13 @@ export const initializeFirebase = async (config?: FirebaseConfig): Promise<boole
 
         // Check if app is already initialized
         if (getApps().length > 0) {
-            // If config changed, we might need to re-init (advanced), but for now let's reuse or delete
-            // Simple approach: if app exists, retrieve it. If we want to support switching configs, we'd need deleteApp.
             app = getApp();
         } else {
             app = initializeApp(firebaseConfig);
         }
 
         db = getFirestore(app);
+        storage = getStorage(app);
         return true;
     } catch (error) {
         console.error("Error initializing Firebase:", error);
@@ -111,4 +112,29 @@ export const subscribeToCloudChanges = (callback: (data: any) => void) => {
             callback(doc.data());
         }
     });
+};
+
+// -- STORAGE FUNCTIONS --
+
+/**
+ * Uploads a file to Firebase Storage and returns the download URL
+ * @param file The file to upload
+ * @param path The path in storage (e.g. 'uploads/csv/filename.csv')
+ */
+export const uploadFileToCloud = async (file: File | Blob, path: string): Promise<string | null> => {
+    if (!storage) {
+        const initialized = await initializeFirebase();
+        if (!initialized || !storage) return null;
+    }
+
+    try {
+        const storageRef = ref(storage, path);
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        console.log(`✅ File uploaded to ${path}:`, downloadURL);
+        return downloadURL;
+    } catch (error) {
+        console.error("Error uploading file to storage:", error);
+        return null;
+    }
 };

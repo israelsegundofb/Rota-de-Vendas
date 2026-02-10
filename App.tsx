@@ -17,7 +17,7 @@ import { parseCSV, parseProductCSV } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges } from './services/firebaseService';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud } from './services/firebaseService';
 import ClientMap from './components/ClientMap';
 import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
@@ -585,6 +585,19 @@ const App: React.FC = () => {
         status: 'processing'
       };
 
+      // Upload file to Cloud Storage for history/backup
+      try {
+        const timestamp = new Date().getTime();
+        const storagePath = `uploads/clients/${ownerId}/${timestamp}_${file.name}`;
+        const downloadUrl = await uploadFileToCloud(file, storagePath);
+        if (downloadUrl) {
+          (newFileRecord as any).storageUrl = downloadUrl;
+          console.log(`[APP] CSV file uploaded to Storage: ${downloadUrl}`);
+        }
+      } catch (storageErr) {
+        console.error("[APP] Failed to upload file to Storage:", storageErr);
+      }
+
       setUploadedFiles(prev => [newFileRecord, ...prev]);
 
       setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
@@ -758,6 +771,18 @@ const App: React.FC = () => {
         itemCount: newProducts.length,
         status: 'completed'
       };
+
+      // Upload product file to Cloud Storage
+      try {
+        const timestamp = new Date().getTime();
+        const storagePath = `uploads/products/${timestamp}_${file.name}`;
+        const downloadUrl = await uploadFileToCloud(file, storagePath);
+        if (downloadUrl) {
+          (newFileRecord as any).storageUrl = downloadUrl;
+        }
+      } catch (storageErr) {
+        console.error("[APP] Failed to upload product file to Storage:", storageErr);
+      }
 
       setUploadedFiles(prev => [newFileRecord, ...prev]);
 
