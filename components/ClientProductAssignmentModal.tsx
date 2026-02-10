@@ -81,7 +81,7 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
                             Cliente: <span className="font-semibold text-gray-700">{client.companyName}</span>
                         </p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors" title="Fechar modal">
                         <X className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
@@ -102,8 +102,9 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
                         className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        title="Filtrar por Departamento"
                     >
-                        <option value="Todos">Todas Categorias</option>
+                        <option value="Todos">Todos os Departamentos</option>
                         {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                 </div>
@@ -135,8 +136,11 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
                                                 <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-800' : 'text-gray-800'}`}>
                                                     {product.name}
                                                 </p>
+                                                <p className="text-xs text-blue-600 font-bold uppercase truncate">
+                                                    {product.brand}
+                                                </p>
                                                 <p className="text-xs text-gray-500 truncate">
-                                                    SKU: {product.sku} • {product.brand}
+                                                    SKU: {product.sku}
                                                 </p>
                                                 <p className="text-xs font-bold text-gray-700 mt-1">
                                                     {product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

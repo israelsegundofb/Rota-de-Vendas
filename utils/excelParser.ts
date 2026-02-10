@@ -189,13 +189,12 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
                         normalizedRow[normalizeHeader(k)] = row[k];
                     });
 
-                    const sku = String(normalizedRow['numero do sku'] || normalizedRow['sku'] || '');
+                    const category = normalizedRow['departamento'] || normalizedRow['categoria'] || 'Geral';
+                    const sku = String(normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || '');
+                    const name = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
                     const brand = normalizedRow['marca'] || normalizedRow['fabricante'] || 'Genérico';
-                    const factoryCode = String(normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '');
-                    const name = normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
                     const price = parseMoney(normalizedRow['preco de venda'] || normalizedRow['preco'] || 0);
-
-                    const category = normalizedRow['categoria'] || brand || 'Geral';
+                    const factoryCode = String(normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '');
                     const margin = parsePercentage(normalizedRow['margem'] || 0);
                     const discount = parsePercentage(normalizedRow['desconto'] || normalizedRow['discount'] || 0);
 

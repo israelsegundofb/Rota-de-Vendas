@@ -1467,7 +1467,7 @@ const App: React.FC = () => {
                                   onChange={e => setFilterProductCategory(e.target.value)}
                                   className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
                                 >
-                                  <option value="Todos">Todas Marcas / Categorias</option>
+                                  <option value="Todos">Todos Deptos / Marcas</option>
                                   {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                 </select>
 
@@ -1495,7 +1495,7 @@ const App: React.FC = () => {
                                     type="text"
                                     value={searchProductQuery}
                                     onChange={e => setSearchProductQuery(e.target.value)}
-                                    placeholder="SKU, Marca, Código ou Descrição..."
+                                    placeholder="Depto, Marca, SKU ou Produto..."
                                     className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-52 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
                                   />
                                 </div>

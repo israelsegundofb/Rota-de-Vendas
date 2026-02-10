@@ -157,6 +157,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
     p.name.toLowerCase().includes(filter.toLowerCase()) ||
     p.sku.toLowerCase().includes(filter.toLowerCase()) ||
     p.brand.toLowerCase().includes(filter.toLowerCase()) ||
+    p.category.toLowerCase().includes(filter.toLowerCase()) ||
     p.factoryCode.toLowerCase().includes(filter.toLowerCase())
   );
 
@@ -247,7 +248,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                 type="text"
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
-                placeholder="Filtrar por SKU, Marca, Código ou Descrição..."
+                placeholder="Filtrar por SKU, Marca, Departamento, Nome..."
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-highest border-b border-outline-variant rounded-t-lg text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors text-sm"
               />
             </div>
@@ -269,22 +270,16 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                       Marca <SortIcon column="brand" />
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-surface-container-highest group select-none w-32"
-                      onClick={() => requestSort('factoryCode')}
-                    >
-                      Cód. Fábrica <SortIcon column="factoryCode" />
-                    </th>
-                    <th
                       className="px-4 py-3 cursor-pointer hover:bg-surface-container-highest group select-none min-w-[200px]"
                       onClick={() => requestSort('name')}
                     >
-                      Descrição <SortIcon column="name" />
+                      Produto <SortIcon column="name" />
                     </th>
                     <th
                       className="px-4 py-3 cursor-pointer hover:bg-surface-container-highest group select-none w-40"
                       onClick={() => requestSort('category')}
                     >
-                      Categoria <SortIcon column="category" />
+                      Departamento <SortIcon column="category" />
                     </th>
                     <th
                       className="px-4 py-3 text-right cursor-pointer hover:bg-surface-container-highest group select-none w-32"
@@ -304,10 +299,9 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                   {displayedProducts.map((p) => (
                     <tr key={`${p.sku}-${(p as any).originalIndex}`} className="hover:bg-surface-container-highest/30 transition-colors group">
                       <td className="px-4 py-2 font-mono text-on-surface-variant text-xs">{p.sku}</td>
-                      <td className="px-4 py-2 font-medium text-on-surface text-xs">
+                      <td className="px-4 py-2 font-bold text-primary text-xs uppercase">
                         {p.brand}
                       </td>
-                      <td className="px-4 py-2 font-mono text-xs text-on-surface-variant">{p.factoryCode}</td>
                       <td className="px-4 py-2 font-medium text-on-surface text-xs truncate max-w-xs" title={p.name}>{p.name}</td>
 
                       {/* Editable Category */}
@@ -317,6 +311,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           className="w-full text-xs text-on-surface border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.category}
                           onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
+                          title="Editar Categoria"
+                          placeholder="Categoria"
                         />
                       </td>
 
@@ -328,6 +324,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           className="w-full text-xs text-right font-bold text-primary border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.price}
                           onChange={(e) => handleProductChange((p as any).originalIndex, 'price', parseFloat(e.target.value) || 0)}
+                          title="Editar Preço"
+                          placeholder="0,00"
                         />
                       </td>
 
@@ -341,6 +339,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           className="w-full text-xs text-right text-tertiary border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-tertiary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.discount || 0}
                           onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
+                          title="Editar Desconto"
+                          placeholder="0.0"
                         />
                       </td>
                     </tr>
@@ -369,12 +369,14 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
 
                   <div className="grid grid-cols-2 gap-3 pt-2 border-t border-outline-variant/20">
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase text-on-surface-variant font-bold">Categoria</label>
+                      <label className="text-[10px] uppercase text-on-surface-variant font-bold">Departamento</label>
                       <input
                         type="text"
                         className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-primary outline-none"
                         value={p.category}
                         onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
+                        title="Editar Departamento"
+                        placeholder="Departamento"
                       />
                     </div>
                     <div className="space-y-1">
@@ -384,6 +386,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                         className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-tertiary outline-none text-tertiary font-bold"
                         value={p.discount || 0}
                         onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
+                        title="Editar Desconto"
+                        placeholder="0"
                       />
                     </div>
                   </div>
@@ -395,6 +399,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                       className="w-full text-sm bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-2 focus:border-primary outline-none text-primary font-bold"
                       value={p.price}
                       onChange={(e) => handleProductChange((p as any).originalIndex, 'price', parseFloat(e.target.value) || 0)}
+                      title="Editar Preço"
+                      placeholder="0,00"
                     />
                   </div>
 
@@ -429,6 +435,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                   }
                 }}
                 className="text-on-surface-variant hover:text-on-surface"
+                title="Cancelar categorização IA"
               >
                 <X className="w-5 h-5" />
               </button>

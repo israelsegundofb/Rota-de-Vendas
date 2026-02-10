@@ -17,6 +17,7 @@ export const ProductSchema = z.object({
     price: z.number().positive(),
     category: z.string().min(1),
     sku: z.string().optional(),
+    brand: z.string().min(1),
 });
 
 export type ValidatedClient = z.infer<typeof ClientSchema>;

@@ -142,16 +142,14 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
             normalizedRow[normalizeHeader(k)] = row[k];
           });
 
-          // Mapping based on prompt: "Número do SKU | Marca | Cód.Fábrica | Descrição | Preço de Venda"
+          // Mapping based on new structure: "Departamento | Cód.Prod / SKU | Nome do Produto | Marca | Preço de Venda"
 
-          const sku = normalizedRow['numero do sku'] || normalizedRow['sku'] || '';
+          const category = normalizedRow['departamento'] || normalizedRow['categoria'] || 'Geral';
+          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || '';
+          const name = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
           const brand = normalizedRow['marca'] || normalizedRow['fabricante'] || 'Genérico';
-          const factoryCode = normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '';
-          const name = normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
           const price = parseMoney(normalizedRow['preco de venda'] || normalizedRow['preco'] || '0');
-
-          // Fallback logic for category: Use 'Marca' as category if specific 'categoria' column is missing, to keep dropdowns working
-          const category = normalizedRow['categoria'] || brand || 'Geral';
+          const factoryCode = normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '';
 
           // Optional margin & discount
           const margin = parsePercentage(normalizedRow['margem'] || '0');

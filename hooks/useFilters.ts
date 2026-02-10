@@ -79,11 +79,12 @@ export const useFilters = (
                     // Check Specific SKU
                     const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => p.sku === filterProductSku);
 
-                    // Check Search Query
+                    // Check Search Query (Includes Brand and Category/Department)
                     const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
                         p.name.toLowerCase().includes(prodQuery) ||
                         p.sku.toLowerCase().includes(prodQuery) ||
                         p.brand.toLowerCase().includes(prodQuery) ||
+                        p.category.toLowerCase().includes(prodQuery) ||
                         p.factoryCode.toLowerCase().includes(prodQuery) ||
                         p.price.toString().includes(prodQuery)
                     );
