@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, Mail, ArrowLeft, Check, Send, Shield } from 'lucide-react';
 import { AppUser } from '../types';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { migrateUsers } from '../utils/authUtils';
 
 interface LoginScreenProps {
   users: AppUser[];
@@ -71,7 +72,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
         const cloudData = await loadFromCloud();
         if (cloudData && cloudData.users) {
           console.log('[AUTH] Fetched fresh users from cloud for validation');
-          currentUsers = cloudData.users;
+          currentUsers = migrateUsers(cloudData.users);
         }
       } catch (e) {
         console.warn('[AUTH] Failed to fetch fresh users, using prop users', e);

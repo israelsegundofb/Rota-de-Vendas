@@ -1,4 +1,4 @@
-import { UserRole } from '../types';
+import { UserRole, AppUser } from '../types';
 
 export const ROLE_LABELS: Record<UserRole, string> = {
     admin_dev: '🛠️ Admin DEV',
@@ -95,4 +95,20 @@ export const isSalesTeam = (role: UserRole): boolean => {
  */
 export const hasFullDataVisibility = (role: UserRole): boolean => {
     return ROLE_HIERARCHY[role] <= 5;
+};
+/**
+ * Migra roles legados e garante propriedades específicas para o Administrador principal.
+ */
+export const migrateUsers = (users: AppUser[]): AppUser[] => {
+    return users.map(u => {
+        // Garante as propriedades do Admin DEV para o administrador principal
+        if (u.id === 'admin' || u.username === 'admin') {
+            return { ...u, role: 'admin_dev', name: 'Admin DEV', salesCategory: 'N/A' };
+        }
+        // Migra roles legados para os novos equivalentes
+        if (u.role === 'admin') return { ...u, role: 'admin_dev' };
+        if (u.role === 'salesperson') return { ...u, role: 'sales_external' };
+
+        return u;
+    });
 };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { EnrichedClient, Product, UploadedFile, AppUser } from '../types';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from '../services/firebaseService';
 import { CATEGORIES, getRegionByUF } from '../utils/constants';
+import { migrateUsers } from '../utils/authUtils';
 
 // Initial Data Loaders
 const loadInitialClients = (): EnrichedClient[] => {
@@ -44,20 +45,7 @@ const loadInitialFiles = (): UploadedFile[] => {
     } catch (e) { return []; }
 };
 
-// Helper to migrate legacy roles and enforce Admin DEV
-const migrateUsers = (users: AppUser[]): AppUser[] => {
-    return users.map(u => {
-        // Enforce Admin DEV properties for the main admin
-        if (u.id === 'admin' || u.username === 'admin') {
-            return { ...u, role: 'admin_dev', name: 'Admin DEV', salesCategory: 'N/A' };
-        }
-        // Migrate legacy roles
-        if (u.role === 'admin') return { ...u, role: 'admin_dev' };
-        if (u.role === 'salesperson') return { ...u, role: 'sales_external' };
-
-        return u;
-    });
-};
+// Helper to migrate legacy roles removed - imported from authUtils
 
 export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]) => void) => {
     const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);

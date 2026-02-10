@@ -1020,7 +1020,7 @@ const App: React.FC = () => {
         <main className="flex-1 flex flex-col relative overflow-hidden bg-surface transition-all duration-300 md:pt-0 pt-16">
 
           {/* Floating Add Button for Mobile (when not in admin views) */}
-          {!isAdmin && activeView === 'table' && (
+          {!isAdminUser && activeView === 'table' && (
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-elevation-2 flex items-center justify-center z-50 animate-bounce-in"
@@ -1063,11 +1063,11 @@ const App: React.FC = () => {
             <div className="flex items-center gap-6">
               <div className="text-right">
                 <p className="text-xs text-gray-400">
-                  {isAdmin ? 'Clientes Visualizados' : 'Meus Clientes'}
+                  {isAdminUser ? 'Clientes Visualizados' : 'Meus Clientes'}
                 </p>
                 <p className="text-lg font-bold leading-none">{visibleClients.length}</p>
               </div>
-              {isAdmin && (
+              {isAdminUser && (
                 <div className="text-right border-l pl-6 border-gray-200">
                   <p className="text-xs text-gray-400">Total Sistema</p>
                   <p className="text-lg font-bold leading-none text-purple-600">{masterClientList.length}</p>
@@ -1304,7 +1304,7 @@ const App: React.FC = () => {
                   {/* Visual Placeholder when empty */}
                   {visibleClients.length === 0 && !procState.isActive ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white rounded-xl border border-dashed border-gray-300">
-                      {isAdmin ? (
+                      {isAdminUser ? (
                         <>
                           <FileUp className="w-12 h-12 mb-2 opacity-20" />
                           <p className="text-lg font-medium text-gray-500">Nenhum dado cadastrado.</p>
