@@ -85,6 +85,21 @@
     }
   </script>
 
+  <style>
+    /* Prevent reCAPTCHA badge from overlapping with Google Maps zoom controls */
+    .grecaptcha-badge {
+      bottom: 80px !important;
+      transition: bottom 0.3s ease !important;
+    }
+
+    /* On mobile, might want to move it even more */
+    @media (max-width: 640px) {
+      .grecaptcha-badge {
+        bottom: 120px !important;
+      }
+    }
+  </style>
+
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script type="module" crossorigin src="/Rota-de-Vendas/assets/index-BZ86RbUN.js"></script>
 </head>
