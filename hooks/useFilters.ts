@@ -16,6 +16,7 @@ export const useFilters = (
     const [filterCategory, setFilterCategory] = useState<string>('Todos');
     const [filterSalespersonId, setFilterSalespersonId] = useState<string>('Todos');
     const [filterSalesCategory, setFilterSalesCategory] = useState<string>('Todos');
+    const [filterOnlyWithPurchases, setFilterOnlyWithPurchases] = useState<boolean>(false);
 
     // Product Filters
     const [filterProductCategory, setFilterProductCategory] = useState<string>('Todos');
@@ -93,9 +94,12 @@ export const useFilters = (
                 }
             }
 
-            return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat;
+            // Only with Purchases Filter
+            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (c.purchasedProducts && c.purchasedProducts.length > 0);
+
+            return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, users, currentUser]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, filterOnlyWithPurchases, users, currentUser]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
@@ -136,6 +140,7 @@ export const useFilters = (
         setFilterProductCategory('Todos');
         setFilterProductSku('Todos');
         setSearchProductQuery('');
+        setFilterOnlyWithPurchases(false);
     };
 
     return {
@@ -150,6 +155,7 @@ export const useFilters = (
         filterProductCategory, setFilterProductCategory,
         filterProductSku, setFilterProductSku,
         searchProductQuery, setSearchProductQuery,
+        filterOnlyWithPurchases, setFilterOnlyWithPurchases,
 
         // Computed
         filteredClients,

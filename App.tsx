@@ -85,6 +85,8 @@ const App: React.FC = () => {
     availableStates,
     availableCities,
     productCategories,
+    filterOnlyWithPurchases,
+    setFilterOnlyWithPurchases,
     resetFilters
   } = useFilters(masterClientList, users, currentUser, products);
 
@@ -1407,6 +1409,27 @@ const App: React.FC = () => {
                       />
                     </div>
 
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setFilterOnlyWithPurchases(true)}
+                        className={`text-[10px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-lg border transition-all ${filterOnlyWithPurchases
+                          ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                          : 'bg-white border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700'
+                          }`}
+                      >
+                        Somente com Compras
+                      </button>
+                      <button
+                        onClick={() => setFilterOnlyWithPurchases(false)}
+                        className={`text-[10px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-lg border transition-all ${!filterOnlyWithPurchases
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                          : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-700'
+                          }`}
+                      >
+                        Mostrar Todos
+                      </button>
+                    </div>
+
                     {isProductFilterActive && (
                       <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" />
@@ -1612,6 +1635,27 @@ const App: React.FC = () => {
                                     placeholder="Depto, Marca, SKU ou Produto..."
                                     className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-52 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
                                   />
+                                </div>
+
+                                <div className="flex gap-1 ml-1">
+                                  <button
+                                    onClick={() => setFilterOnlyWithPurchases(true)}
+                                    className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1.5 rounded-lg border transition-all ${filterOnlyWithPurchases
+                                      ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                      : 'bg-white border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600'
+                                      }`}
+                                  >
+                                    Com Compras
+                                  </button>
+                                  <button
+                                    onClick={() => setFilterOnlyWithPurchases(false)}
+                                    className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1.5 rounded-lg border transition-all ${!filterOnlyWithPurchases
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                      : 'bg-white border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'
+                                      }`}
+                                  >
+                                    Todos
+                                  </button>
                                 </div>
 
                                 {isProductFilterActive && (
