@@ -252,6 +252,21 @@ const App: React.FC = () => {
   };
 
 
+  // Helper for sequential geocoding attempts
+  const geocodeWithFallback = async (addresses: (string | undefined)[]) => {
+    for (const addr of addresses) {
+      const candidate = addr?.trim();
+      if (!candidate) continue;
+      try {
+        const result = await geocodeAddress(candidate, activeApiKey || '');
+        if (result) return result;
+      } catch (e) {
+        console.warn(`Geocoding failed for ${candidate}:`, e);
+      }
+    }
+    return null;
+  };
+
   const handleUpdateClient = async (updatedClient: EnrichedClient) => {
     // Check if address or plusCode changed to re-geocode
     const original = masterClientList.find(c => c.id === updatedClient.id);
@@ -259,20 +274,19 @@ const App: React.FC = () => {
 
     const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
+    const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
 
-    if (addressChanged || plusCodeChanged) {
-      // Prioritize Plus Code if available/changed
-      const addrToGeocode = updatedClient.plusCode || updatedClient.cleanAddress;
+    if (addressChanged || plusCodeChanged || coordinatesMissing) {
+      const geoResult = await geocodeWithFallback([
+        updatedClient.plusCode,
+        updatedClient.cleanAddress,
+        updatedClient.originalAddress
+      ]);
 
-      try {
-        const geoResult = await geocodeAddress(addrToGeocode, activeApiKey || '');
-        if (geoResult) {
-          finalClient.lat = geoResult.lat;
-          finalClient.lng = geoResult.lng;
-          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
-        }
-      } catch (e) {
-        console.error("Failed to re-geocode updated client:", e);
+      if (geoResult) {
+        finalClient.lat = geoResult.lat;
+        finalClient.lng = geoResult.lng;
+        if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
       }
     }
 
@@ -287,18 +301,17 @@ const App: React.FC = () => {
       lng: newClient.lng || 0
     };
 
-    const addrToGeocode = finalClient.cleanAddress || finalClient.originalAddress;
+    if ((!finalClient.lat || !finalClient.lng) || finalClient.lat === 0) {
+      const geoResult = await geocodeWithFallback([
+        finalClient.plusCode,
+        finalClient.cleanAddress,
+        finalClient.originalAddress
+      ]);
 
-    if ((!finalClient.lat || !finalClient.lng) && addrToGeocode) {
-      try {
-        const geoResult = await geocodeAddress(addrToGeocode, activeApiKey || '');
-        if (geoResult) {
-          finalClient.lat = geoResult.lat;
-          finalClient.lng = geoResult.lng;
-          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
-        }
-      } catch (e) {
-        console.error("Failed to geocode new client:", e);
+      if (geoResult) {
+        finalClient.lat = geoResult.lat;
+        finalClient.lng = geoResult.lng;
+        if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
       }
     }
 
@@ -735,6 +748,10 @@ const App: React.FC = () => {
           <div
             className="absolute inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
+            role="button"
+            tabIndex={0}
+            aria-label="Fechar menu"
+            onKeyDown={(e) => e.key === 'Escape' && setIsMobileMenuOpen(false)}
           />
         )}
 
@@ -755,6 +772,7 @@ const App: React.FC = () => {
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="md:hidden text-on-surface-variant hover:text-primary"
+              title="Fechar menu lateral"
             >
               <X className="w-6 h-6" />
             </button>
@@ -872,6 +890,7 @@ const App: React.FC = () => {
             <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
+              title="Encerrar sessão e sair do sistema"
             >
               <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
             </button>
@@ -887,6 +906,7 @@ const App: React.FC = () => {
           <button
             onClick={() => setIsMobileMenuOpen(true)}
             className="p-2 text-on-surface hover:bg-surface-container-highest rounded-full transition-colors"
+            title="Abrir menu"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -1023,7 +1043,10 @@ const App: React.FC = () => {
                     </div>
 
                     <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors ${canViewAllData ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}>
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}
+                        title={isAdminUser ? "Perfil Administrador" : (canViewAllData ? "Perfil Gestor" : "Perfil Vendedor")}
+                      >
                         {canViewAllData ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
                         {isAdminUser ? 'Admin' : (canViewAllData ? 'Gestão' : 'Vendedor')}
                       </span>
@@ -1055,6 +1078,7 @@ const App: React.FC = () => {
                             value={filterSalesCategory}
                             onChange={(e) => setFilterSalesCategory(e.target.value)}
                             className="text-xs border-purple-300 bg-white text-purple-900 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium"
+                            title="Filtrar por equipe de vendas"
                           >
                             <option value="Todos">Todas Equipes</option>
                             <option value="Externo">Externo</option>
@@ -1069,6 +1093,7 @@ const App: React.FC = () => {
                       value={filterRegion}
                       onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
                       className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
+                      title="Filtrar por região geográfica"
                     >
                       <option value="Todas">Todas Regiões</option>
                       {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -1079,6 +1104,7 @@ const App: React.FC = () => {
                       onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
                       className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
                       disabled={availableStates.length === 0}
+                      title="Filtrar por estado (UF)"
                     >
                       <option value="Todos">Todos Estados {filterRegion !== 'Todas' ? `(${filterRegion})` : ''}</option>
                       {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
