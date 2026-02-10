@@ -29,6 +29,7 @@ import AdminProductManagement from './components/AdminProductManagement';
 import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
 import AdminFileManager from './components/AdminFileManager';
+import GoogleMapsKeyModal from './components/GoogleMapsKeyModal';
 import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
@@ -117,6 +118,8 @@ const App: React.FC = () => {
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
   // isFirebaseConnected handled by hook
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
+  const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
+  const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
@@ -482,11 +485,15 @@ const App: React.FC = () => {
   };
 
   const handleInvalidKey = async () => {
-    const newKey = prompt('Digite sua Chave de API do Google Maps:');
+    setIsGoogleMapsModalOpen(true);
+  };
+
+  const handleConfirmMapKey = (newKey: string) => {
     if (newKey && newKey.trim()) {
       setGoogleMapsApiKey(newKey.trim());
       localStorage.setItem('google_maps_api_key', newKey.trim());
       setKeyVersion(v => v + 1);
+      setIsGoogleMapsModalOpen(false);
     }
   };
 
@@ -1038,6 +1045,13 @@ const App: React.FC = () => {
             }}
             onClearDatabase={handleClearAllClients}
             isFirebaseConnected={isFirebaseConnected}
+          />
+
+          <GoogleMapsKeyModal
+            isOpen={isGoogleMapsModalOpen}
+            onClose={() => setIsGoogleMapsModalOpen(false)}
+            onConfirm={handleConfirmMapKey}
+            suggestedKey={SUGGESTED_MAP_KEY}
           />
 
           <CookieConsent
