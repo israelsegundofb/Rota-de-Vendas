@@ -154,11 +154,11 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
 
   // Filter first
   const filtered = localProducts.map((p, index) => ({ ...p, originalIndex: index } as Product & { originalIndex: number })).filter(p =>
-    p.name.toLowerCase().includes(filter.toLowerCase()) ||
-    p.sku.toLowerCase().includes(filter.toLowerCase()) ||
-    p.brand.toLowerCase().includes(filter.toLowerCase()) ||
-    p.category.toLowerCase().includes(filter.toLowerCase()) ||
-    p.factoryCode.toLowerCase().includes(filter.toLowerCase())
+    (p.name || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (p.sku || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (p.brand || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (p.category || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (p.factoryCode || '').toLowerCase().includes(filter.toLowerCase())
   );
 
   // Then Sort

@@ -74,19 +74,19 @@ export const useFilters = (
                     matchProduct = false;
                 } else {
                     // Check Category (Brand often used as category in this context)
-                    const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => p.category === filterProductCategory);
+                    const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => (p.category || '') === filterProductCategory);
 
                     // Check Specific SKU
-                    const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => p.sku === filterProductSku);
+                    const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => (p.sku || '') === filterProductSku);
 
                     // Check Search Query (Includes Brand and Category/Department)
                     const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
-                        p.name.toLowerCase().includes(prodQuery) ||
-                        p.sku.toLowerCase().includes(prodQuery) ||
-                        p.brand.toLowerCase().includes(prodQuery) ||
-                        p.category.toLowerCase().includes(prodQuery) ||
-                        p.factoryCode.toLowerCase().includes(prodQuery) ||
-                        p.price.toString().includes(prodQuery)
+                        (p.name || '').toLowerCase().includes(prodQuery) ||
+                        (p.sku || '').toLowerCase().includes(prodQuery) ||
+                        (p.brand || '').toLowerCase().includes(prodQuery) ||
+                        (p.category || '').toLowerCase().includes(prodQuery) ||
+                        (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
+                        (p.price || 0).toString().includes(prodQuery)
                     );
 
                     matchProduct = hasCat && hasSku && hasMatch;

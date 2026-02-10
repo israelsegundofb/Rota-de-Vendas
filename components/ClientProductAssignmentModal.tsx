@@ -35,9 +35,9 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
     const filteredProducts = useMemo(() => {
         return products.filter(product => {
             const matchesSearch =
-                product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                product.brand.toLowerCase().includes(searchTerm.toLowerCase());
+                (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (product.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
 
             const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
 
