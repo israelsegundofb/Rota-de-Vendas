@@ -107,40 +107,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const dailySales: Record<string, number> = {};
         const sellerSales: Record<string, { name: string; revenue: number }> = {};
         let totalRevenue = 0;
+        let totalSalesCount = 0;
 
         clients.forEach(client => {
-            const clientTotal = client.purchases?.reduce((sum, p) => sum + p.total, 0) || 0;
+            // Filtrar as compras pelo range de data atual
+            const clientPurchases = (client.purchasedProducts || []).filter(p => {
+                const pDate = p.purchaseDate || '';
+                if (startDate && pDate < startDate) return false;
+                if (endDate && pDate > endDate) return false;
+                return true;
+            });
+
+            const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
             totalRevenue += clientTotal;
+            totalSalesCount += clientPurchases.length;
 
             // Region
             const region = client.region || 'Outras';
             regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
 
             // Seller
-            const sellerName = client.vendedor_nome || 'Não Atribuído';
+            const sellerObj = users.find(u => u.id === client.salespersonId);
+            const sellerName = sellerObj?.name || 'Não Atribuído';
             if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
             sellerSales[sellerName].revenue += clientTotal;
 
-            client.purchases?.forEach(p => {
+            clientPurchases.forEach(p => {
+                const pVal = p.totalValue || (p.price * (p.quantity || 1));
                 // Product count and revenue
                 if (!productSales[p.sku]) productSales[p.sku] = { name: p.name, revenue: 0, count: 0 };
-                productSales[p.sku].revenue += p.total;
-                productSales[p.sku].count += 1;
+                productSales[p.sku].revenue += pVal;
+                productSales[p.sku].count += (p.quantity || 1);
 
                 // Category
                 const cat = p.category || 'Outros';
-                categorySales[cat] = (categorySales[cat] || 0) + p.total;
+                categorySales[cat] = (categorySales[cat] || 0) + pVal;
 
                 // Daily trend
-                if (p.date) {
-                    const date = p.date.split('T')[0];
-                    dailySales[date] = (dailySales[date] || 0) + p.total;
+                if (p.purchaseDate) {
+                    const date = p.purchaseDate.split('T')[0];
+                    dailySales[date] = (dailySales[date] || 0) + pVal;
                 }
             });
         });
 
         return {
             totalRevenue,
+            totalSalesCount,
             totalClients: clients.length,
             totalProducts: products.length,
             topProductsData: Object.values(productSales)
@@ -166,7 +179,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             regionalSalesData: Object.entries(regionalSales).map(([name, value]) => ({ name, value })),
             salesTrendData: Object.entries(dailySales).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date))
         };
-    }, [clients, products, productSortOrder]);
+    }, [clients, products, productSortOrder, users, startDate, endDate]);
 
     return (
         <div className="flex flex-col h-full bg-background overflow-hidden animate-in fade-in duration-500">
@@ -386,7 +399,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <KPICard title="Faturamento Total" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={DollarSign} trend={12.5} color="bg-primary" />
                     <KPICard title="Carteira Filtrada" value={stats.totalClients} icon={Users} trend={5.2} color="bg-secondary" />
                     <KPICard title="Mix de Produtos" value={stats.totalProducts} icon={Package} trend={-2.4} color="bg-tertiary" />
-                    <KPICard title="Vendas Registradas" value={stats.salesTrendData.length} icon={Activity} trend={8.1} color="bg-primary" />
+                    <KPICard title="Vendas Registradas" value={stats.totalSalesCount} icon={Activity} trend={8.1} color="bg-primary" />
                 </div>
 
                 {/* 5. Main Charts Row */}
