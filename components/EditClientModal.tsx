@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Save, User, Store, Phone, MapPin, Tag, Globe, Briefcase, FileText, Search, Loader2 } from 'lucide-react';
-import { pesquisarEmpresaPorEndereco, consultarCNPJ } from '../services/cnpjService';
+import { consultarCNPJ } from '../services/cnpjService';
 import { EnrichedClient, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 
@@ -23,10 +23,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             : (typeof client.category === 'string' ? [client.category] : ['Outros'])
     }));
 
-    const [isSearching, setIsSearching] = useState(false);
     const [isRefreshingByCNPJ, setIsRefreshingByCNPJ] = useState(false);
-    const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'success' | 'error'>('idle');
-    const [refreshStatus, setRefreshStatus] = useState<'idle' | 'searching' | 'success' | 'error'>('idle');
+    const [refreshStatus, setRefreshStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
     React.useEffect(() => {
         setFormData({
@@ -54,52 +52,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         onClose();
     };
 
-    const handleCNPJSearch = async () => {
-        if (!formData.cleanAddress || formData.cleanAddress.length < 10) {
-            alert('Por favor, verifique o endereço antes de buscar.');
-            return;
-        }
-
-        setIsSearching(true);
-        setSearchStatus('searching');
-
-        try {
-            // 1. Pesquisa básica pelo endereço + Nome (se houver) para maior precisão
-            const searchTerms = [formData.companyName, formData.cleanAddress].filter(Boolean).join(', ');
-            const results = await pesquisarEmpresaPorEndereco({
-                filtros: searchTerms,
-                uf: formData.state
-            });
-
-            if (results && results.length > 0) {
-                // Pega o primeiro resultado (mais provável)
-                const candidate = results[0];
-                const fullData = await consultarCNPJ(candidate.taxId);
-
-                if (fullData) {
-                    setFormData(prev => ({
-                        ...prev,
-                        cnpj: fullData.cnpj,
-                        companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
-                        lat: fullData.latitude || prev.lat,
-                        lng: fullData.longitude || prev.lng,
-                        mainCnae: fullData.cnae_fiscal,
-                        secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || []
-                    }));
-                    setSearchStatus('success');
-                }
-            } else {
-                setSearchStatus('error');
-                alert('Nhum CNPJ encontrado para este endereço exato na base comercial.');
-            }
-        } catch (err) {
-            console.error(err);
-            setSearchStatus('error');
-        } finally {
-            setIsSearching(false);
-        }
-    };
-
     const handleRefreshByCNPJ = async () => {
         const cleanCNPJ = formData.cnpj?.replace(/\D/g, '');
         if (!cleanCNPJ || cleanCNPJ.length !== 14) {
@@ -108,25 +60,30 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         }
 
         setIsRefreshingByCNPJ(true);
-        setRefreshStatus('searching');
+        setRefreshStatus('idle');
 
         try {
             const fullData = await consultarCNPJ(cleanCNPJ);
 
             if (fullData) {
+                const hasNewAddress = fullData.logradouro && fullData.numero;
                 setFormData(prev => ({
                     ...prev,
                     companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
-                    originalAddress: `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`,
-                    cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
-                    city: fullData.municipio,
-                    state: fullData.uf,
-                    region: getRegionByUF(fullData.uf),
+                    originalAddress: hasNewAddress
+                        ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                        : prev.originalAddress,
+                    cleanAddress: hasNewAddress
+                        ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
+                        : prev.cleanAddress,
+                    city: fullData.municipio || prev.city,
+                    state: fullData.uf || prev.state,
+                    region: fullData.uf ? getRegionByUF(fullData.uf) : prev.region,
                     lat: fullData.latitude || prev.lat,
                     lng: fullData.longitude || prev.lng,
                     contact: fullData.ddd_telefone_1 || prev.contact,
-                    mainCnae: fullData.cnae_fiscal,
-                    secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || []
+                    mainCnae: fullData.cnae_fiscal || prev.mainCnae,
+                    secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
                 }));
                 setRefreshStatus('success');
                 setTimeout(() => setRefreshStatus('idle'), 3000);
@@ -367,19 +324,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 className="flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
                                 title="Endereço Limpo"
                             />
-                            <button
-                                type="button"
-                                onClick={handleCNPJSearch}
-                                disabled={isSearching}
-                                className={`px-4 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${searchStatus === 'success'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-primary/10 text-primary hover:bg-primary/20'
-                                    }`}
-                                title="Tentar descobrir o CNPJ a partir deste endereço"
-                            >
-                                {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                                {searchStatus === 'success' ? 'CNPJ Encontrado!' : 'Descobrir CNPJ'}
-                            </button>
                         </div>
                     </div>
 
@@ -393,7 +337,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 name="cnpj"
                                 value={formData.cnpj || ''}
                                 onChange={handleChange}
-                                className={`flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all ${searchStatus === 'success' || refreshStatus === 'success' ? 'border-green-500' : ''}`}
+                                className={`flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all ${refreshStatus === 'success' ? 'border-green-500' : ''}`}
                                 placeholder="00.000.000/0000-00"
                                 title="CNPJ do Cliente"
                             />

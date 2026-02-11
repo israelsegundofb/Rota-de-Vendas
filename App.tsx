@@ -296,6 +296,7 @@ const App: React.FC = () => {
             if (activeCnpj && activeCnpj.length === 14) {
               const fullData = await consultarCNPJ(activeCnpj);
               if (fullData) {
+                const hasNewAddress = fullData.logradouro && fullData.numero;
                 setMasterClientList(prev => prev.map(c => {
                   if (c.id === client.id) {
                     return {
@@ -303,9 +304,14 @@ const App: React.FC = () => {
                       cnpj: fullData.cnpj,
                       companyName: fullData.nome_fantasia || fullData.razao_social || c.companyName,
                       contact: fullData.ddd_telefone_1 || c.contact,
-                      cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
-                      mainCnae: fullData.cnae_fiscal,
-                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || [],
+                      cleanAddress: hasNewAddress
+                        ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
+                        : c.cleanAddress,
+                      originalAddress: hasNewAddress
+                        ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                        : c.originalAddress,
+                      mainCnae: fullData.cnae_fiscal || c.mainCnae,
+                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || c.secondaryCnaes || [],
                       lat: fullData.latitude || c.lat,
                       lng: fullData.longitude || c.lng,
                       googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri

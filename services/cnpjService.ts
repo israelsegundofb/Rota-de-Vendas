@@ -49,17 +49,26 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
         }
 
         const data = await response.json();
+
+        // Robust address parsing
+        const street = data.address.street || "";
+        const number = data.address.number || "";
+        const district = data.address.district || "";
+        const city = data.address.city || "";
+        const state = data.address.state || "";
+        const streetType = data.address.type || "";
+
         return {
             cnpj: data.taxId,
             razao_social: data.company.name,
             nome_fantasia: data.alias || data.company.name,
-            logradouro: data.address.street,
-            numero: data.address.number,
+            logradouro: streetType ? `${streetType} ${street}` : street,
+            numero: number,
             complemento: data.address.details,
-            bairro: data.address.district,
+            bairro: district,
             cep: data.address.zip,
-            municipio: data.address.city,
-            uf: data.address.state,
+            municipio: city,
+            uf: state,
             ddd_telefone_1: data.phones?.[0] ? `(${data.phones[0].area}) ${data.phones[0].number}` : undefined,
             cnae_fiscal: (data.mainActivity || data.main_activity)?.code
                 ? `${(data.mainActivity || data.main_activity).code} - ${(data.mainActivity || data.main_activity).text}`

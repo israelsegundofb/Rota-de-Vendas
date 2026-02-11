@@ -230,6 +230,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
 
           const rawClient = {
             companyName: map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
+            cnpj: map['cnpj'] || map['taxid'] || map['inscricao'] || '',
             ownerName: map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
             phone: map['contato'] || map['telefone'] || map['celular'] || map['whatsapp'] || '',
             address: address,

@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { EnrichedClient, RawClient, Product } from "../types";
 import { cleanAddress } from "../utils/csvParser";
 import { geocodeAddress } from "./geocodingService";
+import { consultarCNPJ } from "./cnpjService";
 
 // Use batch size 1 to ensure accurate association of Maps Grounding metadata (URIs) to specific clients.
 const BATCH_SIZE = 1;
@@ -108,17 +109,27 @@ export const processClientsWithAI = async (
       return null;
     }
 
-    const rawAddress = client.address || "";
+    const id = `${salespersonId}-${Date.now()}-${index}`;
+
+    // --- PRE-ENRICHMENT WITH CNPJ ---
+    let cnpjData: any = null;
+    if (client.cnpj && client.cnpj.replace(/\D/g, '').length === 14) {
+      try {
+        cnpjData = await consultarCNPJ(client.cnpj);
+      } catch (e) {
+        console.warn(`CNPJ enrichment failed for ${client.cnpj}`, e);
+      }
+    }
+
+    const rawAddress = cnpjData?.logradouro ? `${cnpjData.logradouro}, ${cnpjData.numero}${cnpjData.complemento ? ` - ${cnpjData.complemento}` : ''}, ${cnpjData.bairro}, ${cnpjData.municipio} - ${cnpjData.uf}` : (client.address || "");
     const address = cleanAddress(rawAddress);
-    const company = client.companyName || "Empresa Desconhecida";
+    const company = cnpjData?.nome_fantasia || cnpjData?.razao_social || client.companyName || "Empresa Desconhecida";
     const owner = client.ownerName || "";
-    const contact = client.phone || "";
+    const contact = cnpjData?.ddd_telefone_1 || client.phone || "";
 
     // Extract CEP from address for region fallback
     const cepMatch = address.match(/\d{5}[-]?\d{3}/);
-    const extractedCEP = cepMatch ? cepMatch[0] : "";
-
-    const id = `${salespersonId}-${Date.now()}-${index}`;
+    const extractedCEP = cnpjData?.cep || (cepMatch ? cepMatch[0] : "");
 
     // Skip completely empty rows
     if (!address && company === "Empresa Desconhecida") {
@@ -137,7 +148,8 @@ export const processClientsWithAI = async (
       4. Classifique a empresa em uma destas opções: ${categoryListString} | "Outros".
 
       IMPORTANTE: Use o endereço "${address}" como âncora principal para a busca.
-` + `
+      ${cnpjData ? `DADO ADICIONAL: O CNPJ da empresa é ${cnpjData.cnpj}.` : ""}
+
       Retorne APENAS um objeto JSON válido com os dados encontrados:
       {
         "category": "Categoria Selecionada",
@@ -174,7 +186,7 @@ export const processClientsWithAI = async (
 
         // Parse JSON Response
         let text = response.text || "{}";
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        text = text.replace(/```json / g, '').replace(/```/g, '').trim();
 
         try {
           aiData = JSON.parse(text);
@@ -214,13 +226,13 @@ export const processClientsWithAI = async (
     // 2. GEOCODING & FINALIZATION (Runs regardless of AI success)
     try {
       // --- GEOCODING ENHANCEMENT ---
-      // Initialize with AI data OR existing client data
-      let finalLat = client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
-      let finalLng = client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
-      let finalAddress = aiData.cleanAddress || address;
-      let finalCity = aiData.city || 'Desconhecido';
-      let finalState = aiData.state || 'BR';
-      let finalRegion = aiData.region || 'Indefinido';
+      // Initialize with CNPJ data (highest priority), then AI data, then CSV data
+      let finalLat = cnpjData?.latitude || client.latitude || (typeof aiData.lat === 'number' ? aiData.lat : 0);
+      let finalLng = cnpjData?.longitude || client.longitude || (typeof aiData.lng === 'number' ? aiData.lng : 0);
+      let finalAddress = cnpjData?.logradouro ? `${cnpjData.logradouro}, ${cnpjData.numero}, ${cnpjData.municipio} - ${cnpjData.uf}` : (aiData.cleanAddress || address);
+      let finalCity = cnpjData?.municipio || aiData.city || 'Desconhecido';
+      let finalState = cnpjData?.uf || aiData.state || 'BR';
+      let finalRegion = (cnpjData?.uf ? getRegionFromState(cnpjData.uf) : null) || aiData.region || 'Indefinido';
 
       // Check if we need to force geocoding (Missing coords or (0,0))
       // We strictly trust the "Endereço Completo" (rawAddress) from the CSV as the source of truth if AI fails.
@@ -284,6 +296,9 @@ export const processClientsWithAI = async (
         contact: finalContact,
         originalAddress: rawAddress,
         cleanAddress: finalAddress,
+        cnpj: cnpjData?.cnpj || client.cnpj,
+        mainCnae: cnpjData?.cnae_fiscal,
+        secondaryCnaes: cnpjData?.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`),
         category: NormalizeCategory(aiData.category),
         region: finalRegion,
         state: finalState,

@@ -1,5 +1,6 @@
 export interface RawClient {
   companyName: string;
+  cnpj?: string; // New: optional CNPJ for data enrichment
   ownerName: string;
   phone: string;
   address: string;
