@@ -1,6 +1,6 @@
 
 import { initializeApp, FirebaseApp, getApps, getApp, deleteApp } from 'firebase/app';
-import { getFirestore, Firestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
 import { EnrichedClient, Product, AppUser } from '../types';
@@ -21,7 +21,8 @@ export const initializeFirebase = async (config?: FirebaseConfig): Promise<boole
             app = initializeApp(firebaseConfig);
         }
 
-        db = getFirestore(app);
+        // Initialize Cloud Firestore with no-persistence settings for Incognito compatibility
+        db = initializeFirestore(app, {});
         storage = getStorage(app);
         return true;
     } catch (error) {
