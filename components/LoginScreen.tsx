@@ -65,17 +65,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
       // CAPTCHA OK - Proceder com validação de credenciais
       console.log('[AUTH] CAPTCHA passed, validating credentials...');
 
-      // Buscar usuários atuais do Cloud para garantir dados frescos
+      // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
+      // Se a lista estiver vazia (race condition no modo anônimo), usamos INITIAL_USERS como última instância
       let currentUsers = users;
-      try {
-        const { loadFromCloud } = await import('../services/firebaseService');
-        const cloudData = await loadFromCloud();
-        if (cloudData && cloudData.users) {
-          console.log('[AUTH] Fetched fresh users from cloud for validation');
-          currentUsers = migrateUsers(cloudData.users);
-        }
-      } catch (e) {
-        console.warn('[AUTH] Failed to fetch fresh users, using prop users', e);
+      if (!currentUsers || currentUsers.length === 0) {
+        console.log('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
+        const { INITIAL_USERS } = await import('../hooks/useAuth');
+        currentUsers = migrateUsers(INITIAL_USERS);
       }
 
       const user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
