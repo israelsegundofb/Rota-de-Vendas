@@ -404,25 +404,29 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         </div>
                     </div>
 
-                    {/* CNAE Info (NEW) */}
-                    {(formData.mainCnae || (formData.secondaryCnaes && formData.secondaryCnaes.length > 0)) && (
-                        <div className="bg-surface-container-highest/50 p-4 rounded-2xl border border-outline-variant space-y-3">
+                    {/* CNAE Info */}
+                    <div className="bg-surface-container-highest/50 p-4 rounded-2xl border border-outline-variant space-y-4">
+                        <div className="flex items-center gap-2 pb-1 border-b border-outline-variant/30">
+                            <Briefcase className="w-4 h-4 text-primary" />
+                            <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest">Atividade Econômica (CNAE)</h3>
+                        </div>
+
+                        <div className="space-y-3">
                             <div>
-                                <label className="text-[10px] font-bold text-primary uppercase tracking-widest block mb-1">
-                                    Atividade Econômica Principal (CNAE)
+                                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
+                                    Principal
                                 </label>
                                 <p className="text-sm text-on-surface flex items-start gap-2">
-                                    <Briefcase className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
-                                    {formData.mainCnae || 'Não informado'}
+                                    {formData.mainCnae || (formData.cnpj ? 'Aguardando consulta...' : 'Não informado')}
                                 </p>
                             </div>
 
-                            {formData.secondaryCnaes && formData.secondaryCnaes.length > 0 && (
+                            {(formData.secondaryCnaes && formData.secondaryCnaes.length > 0) ? (
                                 <div>
                                     <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
-                                        Atividades Secundárias
+                                        Secundárias
                                     </label>
-                                    <ul className="space-y-1">
+                                    <ul className="space-y-1.5">
                                         {formData.secondaryCnaes.map((cnae, idx) => (
                                             <li key={idx} className="text-xs text-on-surface-variant flex items-start gap-2">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-outline-variant mt-1.5 shrink-0" />
@@ -431,9 +435,11 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                         ))}
                                     </ul>
                                 </div>
+                            ) : formData.cnpj && (
+                                <p className="text-[10px] text-on-surface-variant italic">Nenhuma atividade secundária registrada.</p>
                             )}
                         </div>
-                    )}
+                    </div>
 
                     {/* Plus Code */}
                     <div className="space-y-1 pt-2">

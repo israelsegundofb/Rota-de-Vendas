@@ -274,17 +274,40 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                     <span className="hidden sm:inline">{formData.lat !== 0 ? 'Dados Atualizados' : 'Atualizar Dados'}</span>
                                 </button>
                             </div>
-                            {formData.lat !== 0 && (
-                                <div className="space-y-1">
-                                    <p className="text-[10px] text-green-600 mt-2 ml-1 flex items-center gap-1">
-                                        <MapPin className="w-3 h-3" /> Coordenadas obtidas com sucesso via CNPJa!
-                                    </p>
-                                    {formData.mainCnae && (
-                                        <p className="text-[10px] text-primary mt-1 ml-1 flex items-start gap-1">
-                                            <Briefcase className="w-3 h-3 mt-0.5 shrink-0" />
-                                            <span className="font-bold">CNAE:</span> {formData.mainCnae}
-                                        </p>
-                                    )}
+                            {/* CNAE Info */}
+                            {(formData.cnpj.replace(/\D/g, '').length === 14) && (
+                                <div className="bg-surface-container-highest/50 p-4 rounded-2xl border border-outline-variant space-y-4 mb-6">
+                                    <div className="flex items-center gap-2 pb-1 border-b border-outline-variant/30">
+                                        <Briefcase className="w-4 h-4 text-primary" />
+                                        <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest">Atividade Econômica (CNAE)</h3>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
+                                                Principal
+                                            </label>
+                                            <p className="text-sm text-on-surface flex items-start gap-2">
+                                                {formData.mainCnae || (isSearchingCNPJ ? 'Buscando...' : 'Aguardando consulta comercial...')}
+                                            </p>
+                                        </div>
+
+                                        {(formData.secondaryCnaes && formData.secondaryCnaes.length > 0) && (
+                                            <div>
+                                                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
+                                                    Secundárias
+                                                </label>
+                                                <ul className="space-y-1.5">
+                                                    {formData.secondaryCnaes.map((cnae, idx) => (
+                                                        <li key={idx} className="text-xs text-on-surface-variant flex items-start gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-outline-variant mt-1.5 shrink-0" />
+                                                            {cnae}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
