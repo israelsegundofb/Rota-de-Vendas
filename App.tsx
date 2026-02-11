@@ -1990,10 +1990,6 @@ const App: React.FC = () => {
                                     <Database className="w-3.5 h-3.5" /> Atualizar Base (CNPJa)
                                   </button>
                                 )}
-
-                                <span className="ml-auto text-xs font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">
-                                  {filteredClients.length} resultados
-                                </span>
                               </div>
 
                               {/* Secondary Filters Row: Products */}

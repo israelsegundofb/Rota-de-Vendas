@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    AreaChart, Area, PieChart, Pie, Cell, Legend
+    LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend, BarChart, Bar
 } from 'recharts';
 import {
     TrendingUp, Users, Package, DollarSign,
     ArrowUpRight, ArrowDownRight, Globe, RefreshCcw, Activity,
-    Search, Filter, Shield, User as UserIcon, Briefcase, ShoppingBag, X
+    Search, Filter, Shield, User as UserIcon, Briefcase, ShoppingBag, X, Calendar
 } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { REGIONS } from '../utils/constants';
@@ -16,27 +16,28 @@ interface AdminDashboardProps {
     products: Product[];
     users: AppUser[];
     onClose: () => void;
-    // Filter Props
+    // Filters from App.tsx
     searchQuery: string;
-    setSearchQuery: (q: string) => void;
+    setSearchQuery: (val: string) => void;
     filterRegion: string;
-    setFilterRegion: (r: string) => void;
+    setFilterRegion: (val: string) => void;
     filterState: string;
-    setFilterState: (s: string) => void;
+    setFilterState: (val: string) => void;
     filterCity: string;
-    setFilterCity: (c: string) => void;
+    setFilterCity: (val: string) => void;
     filterCategory: string;
-    setFilterCategory: (c: string) => void;
+    setFilterCategory: (val: string) => void;
     filterSalespersonId: string;
-    setFilterSalespersonId: (id: string) => void;
+    setFilterSalespersonId: (val: string) => void;
     filterSalesCategory: string;
-    setFilterSalesCategory: (c: string) => void;
+    setFilterSalesCategory: (val: string) => void;
     filterCnae: string;
-    setFilterCnae: (c: string) => void;
+    setFilterCnae: (val: string) => void;
     startDate: string;
-    setStartDate: (d: string) => void;
+    setStartDate: (val: string) => void;
     endDate: string;
-    setEndDate: (d: string) => void;
+    setEndDate: (val: string) => void;
+    // Utils
     availableStates: string[];
     availableCities: string[];
     availableCnaes: string[];
@@ -46,7 +47,29 @@ interface AdminDashboardProps {
     canViewAllData: boolean;
 }
 
-const COLORS = ['#0061A4', '#535F70', '#6B5778', '#BA1A1A', '#9ECAFF', '#D7E3F7', '#F2DAFF'];
+const COLORS = ['#0061A4', '#006A60', '#6B5778', '#BA1A1A', '#535F70', '#56605B', '#49454F', '#000000'];
+
+const KPICard: React.FC<{ title: string; value: string | number; icon: any; trend: number; color: string }> = ({ title, value, icon: Icon, trend, color }) => (
+    <div className="bg-surface p-6 rounded-3xl shadow-elevation-1 border border-outline-variant/30 hover:shadow-elevation-2 transition-all group overflow-hidden relative">
+        <div className={`absolute top-0 right-0 w-32 h-32 ${color} opacity-[0.03] -mr-16 -mt-16 rounded-full group-hover:scale-110 transition-transform`} />
+        <div className="flex justify-between items-start relative z-10">
+            <div>
+                <p className="text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 opacity-60">{title}</p>
+                <p className="text-2xl font-black text-on-surface tracking-tight">{value}</p>
+            </div>
+            <div className={`p-3 rounded-2xl ${color}/10 ${color.replace('bg-', 'text-')}`}>
+                <Icon size={24} />
+            </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2 relative z-10">
+            <span className={`flex items-center text-xs font-black px-2 py-0.5 rounded-full ${trend >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {trend >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                {Math.abs(trend)}%
+            </span>
+            <span className="text-[10px] text-on-surface-variant opacity-40 font-bold uppercase tracking-wider">vs mês anterior</span>
+        </div>
+    </div>
+);
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
     clients, products, users, onClose,
@@ -64,40 +87,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     categories, currentUser, isAdminUser, canViewAllData
 }) => {
     const [lastUpdate] = useState(new Date());
+    const [productSortOrder, setProductSortOrder] = useState<'desc' | 'asc'>('desc');
 
     // 1. Data Processing with Memoization
     const stats = useMemo(() => {
-        let totalRevenue = 0;
-        const productSales: Record<string, { name: string, count: number, revenue: number }> = {};
-        const sellerSales: Record<string, { name: string, count: number, revenue: number }> = {};
+        const productSales: Record<string, { name: string; revenue: number; count: number }> = {};
         const categorySales: Record<string, number> = {};
         const regionalSales: Record<string, number> = {};
         const dailySales: Record<string, number> = {};
+        const sellerSales: Record<string, { name: string; revenue: number }> = {};
+        let totalRevenue = 0;
 
         clients.forEach(client => {
-            const seller = users.find(u => u.id === client.salespersonId)?.name || 'Desconhecido';
-            const region = client.region || 'Indefinido';
+            const clientTotal = client.purchases?.reduce((sum, p) => sum + p.total, 0) || 0;
+            totalRevenue += clientTotal;
 
-            (client.purchasedProducts || []).forEach(prod => {
-                const price = prod.price || 0;
-                totalRevenue += price;
+            // Region
+            const region = client.region || 'Outras';
+            regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
 
-                if (!productSales[prod.sku]) productSales[prod.sku] = { name: prod.name, count: 0, revenue: 0 };
-                productSales[prod.sku].count += 1;
-                productSales[prod.sku].revenue += price;
+            // Seller
+            const sellerName = client.vendedor_nome || 'Não Atribuído';
+            if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
+            sellerSales[sellerName].revenue += clientTotal;
 
-                if (!sellerSales[client.salespersonId]) sellerSales[client.salespersonId] = { name: seller, count: 0, revenue: 0 };
-                sellerSales[client.salespersonId].count += 1;
-                sellerSales[client.salespersonId].revenue += price;
+            client.purchases?.forEach(p => {
+                // Product count and revenue
+                if (!productSales[p.sku]) productSales[p.sku] = { name: p.name, revenue: 0, count: 0 };
+                productSales[p.sku].revenue += p.total;
+                productSales[p.sku].count += 1;
 
-                const cat = prod.category || 'Geral';
-                categorySales[cat] = (categorySales[cat] || 0) + price;
+                // Category
+                const cat = p.category || 'Outros';
+                categorySales[cat] = (categorySales[cat] || 0) + p.total;
 
-                regionalSales[region] = (regionalSales[region] || 0) + price;
-
-                if (prod.purchaseDate) {
-                    const date = prod.purchaseDate.split('T')[0];
-                    dailySales[date] = (dailySales[date] || 0) + price;
+                // Daily trend
+                if (p.date) {
+                    const date = p.date.split('T')[0];
+                    dailySales[date] = (dailySales[date] || 0) + p.total;
                 }
             });
         });
@@ -106,45 +133,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             totalRevenue,
             totalClients: clients.length,
             totalProducts: products.length,
-            topProductsData: Object.values(productSales).sort((a, b) => b.revenue - a.revenue).slice(0, 5),
+            topProductsData: Object.values(productSales)
+                .sort((a, b) => productSortOrder === 'desc' ? b.count - a.count : a.count - b.count)
+                .slice(0, 5),
             sellerPerformanceData: Object.values(sellerSales).sort((a, b) => b.revenue - a.revenue).slice(0, 6),
             categoryDistributionData: (() => {
                 const sorted = Object.entries(categorySales)
-                    .map(([name, value]) => ({ name, value }))
-                    .sort((a, b) => b.value - a.value);
+                    .sort(([, a], [, b]) => b - a);
 
-                if (sorted.length <= 8) return sorted;
+                if (sorted.length <= 8) {
+                    return sorted.map(([name, value]) => ({ name, value }));
+                }
 
-                const top8 = sorted.slice(0, 7);
-                const othersValue = sorted.slice(7).reduce((acc, curr) => acc + curr.value, 0);
+                const top7 = sorted.slice(0, 7);
+                const othersValue = sorted.slice(7).reduce((acc, [, val]) => acc + val, 0);
 
-                return [...top8, { name: 'Outros', value: othersValue }];
+                return [
+                    ...top7.map(([name, value]) => ({ name, value })),
+                    { name: 'Outros', value: othersValue }
+                ];
             })(),
             regionalSalesData: Object.entries(regionalSales).map(([name, value]) => ({ name, value })),
             salesTrendData: Object.entries(dailySales).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date))
         };
-    }, [clients, products, users]);
-
-    // UI Helper Components
-    const KPICard = ({ title, value, icon: Icon, trend, color }: any) => (
-        <div className="bg-surface-container-low p-6 rounded-2xl shadow-elevation-1 border border-outline-variant/30 flex flex-col gap-2 transition-all hover:shadow-elevation-2 hover:border-primary/20 group">
-            <div className="flex justify-between items-start">
-                <div className={`p-3 rounded-xl ${color} text-white shadow-sm transition-transform group-hover:scale-110`}>
-                    <Icon size={24} />
-                </div>
-                {trend && (
-                    <div className={`flex items-center gap-1 text-sm font-bold ${trend > 0 ? 'text-green-600' : 'text-red-600'} bg-gray-50 px-2 py-1 rounded-full border border-gray-100`}>
-                        {trend > 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                        {Math.abs(trend)}%
-                    </div>
-                )}
-            </div>
-            <div>
-                <p className="text-sm font-medium text-on-surface-variant opacity-70 uppercase tracking-wider">{title}</p>
-                <p className="text-2xl font-bold text-on-surface mt-1">{value}</p>
-            </div>
-        </div>
-    );
+    }, [clients, products, productSortOrder]);
 
     return (
         <div className="flex flex-col h-full bg-background overflow-hidden animate-in fade-in duration-500">
@@ -192,6 +204,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center gap-2 bg-secondary-container/30 px-3 py-1.5 rounded-xl border border-secondary-container/50">
                         <Filter className="w-4 h-4 text-secondary" />
                         <span className="text-xs font-bold text-secondary uppercase tracking-tight">Filtros</span>
+                    </div>
+
+                    {/* Date Picker (Period) */}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${startDate || endDate ? 'bg-primary/5 border-primary/20' : 'bg-surface-container-low border-outline-variant/50'}`}>
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span className="text-[10px] font-black text-on-surface opacity-40 uppercase">Período</span>
+                        <div className="flex items-center gap-1">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="text-[11px] bg-transparent border-none outline-none text-on-surface font-bold w-24"
+                                title="Data Inicial"
+                            />
+                            <span className="text-outline-variant">|</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="text-[11px] bg-transparent border-none outline-none text-on-surface font-bold w-24"
+                                title="Data Final"
+                            />
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -269,20 +304,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </select>
                         </div>
 
-                        {/* Segment Filters */}
+                        {/* CNAE Filter */}
                         <div className="flex items-center gap-1 bg-surface-container-low border border-outline-variant p-1 rounded-xl shadow-sm">
-                            <div className="relative">
-                                <ShoppingBag className="w-3.5 h-3.5 text-on-surface-variant/50 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                <select
-                                    value={filterCategory}
-                                    onChange={(e) => setFilterCategory(e.target.value)}
-                                    className="text-xs bg-transparent pl-7 pr-3 py-1 font-bold outline-none cursor-pointer border-r border-outline-variant/30"
-                                    title="Filtrar por Categoria"
-                                >
-                                    <option value="Todos">Categorias</option>
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
                             <div className="relative">
                                 <Briefcase className="w-3.5 h-3.5 text-on-surface-variant/50 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 <select
@@ -302,17 +325,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
             </div>
 
-            {/* Content Scroller */}
+            {/* 3. Content Scroller */}
             <div className="flex-1 overflow-y-auto p-8 space-y-10 bg-surface-container-lowest/30 custom-scrollbar">
-                {/* 3. KPI Grid */}
+                {/* 4. KPI Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <KPICard title="Faturamento Total" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={DollarSign} trend={12.5} color="bg-primary" />
                     <KPICard title="Carteira Filtrada" value={stats.totalClients} icon={Users} trend={5.2} color="bg-secondary" />
                     <KPICard title="Mix de Produtos" value={stats.totalProducts} icon={Package} trend={-2.4} color="bg-tertiary" />
-                    <KPICard title="Vendas Mensais" value="R$ 45.200" icon={Activity} trend={8.1} color="bg-primary" />
+                    <KPICard title="Vendas Registradas" value={stats.salesTrendData.length} icon={Activity} trend={8.1} color="bg-primary" />
                 </div>
 
-                {/* 4. Main Charts Row */}
+                {/* 5. Main Charts Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Sales Trend Chart */}
                     <div className="lg:col-span-2 bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30">
@@ -334,70 +357,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                             <stop offset="95%" stopColor="#0061A4" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                                    <XAxis dataKey="date" stroke="#8E9199" fontSize={11} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#8E9199" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val / 1000}k`} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
+                                    <XAxis dataKey="date" stroke="#8E9199" fontSize={11} axisLine={false} tickLine={false} />
+                                    <YAxis stroke="#8E9199" fontSize={11} axisLine={false} tickLine={false} tickFormatter={(val) => `R$ ${val / 1000}k`} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                                        formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Faturamento']}
+                                        formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Venda']}
                                     />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="value"
-                                        stroke="#0061A4"
-                                        strokeWidth={4}
-                                        fillOpacity={1}
-                                        fill="url(#colorValue)"
-                                        animationDuration={1500}
-                                        animationBegin={200}
-                                    />
+                                    <Area type="monotone" dataKey="value" stroke="#0061A4" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
                     {/* Category Distribution Chart */}
-                    <div className="bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30 overflow-hidden">
+                    <div className="bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30">
                         <h3 className="text-xl font-black text-on-surface mb-8 uppercase tracking-tighter">Mix por Categoria</h3>
-                        <div className="h-96 w-full relative">
+                        <div className="h-80 w-full relative">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
                                         data={stats.categoryDistributionData}
-                                        innerRadius={60}
-                                        outerRadius={85}
+                                        innerRadius={70}
+                                        outerRadius={95}
                                         paddingAngle={4}
                                         dataKey="value"
                                         stroke="none"
                                         animationDuration={1200}
-                                        cx="50%"
-                                        cy="40%"
                                     >
                                         {stats.categoryDistributionData.map((_entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none' }}
                                         formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Total']}
                                     />
                                     <Legend
                                         verticalAlign="bottom"
                                         layout="horizontal"
+                                        align="center"
                                         iconType="circle"
-                                        wrapperStyle={{
-                                            fontSize: '11px',
-                                            fontWeight: 'bold',
-                                            paddingTop: '20px',
-                                            maxWidth: '100%'
-                                        }}
-                                        formatter={(value) => <span className="text-on-surface-variant truncate inline-block max-w-[100px]">{value}</span>}
+                                        wrapperStyle={{ paddingTop: '20px', fontSize: '10px', height: 'auto' }}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
-                            <div className="absolute top-[32%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none">
+                            <div className="absolute inset-x-0 top-[35%] flex flex-col items-center justify-center pointer-events-none">
                                 <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest opacity-40">Liderança</span>
-                                <span className="text-sm font-black text-primary text-center px-4 line-clamp-2">
+                                <span className="text-sm font-black text-primary px-4 text-center line-clamp-2 leading-tight">
                                     {stats.categoryDistributionData[0]?.name || '...'}
                                 </span>
                             </div>
@@ -405,15 +412,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                 </div>
 
-                {/* 5. Second Row - Ranking and Regions */}
+                {/* Second Row of Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Top Products */}
+                    {/* Top Products Chart */}
                     <div className="bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30">
                         <div className="flex items-center gap-3 mb-8">
                             <div className="p-2 bg-secondary/10 rounded-xl text-secondary">
                                 <Package size={20} />
                             </div>
-                            <h3 className="text-xl font-black text-on-surface uppercase tracking-tighter">Produtos Mais Vendidos</h3>
+                            <h3 className="text-xl font-black text-on-surface uppercase tracking-tighter">
+                                {productSortOrder === 'desc' ? 'Produtos Mais Vendidos' : 'Produtos Menos Vendidos'}
+                            </h3>
+                            <div className="flex gap-1 ml-auto bg-surface-container-high p-1 rounded-lg">
+                                <button
+                                    onClick={() => setProductSortOrder('desc')}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all ${productSortOrder === 'desc' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-highest'}`}
+                                >
+                                    TOP
+                                </button>
+                                <button
+                                    onClick={() => setProductSortOrder('asc')}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all ${productSortOrder === 'asc' ? 'bg-tertiary text-on-tertiary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-highest'}`}
+                                >
+                                    BOTTOM
+                                </button>
+                            </div>
                         </div>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
@@ -421,10 +444,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F0F0F0" />
                                     <XAxis type="number" hide />
                                     <YAxis dataKey="name" type="category" stroke="#8E9199" fontSize={10} width={120} axisLine={false} tickLine={false} />
-                                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.03)' }} contentStyle={{ borderRadius: '12px' }} />
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(0,0,0,0.03)' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                        formatter={(val: number) => [val, 'Qtd Vendida']}
+                                    />
                                     <Bar
-                                        dataKey="revenue"
-                                        fill="#535F70"
+                                        dataKey="count"
+                                        fill={productSortOrder === 'desc' ? '#535F70' : '#BA1A1A'}
                                         radius={[0, 8, 8, 0]}
                                         barSize={24}
                                         animationDuration={1000}
@@ -437,10 +464,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {/* Regional Performance */}
                     <div className="bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30">
                         <div className="flex items-center gap-3 mb-8">
-                            <div className="p-2 bg-tertiary/10 rounded-xl text-tertiary">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
                                 <Globe size={20} />
                             </div>
-                            <h3 className="text-xl font-black text-on-surface uppercase tracking-tighter">Análise Regional</h3>
+                            <h3 className="text-xl font-black text-on-surface uppercase tracking-tighter">Desempenho Regional</h3>
                         </div>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
