@@ -35,6 +35,7 @@ import AdminFileManager from './components/AdminFileManager';
 import GoogleMapsKeyModal from './components/GoogleMapsKeyModal';
 import CNPJaKeyModal from './components/CNPJaKeyModal';
 import LoadingScreen from './components/LoadingScreen';
+import AdminDashboard from './components/AdminDashboard';
 import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
@@ -126,7 +127,7 @@ const App: React.FC = () => {
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
-  const [activeView, setActiveView] = useState<'map' | 'table' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files'>('map');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
@@ -1278,6 +1279,20 @@ const App: React.FC = () => {
                 <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
                 Mapa da Carteira
               </button>
+
+              {isAdminUser && (
+                <button
+                  onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
+                  Dashboard Admin
+                </button>
+              )}
+
               <button
                 onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
@@ -1433,8 +1448,9 @@ const App: React.FC = () => {
               <span className="font-semibold text-blue-600">
                 {activeView === 'map' ? 'Mapa da Carteira' :
                   activeView === 'table' ? 'Listagem de Clientes' :
-                    activeView === 'admin_categories' ? 'Categorias de Clientes' :
-                      activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
+                    activeView === 'dashboard' ? 'Dashboard Administrativo' :
+                      activeView === 'admin_categories' ? 'Categorias de Clientes' :
+                        activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
               </span>
             </div>
             <div className="flex items-center gap-6">
@@ -1495,6 +1511,15 @@ const App: React.FC = () => {
                   onDeleteFile={handleDeleteFile}
                   onReassignSalesperson={handleReassignFileSalesperson}
                   procState={procState}
+                />
+              </div>
+            ) : activeView === 'dashboard' && isAdminUser ? (
+              <div className="flex-1 overflow-hidden bg-surface">
+                <AdminDashboard
+                  clients={filteredClients}
+                  products={products}
+                  users={users}
+                  onClose={() => setActiveView('map')}
                 />
               </div>
             ) : (
