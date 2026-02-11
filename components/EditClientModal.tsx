@@ -78,6 +78,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         : prev.cleanAddress,
                     city: fullData.municipio || prev.city,
                     state: fullData.uf || prev.state,
+                    district: fullData.bairro || prev.district,
                     region: fullData.uf ? getRegionByUF(fullData.uf) : prev.region,
                     lat: fullData.latitude || prev.lat,
                     lng: fullData.longitude || prev.lng,
@@ -297,6 +298,20 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 </select>
                                 <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
                             </div>
+                        </div>
+
+                        {/* Bairro */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-on-surface-variant ml-1 font-bold">Bairro</label>
+                            <input
+                                type="text"
+                                name="district"
+                                value={formData.district || ''}
+                                onChange={handleChange}
+                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary outline-none transition-all"
+                                title="Bairro"
+                                placeholder="Bairro"
+                            />
                         </div>
 
                         {/* Cidade & Estado (Compact) */}

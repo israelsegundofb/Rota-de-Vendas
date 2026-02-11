@@ -479,17 +479,34 @@ const App: React.FC = () => {
   };
 
   const handleUpdateClient = async (updatedClient: EnrichedClient) => {
-    // Check if address or plusCode changed to re-geocode
     const original = masterClientList.find(c => c.id === updatedClient.id);
     let finalClient = { ...updatedClient };
 
     const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
+    const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
     const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
 
-    if (addressChanged || plusCodeChanged || coordinatesMissing) {
+    // Se as coordenadas foram explicitamente alteradas (ex: via consulta CNPJ ou edição manual)
+    // nós confiamos nelas e pulamos a re-geocodificação automática via string de endereço.
+    const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+
+    if (!hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing)) {
+      // Monta uma string de busca mais robusta conforme sugerido pelo usuário:
+      // Logradouro, Bairro, Estado, CEP, Região, País
+      const detailedAddress = [
+        updatedClient.cleanAddress, // Geralmente contém Rua e Número
+        updatedClient.district,
+        updatedClient.city,
+        updatedClient.state,
+        updatedClient.zip,
+        updatedClient.region,
+        updatedClient.country || 'Brasil'
+      ].filter(Boolean).join(', ');
+
       const geoResult = await geocodeWithFallback([
         updatedClient.plusCode,
+        detailedAddress,
         updatedClient.cleanAddress,
         updatedClient.originalAddress
       ]);
@@ -499,14 +516,14 @@ const App: React.FC = () => {
         finalClient.lng = geoResult.lng;
         if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
 
-        // Auto-generate Plus Code if missing
+        // Auto-gera Plus Code se estiver faltando
         if (!finalClient.plusCode) {
           const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
           if (plusCode) finalClient.plusCode = plusCode;
         }
       }
     } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
-      // Coordinates exist but Plus Code is missing (e.g. manual edit with just coords)
+      // Coordenadas existem mas Plus Code falta
       const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
       if (plusCode) finalClient.plusCode = plusCode;
     }

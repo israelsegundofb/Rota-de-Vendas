@@ -45,6 +45,7 @@ export interface EnrichedClient {
   region: 'Norte' | 'Nordeste' | 'Centro-Oeste' | 'Sudeste' | 'Sul' | 'Indefinido';
   state: string;
   city: string;
+  district?: string;
   zip?: string;
   country?: string;
   lat: number;

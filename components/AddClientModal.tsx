@@ -30,6 +30,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
         region: 'Nordeste',
         state: 'CE',
         city: 'Fortaleza',
+        district: '',
         originalAddress: '',
         cleanAddress: '',
         plusCode: '',
@@ -60,6 +61,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 region: 'Nordeste',
                 state: 'CE',
                 city: 'Fortaleza',
+                district: '',
                 originalAddress: '',
                 cleanAddress: '',
                 plusCode: '',
@@ -135,6 +137,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                         : prev.originalAddress,
                     city: data.municipio || prev.city,
                     state: data.uf || prev.state,
+                    district: data.bairro || prev.district,
                     region: data.uf ? getRegionByUF(data.uf) : prev.region,
                     contact: data.ddd_telefone_1 || prev.contact,
                     whatsapp: data.ddd_telefone_1 || prev.whatsapp, // Fallback to phone as whatsapp if found
@@ -403,6 +406,22 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                                     </select>
                                     <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
                                 </div>
+                            </div>
+
+                            {/* District (Bairro) */}
+                            <div>
+                                <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">
+                                    Bairro *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.district || ''}
+                                    onChange={e => handleChange('district', e.target.value)}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
+                                    placeholder="Ex: Aldeota"
+                                    title="Bairro"
+                                />
                             </div>
 
                             {/* City */}
