@@ -55,19 +55,26 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
     const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
     const [isDataLoaded, setIsDataLoaded] = useState(false);
+    const [loadingProgress, setLoadingProgress] = useState(0);
+    const [loadingMessage, setLoadingMessage] = useState('Iniciando sistema...');
 
     // Initialize Data
     useEffect(() => {
         const initData = async () => {
             // 1. Try to init Firebase
+            setLoadingMessage('Conectando ao Firebase...');
+            setLoadingProgress(10);
             const connected = await initializeFirebase();
             setIsFirebaseConnected(connected);
+            setLoadingProgress(25);
 
             // 2. If connected, try to load from cloud
             if (connected) {
-                console.log("Loading data from Cloud...");
+                setLoadingMessage('Buscando dados na nuvem...');
+                setLoadingProgress(40);
                 try {
                     const cloudData = await loadFromCloud();
+                    setLoadingProgress(60);
 
                     if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
                         console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
@@ -80,7 +87,9 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         }
                         if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
 
-                        setIsDataLoaded(true);
+                        setLoadingMessage('Finalizando sincronização...');
+                        setLoadingProgress(100);
+                        setTimeout(() => setIsDataLoaded(true), 500);
                         return;
                     } else {
                         // Cloud is empty - migrate localStorage or use defaults
@@ -112,7 +121,9 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                             loadInitialFiles()
                         );
 
-                        setIsDataLoaded(true);
+                        setLoadingMessage('Migração concluída!');
+                        setLoadingProgress(100);
+                        setTimeout(() => setIsDataLoaded(true), 500);
                         return;
                     }
                 } catch (e) {
@@ -133,7 +144,9 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                 setUsers(migrateUsers(INITIAL_USERS));
             }
 
-            setIsDataLoaded(true);
+            setLoadingMessage('Carregado localmente');
+            setLoadingProgress(100);
+            setTimeout(() => setIsDataLoaded(true), 500);
         };
 
         initData();
@@ -167,6 +180,8 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         uploadedFiles,
         setUploadedFiles,
         isFirebaseConnected,
-        isDataLoaded
+        isDataLoaded,
+        loadingProgress,
+        loadingMessage
     };
 };

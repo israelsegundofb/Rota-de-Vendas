@@ -30,6 +30,7 @@ import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
 import AdminFileManager from './components/AdminFileManager';
 import GoogleMapsKeyModal from './components/GoogleMapsKeyModal';
+import LoadingScreen from './components/LoadingScreen';
 import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
@@ -66,7 +67,8 @@ const App: React.FC = () => {
     products, setProducts,
     categories, setCategories,
     uploadedFiles, setUploadedFiles,
-    isFirebaseConnected, isDataLoaded
+    isFirebaseConnected, isDataLoaded,
+    loadingProgress, loadingMessage
   } = useDataPersistence(users, setUsers);
 
   const {
@@ -951,6 +953,10 @@ const App: React.FC = () => {
   const isAdminUser = isAdmin(currentUser.role);
   const canViewAllData = hasFullDataVisibility(currentUser.role);
   const isProductFilterActive = filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || searchProductQuery !== '';
+
+  if (!isDataLoaded) {
+    return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
+  }
 
   return (
     <GoogleReCaptchaProvider
