@@ -1754,7 +1754,7 @@ const App: React.FC = () => {
                         <option value="Todos">Todos Produtos</option>
                         {products
                           .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                           .map(p => (
                             <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
                           ))
@@ -2069,7 +2069,7 @@ const App: React.FC = () => {
                                     <option value="Todos">Todos Produtos</option>
                                     {products
                                       .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                                      .sort((a, b) => a.name.localeCompare(b.name))
+                                      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                       .map(p => (
                                         <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
                                       ))

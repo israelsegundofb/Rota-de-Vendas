@@ -39,7 +39,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
         });
 
         // Ordenar por data (mais recente primeiro)
-        return records.sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
+        return records.sort((a, b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || ''));
     }, [clients, startDate, endDate]);
 
     const stats = useMemo(() => {
