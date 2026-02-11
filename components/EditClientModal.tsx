@@ -11,9 +11,10 @@ interface EditClientModalProps {
     onSave: (updatedClient: EnrichedClient) => void;
     users?: AppUser[];
     uploadedFiles?: UploadedFile[];
+    onCNPJAuthError?: () => void;
 }
 
-const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [] }) => {
+const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError }) => {
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
         cnpj: client.cnpj || '',
@@ -133,10 +134,18 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 setRefreshStatus('error');
                 alert('CNPJ não encontrado na base de dados.');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
             setRefreshStatus('error');
-            alert('Erro ao consultar CNPJ. Verifique sua chave de API.');
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+                if (onCNPJAuthError) {
+                    onCNPJAuthError();
+                } else {
+                    alert('Chave de API CNPJa inválida ou expirada. Configure-a nas opções do sistema.');
+                }
+            } else {
+                alert('Erro ao consultar CNPJ. Verifique sua chave de API.');
+            }
         } finally {
             setIsRefreshingByCNPJ(false);
         }

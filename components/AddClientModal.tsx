@@ -6,6 +6,8 @@ import { consultarCNPJ, pesquisarEmpresaPorEndereco } from '../services/cnpjServ
 
 interface AddClientModalProps {
     isOpen: boolean;
+    isFirebaseConnected?: boolean;
+    onCNPJAuthError?: () => void;
     onClose: () => void;
     onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'> & { lat?: number; lng?: number }) => void;
     salespersonId: string;
@@ -13,7 +15,9 @@ interface AddClientModalProps {
     users?: AppUser[];
 }
 
-const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd, salespersonId, ownerName, users = [] }) => {
+const AddClientModal: React.FC<AddClientModalProps> = ({
+    isOpen, onClose, onAdd, salespersonId, ownerName, users = [], isFirebaseConnected = false, onCNPJAuthError
+}) => {
     const [selectedSalespersonId, setSelectedSalespersonId] = useState(salespersonId);
     // State for form
     const [formData, setFormData] = useState({
@@ -176,7 +180,15 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 }));
             }
         } catch (err: any) {
-            setError(err.message || 'Erro ao consultar CNPJ. Verifique a chave da API.');
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+                if (onCNPJAuthError) {
+                    onCNPJAuthError();
+                } else {
+                    setError('Chave de API CNPJa inválida ou expirada. Configure-a nas opções do sistema.');
+                }
+            } else {
+                setError(err.message || 'Erro ao consultar CNPJ. Verifique a chave da API.');
+            }
         } finally {
             setIsSearchingCNPJ(false);
         }

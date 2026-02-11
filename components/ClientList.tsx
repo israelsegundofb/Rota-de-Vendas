@@ -19,6 +19,7 @@ interface ClientListProps {
   users?: AppUser[];
   uploadedFiles?: UploadedFile[];
   onGeneratePlusCodes?: () => void;
+  onCNPJAuthError?: () => void;
 }
 
 const ClientList: React.FC<ClientListProps> = ({
@@ -32,7 +33,8 @@ const ClientList: React.FC<ClientListProps> = ({
   productCategories = [],
   users = [],
   uploadedFiles = [],
-  onGeneratePlusCodes
+  onGeneratePlusCodes,
+  onCNPJAuthError
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('Todos');
@@ -422,31 +424,25 @@ const ClientList: React.FC<ClientListProps> = ({
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
             client={selectedClient}
-            onSave={(updated) => {
-              onUpdateClient(updated);
-              setIsEditModalOpen(false);
-            }}
+            onSave={onUpdateClient}
             users={users}
             uploadedFiles={uploadedFiles}
+            onCNPJAuthError={onCNPJAuthError}
           />
         )
       }
 
-      {
-        isAddModalOpen && onAddClient && (
-          <AddClientModal
-            isOpen={isAddModalOpen}
-            onClose={() => setIsAddModalOpen(false)}
-            onAdd={(newClient) => {
-              onAddClient(newClient);
-              setIsAddModalOpen(false);
-            }}
-            salespersonId={currentUserId || ''}
-            ownerName={currentUserName || ''}
-            users={users}
-          />
-        )
-      }
+      {isAddModalOpen && currentUserId && (
+        <AddClientModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={onAddClient || (() => { })}
+          salespersonId={currentUserId}
+          ownerName={currentUserName || ''}
+          users={users}
+          onCNPJAuthError={onCNPJAuthError}
+        />
+      )}
 
       {/* Product Assignment Modal */}
       <ClientProductAssignmentModal

@@ -19,7 +19,10 @@ export interface CNPJResponse {
     longitude?: number;
 }
 
-const API_KEY = import.meta.env.VITE_CNPJA_API_KEY;
+const getApiKey = () => {
+    return localStorage.getItem('cnpja_api_key') || import.meta.env.VITE_CNPJA_API_KEY || '';
+};
+
 const BASE_URL = 'https://api.cnpja.com';
 
 /**
@@ -36,7 +39,7 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
         // Na API Comercial, o endpoint é /office/:taxId
         // Adicionamos geocoding=true para obter lat/lng nativamente
         const response = await fetch(`${BASE_URL}/office/${cleanCNPJ}?geocoding=true`, {
-            headers: { 'Authorization': API_KEY }
+            headers: { 'Authorization': getApiKey() }
         });
 
         if (!response.ok) {
@@ -79,7 +82,8 @@ export const pesquisarEmpresaPorEndereco = async (params: {
     filtros: string; // Ex: "Rua X, Bairro Y, Cidade Z"
     uf?: string;
 }): Promise<any[]> => {
-    if (!API_KEY || API_KEY === 'SUA_CHAVE_AQUI') {
+    const apiKey = getApiKey();
+    if (!apiKey || apiKey === 'SUA_CHAVE_AQUI') {
         console.warn("Chave de API CNPJa não configurada.");
         return [];
     }
@@ -93,7 +97,7 @@ export const pesquisarEmpresaPorEndereco = async (params: {
         });
 
         const response = await fetch(`${BASE_URL}/office?${query}`, {
-            headers: { 'Authorization': API_KEY }
+            headers: { 'Authorization': getApiKey() }
         });
 
         if (!response.ok) return [];

@@ -32,6 +32,7 @@ import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
 import AdminFileManager from './components/AdminFileManager';
 import GoogleMapsKeyModal from './components/GoogleMapsKeyModal';
+import CNPJaKeyModal from './components/CNPJaKeyModal';
 import LoadingScreen from './components/LoadingScreen';
 import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
@@ -129,6 +130,7 @@ const App: React.FC = () => {
   // isFirebaseConnected handled by hook
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
+  const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
   // Custom Dialog State
@@ -314,9 +316,16 @@ const App: React.FC = () => {
                 updatedCount++;
               }
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
             errorCount++;
+
+            // Check for 401 specifically to stop the whole process if the key is invalid
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+              isUploadCancelled.current = true;
+              setProcState(prev => ({ ...prev, status: 'error', errorMessage: 'Autenticação CNPJa falhou. Chave inválida ou expirada.' }));
+              setIsCNPJaModalOpen(true);
+            }
           } finally {
             setProcState(prev => ({ ...prev, current: index + 1 }));
           }
@@ -655,6 +664,12 @@ const App: React.FC = () => {
       const firstSeller = users.find(u => isSalesTeam(u.role));
       if (firstSeller) setTargetUploadUserId(firstSeller.id);
     }
+  };
+
+  const handleConfirmCNPJaKey = (key: string) => {
+    localStorage.setItem('cnpja_api_key', key);
+    setIsCNPJaModalOpen(false);
+    showAlert("Sucesso", "Chave CNPJa atualizada! Tente realizar a consulta novamente.", "success");
   };
 
   const handleLogout = () => {
@@ -1315,6 +1330,12 @@ const App: React.FC = () => {
             suggestedKey={SUGGESTED_MAP_KEY}
           />
 
+          <CNPJaKeyModal
+            isOpen={isCNPJaModalOpen}
+            onClose={() => setIsCNPJaModalOpen(false)}
+            onConfirm={handleConfirmCNPJaKey}
+          />
+
           <CookieConsent
             onAccept={() => {
               console.log("Cookie consent accepted. Storage enabled.");
@@ -1932,6 +1953,7 @@ const App: React.FC = () => {
                           users={users}
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
+                          onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
                         />
                       )}
                     </div>
