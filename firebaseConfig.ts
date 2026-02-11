@@ -17,9 +17,7 @@ export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
     const stored = localStorage.getItem('firebase_config');
     if (stored) return JSON.parse(stored);
 
-    // Default Firebase Config with hardcoded fallbacks
-    // Firebase client config is public/safe to hardcode (same as Google Maps key in HTML)
-    return {
+    const config = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
@@ -27,6 +25,13 @@ export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
         messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
         appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
     };
+
+    // Debug: Verificar presença das chaves (apenas primeiros caracteres)
+    console.log('[FIREBASE] Environment Config Check:');
+    console.log('- API Key:', config.apiKey ? `FOUND (${config.apiKey.substring(0, 5)}...)` : 'MISSING ❌');
+    console.log('- Project ID:', config.projectId ? `FOUND (${config.projectId})` : 'MISSING ❌');
+
+    return config;
 };
 
 export const saveFirebaseConfig = (config: FirebaseConfig) => {
