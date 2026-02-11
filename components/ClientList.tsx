@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isAdmin, isSalesTeam } from '../utils/authUtils';
-import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag } from 'lucide-react';
+import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag, Briefcase } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
 import ClientProductAssignmentModal from './ClientProductAssignmentModal';
@@ -65,7 +65,7 @@ const ClientList: React.FC<ClientListProps> = ({
 
   const handleExportCSV = () => {
     const headers = [
-      'ID', 'Razão Social', 'Proprietário', 'Contato', 'Endereço', 'Cidade', 'UF', 'Região', 'Segmento', 'Produtos Comprados', 'Link Maps'
+      'ID', 'Razão Social', 'Proprietário', 'Contato', 'Endereço', 'Cidade', 'UF', 'Região', 'Segmento', 'CNAE', 'Produtos Comprados', 'Link Maps'
     ];
 
     const rows = filteredClients.map(client => [
@@ -78,6 +78,7 @@ const ClientList: React.FC<ClientListProps> = ({
       client.state,
       client.region,
       client.category.join('; '),
+      client.mainCnae || '',
       client.purchasedProducts ? client.purchasedProducts.map(p => p.sku).join('; ') : '',
       client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`
     ]);
@@ -146,9 +147,17 @@ const ClientList: React.FC<ClientListProps> = ({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-on-surface truncate pr-2" title={client.companyName}>{client.companyName}</h3>
-            <div className="flex items-center gap-1 text-xs text-on-surface-variant mt-0.5">
-              <Tag className="w-3 h-3" />
-              <span className="truncate">{client.category.join(', ')}</span>
+            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-1 text-xs text-on-surface-variant">
+                <Tag className="w-3 h-3" />
+                <span className="truncate">{client.category.join(', ')}</span>
+              </div>
+              {client.mainCnae && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-700 border border-purple-100 truncate max-w-[150px]" title={client.mainCnae}>
+                  <Briefcase className="w-2.5 h-2.5 mr-1" />
+                  {client.mainCnae}
+                </span>
+              )}
             </div>
 
             {/* PRODUCT STATS */}
@@ -233,6 +242,11 @@ const ClientList: React.FC<ClientListProps> = ({
         <div>
           <h3 className="font-bold text-gray-900">{client.companyName}</h3>
           <p className="text-xs text-gray-500">{client.category.join(', ')}</p>
+          {client.mainCnae && (
+            <p className="text-[10px] text-purple-600 font-medium flex items-center gap-1 mt-0.5">
+              <Briefcase className="w-3 h-3" /> {client.mainCnae}
+            </p>
+          )}
 
           {/* BADGE DE PRODUTOS MOBILE */}
           {client.purchasedProducts && client.purchasedProducts.length > 0 && (

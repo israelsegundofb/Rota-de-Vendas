@@ -1452,6 +1452,7 @@ const App: React.FC = () => {
                       onChange={(e) => setFilterCity(e.target.value)}
                       className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5 min-w-[100px]"
                       disabled={filterState === 'Todos' || availableCities.length === 0}
+                      title="Filtrar por cidade"
                     >
                       <option value="Todas">Todas Cidades</option>
                       {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1463,9 +1464,25 @@ const App: React.FC = () => {
                         value={filterCategory}
                         onChange={(e) => setFilterCategory(e.target.value)}
                         className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5"
+                        title="Filtrar por categoria de cliente"
                       >
                         <option value="Todos">Todas Cat. Clientes</option>
                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1 relative">
+                      <Briefcase className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
+                      <select
+                        value={filterCnae}
+                        onChange={(e) => setFilterCnae(e.target.value)}
+                        className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5 max-w-[200px]"
+                        title="Filtrar por CNAE (Atividade Econômica)"
+                      >
+                        <option value="Todos">Todos CNAEs</option>
+                        {availableCnaes.map(c => (
+                          <option key={c} value={c}>{c.length > 40 ? c.substring(0, 40) + '...' : c}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -1481,6 +1498,7 @@ const App: React.FC = () => {
                       value={filterProductCategory}
                       onChange={e => setFilterProductCategory(e.target.value)}
                       className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                      title="Filtrar por marca ou categoria de produto"
                     >
                       <option value="Todos">Todas Marcas / Categorias</option>
                       {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -1587,6 +1605,16 @@ const App: React.FC = () => {
                       >
                         Mostrar Todos
                       </button>
+
+                      {isAdminUser && (
+                        <button
+                          onClick={handleMassUpdateClients}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all text-[10px] font-bold uppercase tracking-wider ml-2"
+                          title="Enriquecer toda a base com dados da Receita Federal via CNPJa Comercial"
+                        >
+                          <Database className="w-3 h-3" /> Atualizar Base (CNPJa)
+                        </button>
+                      )}
                     </div>
 
                     {isProductFilterActive && (

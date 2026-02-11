@@ -61,9 +61,10 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         setSearchStatus('searching');
 
         try {
-            // 1. Pesquisa básica pelo endereço
+            // 1. Pesquisa básica pelo endereço + Nome (se houver) para maior precisão
+            const searchTerms = [formData.companyName, formData.cleanAddress].filter(Boolean).join(', ');
             const results = await pesquisarEmpresaPorEndereco({
-                filtros: formData.cleanAddress,
+                filtros: searchTerms,
                 uf: formData.state
             });
 

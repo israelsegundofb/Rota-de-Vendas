@@ -652,6 +652,13 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                       <Tag className="w-3 h-3 mr-1" />
                       {selectedClient.category.join(', ')}
                     </span>
+
+                    {selectedClient.mainCnae && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-700 border border-purple-100 ml-1 truncate max-w-[120px]" title={selectedClient.mainCnae}>
+                        {selectedClient.mainCnae}
+                      </span>
+                    )}
+
                     <a
                       href={selectedClient.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`}
                       target="_blank"

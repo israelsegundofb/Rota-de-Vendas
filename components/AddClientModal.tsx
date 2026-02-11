@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EnrichedClient, AppUser } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase } from 'lucide-react';
-import { consultarCNPJ } from '../services/cnpjService';
+import { consultarCNPJ, pesquisarEmpresaPorEndereco } from '../services/cnpjService';
 
 interface AddClientModalProps {
     isOpen: boolean;
@@ -102,6 +102,50 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 return { ...prev, category: [...current, cat] };
             }
         });
+    };
+
+    const handleNameSearch = async () => {
+        if (!formData.companyName || formData.companyName.length < 3) {
+            setError('Por favor, informe ao menos 3 letras da Razão Social.');
+            return;
+        }
+
+        setIsSearchingCNPJ(true);
+        setError('');
+
+        try {
+            const results = await pesquisarEmpresaPorEndereco({
+                filtros: formData.companyName,
+                uf: formData.state
+            });
+
+            if (results && results.length > 0) {
+                const candidate = results[0];
+                const fullData = await consultarCNPJ(candidate.taxId);
+                if (fullData) {
+                    setFormData(prev => ({
+                        ...prev,
+                        cnpj: fullData.cnpj,
+                        companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
+                        originalAddress: `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}`,
+                        city: fullData.municipio,
+                        state: fullData.uf,
+                        region: getRegionByUF(fullData.uf),
+                        lat: fullData.latitude || 0,
+                        lng: fullData.longitude || 0,
+                        cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
+                        mainCnae: fullData.cnae_fiscal,
+                        secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || []
+                    }));
+                }
+            } else {
+                setError('Nenhum resultado encontrado para este nome nesta região.');
+            }
+        } catch (err: any) {
+            setError('Erro na busca. Verifique sua conexão ou chave de API.');
+        } finally {
+            setIsSearchingCNPJ(false);
+        }
     };
 
     const handleCNPJLookup = async () => {
@@ -250,14 +294,25 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                 <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">
                                     Razão Social *
                                 </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.companyName}
-                                    onChange={e => handleChange('companyName', e.target.value)}
-                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
-                                    placeholder="Nome do estabelecimento"
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.companyName}
+                                        onChange={e => handleChange('companyName', e.target.value)}
+                                        className="flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
+                                        placeholder="Nome do estabelecimento"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleNameSearch}
+                                        disabled={isSearchingCNPJ}
+                                        className="px-3 bg-primary/10 text-primary rounded-xl hover:bg-primary/20 transition-colors shrink-0"
+                                        title="Buscar CNPJ por este nome"
+                                    >
+                                        <Search className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Owner Name */}
