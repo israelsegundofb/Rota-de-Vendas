@@ -109,5 +109,7 @@ jobs:
           gcloud run deploy rota-de-vendas-ga \
             --source . \
             --region southamerica-east1 \
+            --project gen-lang-client-0586123917 \
+            --quiet \
             --allow-unauthenticated \
             --set-build-env-vars VITE_GOOGLE_API_KEY="${{ secrets.GOOGLE_MAPS_API_KEY }}",VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}",VITE_FIREBASE_PROJECT_ID="gen-lang-client-0586123917",VITE_RECAPTCHA_SITE_KEY="${{ secrets.VITE_RECAPTCHA_SITE_KEY }}"
