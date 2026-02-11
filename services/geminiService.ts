@@ -186,7 +186,7 @@ export const processClientsWithAI = async (
 
         // Parse JSON Response
         let text = response.text || "{}";
-        text = text.replace(/```json / g, '').replace(/```/g, '').trim();
+        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         try {
           aiData = JSON.parse(text);
