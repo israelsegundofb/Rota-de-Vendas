@@ -274,7 +274,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
   });
 };
 
-export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: string; sku: string; productName: string; purchaseDate: string }[]> => {
+export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: string; cnpj: string; sku: string; productName: string; purchaseDate: string }[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -282,7 +282,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
       encoding: "UTF-8",
       complete: (results) => {
         const data = results.data as any[];
-        const records: { companyName: string; sku: string; productName: string; purchaseDate: string }[] = [];
+        const records: { companyName: string; cnpj: string; sku: string; productName: string; purchaseDate: string }[] = [];
 
         data.forEach((row) => {
           const normalizedRow: Record<string, any> = {};
@@ -291,6 +291,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
           });
 
           const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['empresa'] || '';
+          const cnpj = normalizedRow['cnpj'] || normalizedRow['cpf/cnpj'] || normalizedRow['cpf'] || '';
           const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || '';
           const productName = normalizedRow['nome do produto'] || normalizedRow['produto'] || normalizedRow['descricao'] || '';
           const purchaseDate = normalizedRow['data da compra'] || normalizedRow['data'] || normalizedRow['emissao'] || '';
@@ -298,6 +299,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
           if (companyName && (sku || productName)) {
             records.push({
               companyName: String(companyName).trim(),
+              cnpj: String(cnpj).trim().replace(/[.\-\/]/g, ""),
               sku: String(sku).trim(),
               productName: String(productName).trim(),
               purchaseDate: String(purchaseDate).trim()

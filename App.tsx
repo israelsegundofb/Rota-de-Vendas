@@ -977,28 +977,44 @@ const App: React.FC = () => {
 
       // Group by client
       const groupedByClient = records.reduce((acc, rec) => {
-        const name = (rec.companyName || '').toLowerCase().trim();
-        if (!acc[name]) acc[name] = [];
-        acc[name].push(rec);
+        // Use normalized CNPJ if available, otherwise normalized name as group key
+        const key = rec.cnpj ? rec.cnpj : (rec.companyName || '').toLowerCase().trim();
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(rec);
         return acc;
       }, {} as Record<string, typeof records>);
 
-      const clientNamesInFile = Object.keys(groupedByClient);
+      const clientKeysInFile = Object.keys(groupedByClient);
 
-      setProcState(prev => ({ ...prev, total: clientNamesInFile.length, status: 'processing' }));
+      setProcState(prev => ({ ...prev, total: clientKeysInFile.length, status: 'processing' }));
 
       let updatedCount = 0;
       setMasterClientList(prevList => {
         const newList = [...prevList];
-        clientNamesInFile.forEach((clientName, index) => {
+        clientKeysInFile.forEach((key, index) => {
           setProcState(prev => ({ ...prev, current: index + 1 }));
 
-          // Find client index
-          const clientIdx = newList.findIndex(c => (c.companyName || '').toLowerCase().trim() === clientName);
+          const clientPurchases = groupedByClient[key];
+          const firstRec = clientPurchases[0];
+
+          // Find client index: Prioritize CNPJ match, fallback to Name match
+          let clientIdx = -1;
+
+          if (firstRec.cnpj) {
+            clientIdx = newList.findIndex(c => {
+              const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-\/]/g, "");
+              return cleanSystemCnpj === firstRec.cnpj;
+            });
+          }
+
+          if (clientIdx === -1) {
+            const normalizedFileName = (firstRec.companyName || '').toLowerCase().trim();
+            clientIdx = newList.findIndex(c => (c.companyName || '').toLowerCase().trim() === normalizedFileName);
+          }
 
           if (clientIdx !== -1) {
             updatedCount++;
-            const clientPurchases = groupedByClient[clientName];
+            const clientPurchases = groupedByClient[key];
 
             // Map CSV records to Product objects
             const newPurchasedProducts: Product[] = clientPurchases.map(rec => {
