@@ -61,12 +61,17 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
             municipio: data.address.city,
             uf: data.address.state,
             ddd_telefone_1: data.phones?.[0] ? `(${data.phones[0].area}) ${data.phones[0].number}` : undefined,
-            cnae_fiscal: data.mainActivity?.code ? `${data.mainActivity.code} - ${data.mainActivity.text}` : data.mainActivity?.text,
-            cnae_descricao: data.mainActivity?.text,
-            cnaes_secundarios: data.sideActivities?.map((a: any) => ({ codigo: a.code, texto: a.text })),
-            situacao_cadastral: data.registration?.status?.description,
-            latitude: data.address.coordinates?.latitude,
-            longitude: data.address.coordinates?.longitude
+            cnae_fiscal: (data.mainActivity || data.main_activity)?.code
+                ? `${(data.mainActivity || data.main_activity).code} - ${(data.mainActivity || data.main_activity).text}`
+                : (data.mainActivity || data.main_activity)?.text,
+            cnae_descricao: (data.mainActivity || data.main_activity)?.text,
+            cnaes_secundarios: (data.sideActivities || data.side_activities || data.secondary_activities)?.map((a: any) => ({
+                codigo: a.code,
+                texto: a.text
+            })),
+            situacao_cadastral: data.registration?.status?.description || data.registration?.status,
+            latitude: data.address.coordinates?.latitude || data.latitude,
+            longitude: data.address.coordinates?.longitude || data.longitude
         };
     } catch (error) {
         console.error("Erro na consulta CNPJa Comercial:", error);
@@ -126,7 +131,13 @@ const fallbackBrasilAPI = async (cnpj: string): Promise<CNPJResponse | null> => 
             cep: data.cep,
             municipio: data.municipio,
             uf: data.uf,
-            ddd_telefone_1: data.ddd_telefone_1
+            ddd_telefone_1: data.ddd_telefone_1,
+            cnae_fiscal: data.cnae_fiscal ? `${data.cnae_fiscal} - ${data.cnae_fiscal_descricao}` : data.cnae_fiscal_descricao,
+            cnae_descricao: data.cnae_fiscal_descricao,
+            cnaes_secundarios: data.cnaes_secundarios?.map((s: any) => ({
+                codigo: s.codigo,
+                texto: s.descricao
+            }))
         };
     } catch {
         return null;
