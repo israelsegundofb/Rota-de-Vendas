@@ -28,7 +28,10 @@ export interface EnrichedClient {
   contact: string;
   originalAddress: string;
   cleanAddress: string;
-  category: string[]; // Changed from string to string[] for multiple segments
+  cnpj?: string;
+  mainCnae?: string;
+  secondaryCnaes?: string[];
+  category: string[];
   region: 'Norte' | 'Nordeste' | 'Centro-Oeste' | 'Sudeste' | 'Sul' | 'Indefinido';
   state: string;
   city: string;

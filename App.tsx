@@ -18,6 +18,8 @@ import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud } from './services/firebaseService';
+import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
+import pLimit from 'p-limit';
 import ClientMap from './components/ClientMap';
 import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
@@ -79,6 +81,7 @@ const App: React.FC = () => {
     filterCategory, setFilterCategory,
     filterSalespersonId, setFilterSalespersonId,
     filterSalesCategory, setFilterSalesCategory,
+    filterCnae, setFilterCnae,
     filterProductCategory, setFilterProductCategory,
     filterProductSku, setFilterProductSku,
     searchProductQuery, setSearchProductQuery,
@@ -87,6 +90,7 @@ const App: React.FC = () => {
     visibleClients, // Exposed if needed for counts
     availableStates,
     availableCities,
+    availableCnaes,
     productCategories,
     filterOnlyWithPurchases,
     setFilterOnlyWithPurchases,
@@ -172,14 +176,12 @@ const App: React.FC = () => {
 
     if (!confirmCleanup) return;
 
-    // Find duplicates based on companyName + address
     const seen = new Map<string, EnrichedClient>();
     const unique: EnrichedClient[] = [];
     let duplicateCount = 0;
 
     masterClientList.forEach((client) => {
       const key = `${client.companyName || ''}-${client.cleanAddress || ''}`.toLowerCase().trim();
-
       if (seen.has(key)) {
         duplicateCount++;
       } else {
@@ -193,7 +195,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Update state with cleaned list
     setMasterClientList(unique);
 
     alert(
@@ -202,6 +203,106 @@ const App: React.FC = () => {
       `Total anterior: ${masterClientList.length}\n` +
       `Total atual: ${unique.length}`
     );
+  };
+
+  /**
+   * UTILITÁRIO DE ATUALIZAÇÃO EM MASSA (ENRIQUECIMENTO)
+   * Percorre a base e atualiza via CNPJa Comercial
+   */
+  const handleMassUpdateClients = async () => {
+    if (masterClientList.length === 0) {
+      alert('⚠️ Nenhum cliente na base para atualizar.');
+      return;
+    }
+
+    const confirmUpdate = window.confirm(
+      '🚀 Iniciar Atualização em Massa?\n\n' +
+      'Este processo irá utilizar sua API CNPJa para:\n' +
+      '• Buscar CNPJs faltantes via Razão Social\n' +
+      '• Atualizar CNAEs (Atividade Econômica)\n' +
+      '• Atualizar Telefones e Endereços Oficiais\n' +
+      '• Re-gerar Georreferenciamento (Lat/Lng)\n\n' +
+      `Total de clientes: ${masterClientList.length}\n\n` +
+      'Deseja continuar?'
+    );
+
+    if (!confirmUpdate) return;
+
+    setProcState({
+      isActive: true,
+      current: 0,
+      total: masterClientList.length,
+      status: 'processing',
+      fileName: 'Enriquecimento de Base (CNPJa Comercial)',
+      ownerName: currentUser?.name || 'Sistema'
+    });
+
+    const limit = pLimit(3); // Concorrência moderada
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    const tasks = masterClientList.map((client, index) => limit(async () => {
+      try {
+        let activeCnpj = client.cnpj?.replace(/\D/g, '');
+
+        // 1. Se não tem CNPJ, tenta descobrir pelo nome
+        if (!activeCnpj || activeCnpj.length !== 14) {
+          const searchResults = await pesquisarEmpresaPorEndereco({
+            filtros: client.companyName,
+            uf: client.state
+          });
+          if (searchResults && searchResults.length > 0) {
+            activeCnpj = searchResults[0].taxId;
+          }
+        }
+
+        // 2. Com o CNPJ, busca os dados completos
+        if (activeCnpj && activeCnpj.length === 14) {
+          const fullData = await consultarCNPJ(activeCnpj);
+          if (fullData) {
+            // 3. Atualiza o cliente na lista
+            setMasterClientList(prev => prev.map(c => {
+              if (c.id === client.id) {
+                return {
+                  ...c,
+                  cnpj: fullData.cnpj,
+                  companyName: fullData.nome_fantasia || fullData.razao_social || c.companyName,
+                  contact: fullData.ddd_telefone_1 || c.contact,
+                  cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
+                  mainCnae: fullData.cnae_fiscal,
+                  secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || [],
+                  lat: fullData.latitude || c.lat,
+                  lng: fullData.longitude || c.lng,
+                  googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
+                };
+              }
+              return c;
+            }));
+            updatedCount++;
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
+        errorCount++;
+      } finally {
+        setProcState(prev => ({ ...prev, current: index + 1 }));
+      }
+    }));
+
+    await Promise.all(tasks);
+
+    setProcState(prev => ({ ...prev, status: 'completed' }));
+
+    alert(
+      `✅ Atualização Concluída!\n\n` +
+      `• Sucesso: ${updatedCount} clientes\n` +
+      `• Erros/Não localizados: ${errorCount + (masterClientList.length - updatedCount - errorCount)}\n\n` +
+      'Sua base de dados agora está enriquecida e georreferenciada!'
+    );
+
+    setTimeout(() => {
+      setProcState(prev => ({ ...prev, isActive: false }));
+    }, 3000);
   };
 
 
@@ -361,7 +462,7 @@ const App: React.FC = () => {
     setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
   };
 
-  const handleAddClient = async (newClient: EnrichedClient) => {
+  const handleAddClient = async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'> & { id?: string; lat?: number; lng?: number }) => {
     // 1. Geocode Address if coordinates are missing
     let finalClient: EnrichedClient = {
       ...newClient,
@@ -1639,11 +1740,37 @@ const App: React.FC = () => {
                                     value={filterCategory}
                                     onChange={(e) => setFilterCategory(e.target.value)}
                                     className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5"
+                                    title="Filtrar por categoria de cliente"
                                   >
                                     <option value="Todos">Todas Cat. Clientes</option>
                                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                   </select>
                                 </div>
+
+                                <div className="flex items-center gap-1 relative">
+                                  <Briefcase className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
+                                  <select
+                                    value={filterCnae}
+                                    onChange={(e) => setFilterCnae(e.target.value)}
+                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5 max-w-[200px]"
+                                    title="Filtrar por CNAE (Atividade Econômica)"
+                                  >
+                                    <option value="Todos">Todos CNAEs</option>
+                                    {availableCnaes.map(c => (
+                                      <option key={c} value={c}>{c.length > 40 ? c.substring(0, 40) + '...' : c}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {isAdminUser && (
+                                  <button
+                                    onClick={handleMassUpdateClients}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all text-[10px] font-bold uppercase tracking-wider ml-2"
+                                    title="Enriquecer toda a base com dados da Receita Federal via CNPJa Comercial"
+                                  >
+                                    <Database className="w-3.5 h-3.5" /> Atualizar Base (CNPJa)
+                                  </button>
+                                )}
 
                                 <span className="ml-auto text-xs font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">
                                   {filteredClients.length} resultados

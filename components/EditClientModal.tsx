@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Save, User, Store, Phone, MapPin, Tag, Globe, Briefcase, FileText } from 'lucide-react';
+import { X, Save, User, Store, Phone, MapPin, Tag, Globe, Briefcase, FileText, Search, Loader2 } from 'lucide-react';
+import { pesquisarEmpresaPorEndereco, consultarCNPJ } from '../services/cnpjService';
 import { EnrichedClient, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 
@@ -15,10 +16,14 @@ interface EditClientModalProps {
 const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [] }) => {
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
+        cnpj: client.cnpj || '',
         category: Array.isArray(client.category)
             ? client.category
             : (typeof client.category === 'string' ? [client.category] : ['Outros'])
     }));
+
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'success' | 'error'>('idle');
 
     React.useEffect(() => {
         setFormData({
@@ -44,6 +49,51 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         e.preventDefault();
         onSave(formData);
         onClose();
+    };
+
+    const handleCNPJSearch = async () => {
+        if (!formData.cleanAddress || formData.cleanAddress.length < 10) {
+            alert('Por favor, verifique o endereço antes de buscar.');
+            return;
+        }
+
+        setIsSearching(true);
+        setSearchStatus('searching');
+
+        try {
+            // 1. Pesquisa básica pelo endereço
+            const results = await pesquisarEmpresaPorEndereco({
+                filtros: formData.cleanAddress,
+                uf: formData.state
+            });
+
+            if (results && results.length > 0) {
+                // Pega o primeiro resultado (mais provável)
+                const candidate = results[0];
+                const fullData = await consultarCNPJ(candidate.taxId);
+
+                if (fullData) {
+                    setFormData(prev => ({
+                        ...prev,
+                        cnpj: fullData.cnpj,
+                        companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
+                        lat: fullData.latitude || prev.lat,
+                        lng: fullData.longitude || prev.lng,
+                        mainCnae: fullData.cnae_fiscal,
+                        secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || []
+                    }));
+                    setSearchStatus('success');
+                }
+            } else {
+                setSearchStatus('error');
+                alert('Nhum CNPJ encontrado para este endereço exato na base comercial.');
+            }
+        } catch (err) {
+            console.error(err);
+            setSearchStatus('error');
+        } finally {
+            setIsSearching(false);
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -253,15 +303,76 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         <label className="text-xs font-medium text-on-surface-variant ml-1">
                             Endereço Completo
                         </label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                name="cleanAddress"
+                                value={formData.cleanAddress}
+                                onChange={handleChange}
+                                className="flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                                title="Endereço Limpo"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleCNPJSearch}
+                                disabled={isSearching}
+                                className={`px-4 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${searchStatus === 'success'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                    }`}
+                                title="Tentar descobrir o CNPJ a partir deste endereço"
+                            >
+                                {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                {searchStatus === 'success' ? 'CNPJ Encontrado!' : 'Descobrir CNPJ'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* CNPJ Field (NEW) */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-on-surface-variant ml-1">
+                            CNPJ
+                        </label>
                         <input
                             type="text"
-                            name="cleanAddress"
-                            value={formData.cleanAddress}
+                            name="cnpj"
+                            value={formData.cnpj || ''}
                             onChange={handleChange}
-                            className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
-                            title="Endereço Limpo"
+                            className={`w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all ${searchStatus === 'success' ? 'border-green-500' : ''}`}
+                            placeholder="00.000.000/0000-00"
                         />
                     </div>
+
+                    {/* CNAE Info (NEW) */}
+                    {(formData.mainCnae || (formData.secondaryCnaes && formData.secondaryCnaes.length > 0)) && (
+                        <div className="bg-surface-container-highest/50 p-4 rounded-2xl border border-outline-variant space-y-3">
+                            <div>
+                                <label className="text-[10px] font-bold text-primary uppercase tracking-widest block mb-1">
+                                    Atividade Econômica Principal (CNAE)
+                                </label>
+                                <p className="text-sm text-on-surface flex items-start gap-2">
+                                    <Briefcase className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
+                                    {formData.mainCnae || 'Não informado'}
+                                </p>
+                            </div>
+
+                            {formData.secondaryCnaes && formData.secondaryCnaes.length > 0 && (
+                                <div>
+                                    <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">
+                                        Atividades Secundárias
+                                    </label>
+                                    <ul className="space-y-1">
+                                        {formData.secondaryCnaes.map((cnae, idx) => (
+                                            <li key={idx} className="text-xs text-on-surface-variant flex items-start gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-outline-variant mt-1.5 shrink-0" />
+                                                {cnae}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Plus Code */}
                     <div className="space-y-1 pt-2">

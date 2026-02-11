@@ -16,6 +16,7 @@ export const useFilters = (
     const [filterCategory, setFilterCategory] = useState<string>('Todos');
     const [filterSalespersonId, setFilterSalespersonId] = useState<string>('Todos');
     const [filterSalesCategory, setFilterSalesCategory] = useState<string>('Todos');
+    const [filterCnae, setFilterCnae] = useState<string>('Todos');
     const [filterOnlyWithPurchases, setFilterOnlyWithPurchases] = useState<boolean>(false);
 
     // Product Filters
@@ -70,6 +71,11 @@ export const useFilters = (
             let matchProduct = true;
             const prodQuery = (searchProductQuery || '').toLowerCase();
 
+            // CNAE Filter (Matches Main or Secondary)
+            const matchCnae = filterCnae === 'Todos' ||
+                (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
+                (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
+
             if (filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || prodQuery !== '') {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
@@ -98,9 +104,9 @@ export const useFilters = (
             // Only with Purchases Filter
             const matchOnlyWithPurchases = !filterOnlyWithPurchases || (c.purchasedProducts && c.purchasedProducts.length > 0);
 
-            return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases;
+            return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, filterOnlyWithPurchases, users, currentUser]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, filterOnlyWithPurchases, users, currentUser]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
@@ -131,6 +137,17 @@ export const useFilters = (
         return Array.from(cats).sort();
     }, [products]);
 
+    const availableCnaes = useMemo(() => {
+        const cnaes = new Set<string>();
+        visibleClients.forEach(c => {
+            if (c.mainCnae) cnaes.add(c.mainCnae);
+            if (c.secondaryCnaes) {
+                c.secondaryCnaes.forEach(s => cnaes.add(s));
+            }
+        });
+        return Array.from(cnaes).sort();
+    }, [visibleClients]);
+
     const resetFilters = () => {
         setSearchQuery('');
         setFilterRegion('Todas');
@@ -138,6 +155,7 @@ export const useFilters = (
         setFilterCity('Todas');
         setFilterSalespersonId('Todos');
         setFilterSalesCategory('Todos');
+        setFilterCnae('Todos');
         setFilterProductCategory('Todos');
         setFilterProductSku('Todos');
         setSearchProductQuery('');
@@ -153,6 +171,7 @@ export const useFilters = (
         filterCategory, setFilterCategory,
         filterSalespersonId, setFilterSalespersonId,
         filterSalesCategory, setFilterSalesCategory,
+        filterCnae, setFilterCnae,
         filterProductCategory, setFilterProductCategory,
         filterProductSku, setFilterProductSku,
         searchProductQuery, setSearchProductQuery,
@@ -164,6 +183,7 @@ export const useFilters = (
         visibleClients,
         availableStates,
         availableCities,
+        availableCnaes,
         productCategories,
 
         // Actions

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { EnrichedClient, AppUser } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
-import { X, Save, MapPin, Store, AlertCircle, Globe, User } from 'lucide-react';
+import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase } from 'lucide-react';
+import { consultarCNPJ } from '../services/cnpjService';
 
 interface AddClientModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'>) => void;
+    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'> & { lat?: number; lng?: number }) => void;
     salespersonId: string;
     ownerName: string;
     users?: AppUser[];
@@ -17,6 +18,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
     // State for form
     const [formData, setFormData] = useState({
         companyName: '',
+        cnpj: '',
         ownerName: '',
         contact: '',
         category: ['Outros'], // Changed to array
@@ -25,8 +27,14 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         city: 'Fortaleza',
         originalAddress: '',
         cleanAddress: '',
-        plusCode: ''
+        plusCode: '',
+        lat: 0,
+        lng: 0,
+        mainCnae: '',
+        secondaryCnaes: [] as string[]
     });
+
+    const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
 
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,6 +45,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
             // Reset form
             setFormData({
                 companyName: '',
+                cnpj: '',
                 ownerName: '',
                 contact: '',
                 category: ['Outros'],
@@ -45,7 +54,11 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 city: 'Fortaleza',
                 originalAddress: '',
                 cleanAddress: '',
-                plusCode: ''
+                plusCode: '',
+                lat: 0,
+                lng: 0,
+                mainCnae: '',
+                secondaryCnaes: []
             });
             setSelectedSalespersonId(salespersonId);
             setError('');
@@ -91,6 +104,40 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
         });
     };
 
+    const handleCNPJLookup = async () => {
+        if (!formData.cnpj || formData.cnpj.replace(/\D/g, '').length !== 14) {
+            setError('Por favor, informe um CNPJ válido com 14 dígitos.');
+            return;
+        }
+
+        setIsSearchingCNPJ(true);
+        setError('');
+
+        try {
+            const data = await consultarCNPJ(formData.cnpj);
+            if (data) {
+                setFormData(prev => ({
+                    ...prev,
+                    companyName: data.nome_fantasia || data.razao_social,
+                    originalAddress: `${data.logradouro}, ${data.numero}${data.complemento ? ` - ${data.complemento}` : ''}, ${data.bairro}`,
+                    city: data.municipio,
+                    state: data.uf,
+                    region: getRegionByUF(data.uf),
+                    contact: data.ddd_telefone_1 || prev.contact,
+                    lat: data.latitude || 0,
+                    lng: data.longitude || 0,
+                    cleanAddress: `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`,
+                    mainCnae: data.cnae_fiscal,
+                    secondaryCnaes: data.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || []
+                }));
+            }
+        } catch (err: any) {
+            setError(err.message || 'Erro ao consultar CNPJ. Verifique a chave da API.');
+        } finally {
+            setIsSearchingCNPJ(false);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -113,10 +160,14 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
             state: formData.state,
             city: formData.city,
             originalAddress: fullAddress,
-            cleanAddress: fullAddress,
-            plusCode: formData.plusCode, // New field
+            cleanAddress: formData.cleanAddress || fullAddress,
+            plusCode: formData.plusCode,
             salespersonId: selectedSalespersonId,
-            googleMapsUri: ''
+            googleMapsUri: '',
+            lat: formData.lat,
+            lng: formData.lng,
+            mainCnae: formData.mainCnae,
+            secondaryCnaes: formData.secondaryCnaes
         });
 
         setIsSubmitting(false);
@@ -148,6 +199,51 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                 {/* Body */}
                 <div className="px-6 py-4 overflow-y-auto custom-scrollbar flex-1">
                     <form id="add-client-form" onSubmit={handleSubmit} className="space-y-6">
+
+                        {/* CNPJ Lookup Section */}
+                        <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant">
+                            <label className="block text-xs font-semibold text-primary mb-2 ml-1 uppercase tracking-wider">
+                                Consulta Rápida por CNPJ (Comercial)
+                            </label>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={formData.cnpj}
+                                        onChange={e => handleChange('cnpj', e.target.value)}
+                                        className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary outline-none transition-colors"
+                                        placeholder="00.000.000/0000-00"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCNPJLookup}
+                                    disabled={isSearchingCNPJ}
+                                    className="px-4 py-2 bg-primary text-on-primary rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isSearchingCNPJ ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Search className="w-4 h-4" />
+                                    )}
+                                    <span className="hidden sm:inline">Consultar</span>
+                                </button>
+                            </div>
+                            {formData.lat !== 0 && (
+                                <div className="space-y-1">
+                                    <p className="text-[10px] text-green-600 mt-2 ml-1 flex items-center gap-1">
+                                        <MapPin className="w-3 h-3" /> Coordenadas obtidas com sucesso via CNPJa!
+                                    </p>
+                                    {formData.mainCnae && (
+                                        <p className="text-[10px] text-primary mt-1 ml-1 flex items-start gap-1">
+                                            <Briefcase className="w-3 h-3 mt-0.5 shrink-0" />
+                                            <span className="font-bold">CNAE:</span> {formData.mainCnae}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Company Name */}
                             <div>
