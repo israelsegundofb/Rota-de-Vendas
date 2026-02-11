@@ -1403,6 +1403,7 @@ const App: React.FC = () => {
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-elevation-2 flex items-center justify-center z-50 animate-bounce-in"
+              title="Adicionar Novo Cliente"
             >
               <UsersIcon className="w-6 h-6" />
             </button>
@@ -1520,25 +1521,39 @@ const App: React.FC = () => {
                   products={products}
                   users={users}
                   onClose={() => setActiveView('map')}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  filterRegion={filterRegion}
+                  setFilterRegion={setFilterRegion}
+                  filterState={filterState}
+                  setFilterState={setFilterState}
+                  filterCity={filterCity}
+                  setFilterCity={setFilterCity}
+                  filterCategory={filterCategory}
+                  setFilterCategory={setFilterCategory}
+                  filterSalespersonId={filterSalespersonId}
+                  setFilterSalespersonId={setFilterSalespersonId}
+                  filterSalesCategory={filterSalesCategory}
+                  setFilterSalesCategory={setFilterSalesCategory}
+                  filterCnae={filterCnae}
+                  setFilterCnae={setFilterCnae}
+                  startDate={startDate}
+                  setStartDate={setStartDate}
+                  endDate={endDate}
+                  setEndDate={setEndDate}
+                  availableStates={availableStates}
+                  availableCities={availableCities}
+                  availableCnaes={availableCnaes}
+                  categories={categories}
+                  currentUser={currentUser}
+                  isAdminUser={isAdminUser}
+                  canViewAllData={canViewAllData}
                 />
               </div>
             ) : (
               <>
                 <div className="bg-gray-100 px-3 py-2.5 border-b border-gray-200 flex flex-col gap-2">
-                  {/* Primary Filters Row */}
                   <div className="flex flex-wrap gap-2 items-center">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Buscar cliente ou empresa..."
-                        className="pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 w-52 border outline-none"
-                      />
-                    </div>
-
-                    <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
                     <div className="flex items-center gap-1.5 text-gray-600">
                       <Filter className="w-4 h-4" />
                       <span className="text-xs font-bold hidden md:inline">Filtros:</span>
@@ -1932,6 +1947,7 @@ const App: React.FC = () => {
                                   onChange={(e) => setFilterCity(e.target.value)}
                                   className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
                                   disabled={filterState === 'Todos' || availableCities.length === 0}
+                                  title="Filtrar por cidade"
                                 >
                                   <option value="Todas">Todas Cidades</option>
                                   {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1991,6 +2007,7 @@ const App: React.FC = () => {
                                   value={filterProductCategory}
                                   onChange={e => setFilterProductCategory(e.target.value)}
                                   className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                  title="Filtrar por marca ou categoria de produto"
                                 >
                                   <option value="Todos">Todos Deptos / Marcas</option>
                                   {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -2002,6 +2019,7 @@ const App: React.FC = () => {
                                     value={filterProductSku}
                                     onChange={e => setFilterProductSku(e.target.value)}
                                     className={`text-xs rounded-lg pl-7 pr-2 py-1.5 border appearance-none transition-colors max-w-[180px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                    title="Filtrar por SKU do produto"
                                   >
                                     <option value="Todos">Todos Produtos</option>
                                     {products
@@ -2076,79 +2094,75 @@ const App: React.FC = () => {
                   )}
                 </div>
               </>
-            )
-          }
+            )}
 
           {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
-          {
-            procState.isActive && (
-              <div className="absolute bottom-6 right-6 z-50 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden animate-slide-up">
-                <div className={`h-1.5 w-full ${procState.status === 'error' ? 'bg-red-200' : 'bg-blue-100'}`}>
-                  <div
-                    className={`h-full transition-all duration-300 ${procState.status === 'completed' ? 'bg-green-500 w-full' :
-                      procState.status === 'error' ? 'bg-red-500 w-full' :
-                        'bg-blue-600'
-                      }`}
-                    style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
-                  />
-                </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                        {procState.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-                        {procState.status === 'processing' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                        {procState.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
-
-                        {procState.status === 'reading' ? 'Lendo Arquivo...' :
-                          procState.status === 'processing' ? 'Processando Planilha' :
-                            procState.status === 'completed' ? 'Processamento Concluído' :
-                              'Erro no Processamento'}
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {procState.fileName} <span className="mx-1">•</span> {procState.ownerName}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (procState.isActive && procState.status === 'processing') {
-                          // Trigger cancellation confirmation
-                          if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
-                            isUploadCancelled.current = true;
-                            setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
-                          }
-                        } else {
-                          setProcState(prev => ({ ...prev, isActive: false }));
-                        }
-                      }}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {procState.status === 'processing' && (
-                    <div className="mt-3">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>Progresso (IA + Maps)</span>
-                        <span className="font-mono">{procState.current} / {procState.total}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400">Você pode continuar usando o sistema.</p>
-                    </div>
-                  )}
-
-                  {procState.status === 'error' && (
-                    <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
-                      {procState.errorMessage}
-                    </p>
-                  )}
-                </div>
+          {procState.isActive && (
+            <div className="absolute bottom-6 right-6 z-50 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden animate-slide-up">
+              <div className={`h-1.5 w-full ${procState.status === 'error' ? 'bg-red-200' : 'bg-blue-100'}`}>
+                <div
+                  className={`h-full transition-all duration-300 ${procState.status === 'completed' ? 'bg-green-500 w-full' :
+                    procState.status === 'error' ? 'bg-red-500 w-full' :
+                      'bg-blue-600'
+                    }`}
+                  style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
+                />
               </div>
-            )
-          }
+              <div className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      {procState.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                      {procState.status === 'processing' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                      {procState.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
 
-        </main >
-      </div >
+                      {procState.status === 'reading' ? 'Lendo Arquivo...' :
+                        procState.status === 'processing' ? 'Processando Planilha' :
+                          procState.status === 'completed' ? 'Processamento Concluído' :
+                            'Erro no Processamento'}
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {procState.fileName} <span className="mx-1">•</span> {procState.ownerName}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (procState.isActive && procState.status === 'processing') {
+                        if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
+                          isUploadCancelled.current = true;
+                          setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
+                        }
+                      } else {
+                        setProcState(prev => ({ ...prev, isActive: false }));
+                      }
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                    title="Fechar Notificação"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {procState.status === 'processing' && (
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Progresso (IA + Maps)</span>
+                      <span className="font-mono">{procState.current} / {procState.total}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">Você pode continuar usando o sistema.</p>
+                  </div>
+                )}
+
+                {procState.status === 'error' && (
+                  <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
+                    {procState.errorMessage}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Custom Global Dialog System */}
       <CustomDialog
@@ -2163,7 +2177,6 @@ const App: React.FC = () => {
       />
     </GoogleReCaptchaProvider>
   );
-}; // End of App component
-
+};
 
 export default App;
