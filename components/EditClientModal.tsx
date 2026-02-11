@@ -23,7 +23,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     }));
 
     const [isSearching, setIsSearching] = useState(false);
+    const [isRefreshingByCNPJ, setIsRefreshingByCNPJ] = useState(false);
     const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'success' | 'error'>('idle');
+    const [refreshStatus, setRefreshStatus] = useState<'idle' | 'searching' | 'success' | 'error'>('idle');
 
     React.useEffect(() => {
         setFormData({
@@ -94,6 +96,49 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             setSearchStatus('error');
         } finally {
             setIsSearching(false);
+        }
+    };
+
+    const handleRefreshByCNPJ = async () => {
+        const cleanCNPJ = formData.cnpj?.replace(/\D/g, '');
+        if (!cleanCNPJ || cleanCNPJ.length !== 14) {
+            alert('Por favor, informe um CNPJ válido com 14 dígitos para atualizar.');
+            return;
+        }
+
+        setIsRefreshingByCNPJ(true);
+        setRefreshStatus('searching');
+
+        try {
+            const fullData = await consultarCNPJ(cleanCNPJ);
+
+            if (fullData) {
+                setFormData(prev => ({
+                    ...prev,
+                    companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
+                    originalAddress: `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`,
+                    cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
+                    city: fullData.municipio,
+                    state: fullData.uf,
+                    region: getRegionByUF(fullData.uf),
+                    lat: fullData.latitude || prev.lat,
+                    lng: fullData.longitude || prev.lng,
+                    contact: fullData.ddd_telefone_1 || prev.contact,
+                    mainCnae: fullData.cnae_fiscal,
+                    secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || []
+                }));
+                setRefreshStatus('success');
+                setTimeout(() => setRefreshStatus('idle'), 3000);
+            } else {
+                setRefreshStatus('error');
+                alert('CNPJ não encontrado na base de dados.');
+            }
+        } catch (err) {
+            console.error(err);
+            setRefreshStatus('error');
+            alert('Erro ao consultar CNPJ. Verifique sua chave de API.');
+        } finally {
+            setIsRefreshingByCNPJ(false);
         }
     };
 
@@ -329,19 +374,34 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         </div>
                     </div>
 
-                    {/* CNPJ Field (NEW) */}
                     <div className="space-y-1">
                         <label className="text-xs font-medium text-on-surface-variant ml-1">
                             CNPJ
                         </label>
-                        <input
-                            type="text"
-                            name="cnpj"
-                            value={formData.cnpj || ''}
-                            onChange={handleChange}
-                            className={`w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all ${searchStatus === 'success' ? 'border-green-500' : ''}`}
-                            placeholder="00.000.000/0000-00"
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                name="cnpj"
+                                value={formData.cnpj || ''}
+                                onChange={handleChange}
+                                className={`flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all ${searchStatus === 'success' || refreshStatus === 'success' ? 'border-green-500' : ''}`}
+                                placeholder="00.000.000/0000-00"
+                                title="CNPJ do Cliente"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleRefreshByCNPJ}
+                                disabled={isRefreshingByCNPJ}
+                                className={`px-4 flex items-center gap-2 rounded-xl text-xs font-bold transition-all shadow-sm ${refreshStatus === 'success'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-primary text-white hover:bg-primary/90'
+                                    }`}
+                                title="Atualizar todos os dados a partir deste CNPJ"
+                            >
+                                {isRefreshingByCNPJ ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                {refreshStatus === 'success' ? 'Dados Atualizados!' : 'Atualizar Dados'}
+                            </button>
+                        </div>
                     </div>
 
                     {/* CNAE Info (NEW) */}

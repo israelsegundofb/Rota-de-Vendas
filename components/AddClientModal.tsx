@@ -257,20 +257,21 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd,
                                         onChange={e => handleChange('cnpj', e.target.value)}
                                         className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary outline-none transition-colors"
                                         placeholder="00.000.000/0000-00"
+                                        title="CNPJ do Cliente"
                                     />
                                 </div>
                                 <button
                                     type="button"
                                     onClick={handleCNPJLookup}
                                     disabled={isSearchingCNPJ}
-                                    className="px-4 py-2 bg-primary text-on-primary rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                    className={`px-4 py-2 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 ${formData.lat !== 0 ? 'bg-green-100 text-green-700' : 'bg-primary text-on-primary hover:bg-primary/90'}`}
                                 >
                                     {isSearchingCNPJ ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
                                         <Search className="w-4 h-4" />
                                     )}
-                                    <span className="hidden sm:inline">Consultar</span>
+                                    <span className="hidden sm:inline">{formData.lat !== 0 ? 'Dados Atualizados' : 'Atualizar Dados'}</span>
                                 </button>
                             </div>
                             {formData.lat !== 0 && (
