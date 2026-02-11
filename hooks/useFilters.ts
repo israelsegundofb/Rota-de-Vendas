@@ -18,6 +18,8 @@ export const useFilters = (
     const [filterSalesCategory, setFilterSalesCategory] = useState<string>('Todos');
     const [filterCnae, setFilterCnae] = useState<string>('Todos');
     const [filterOnlyWithPurchases, setFilterOnlyWithPurchases] = useState<boolean>(false);
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
 
     // Product Filters
     const [filterProductCategory, setFilterProductCategory] = useState<string>('Todos');
@@ -97,7 +99,21 @@ export const useFilters = (
                         (p.price || 0).toString().includes(prodQuery)
                     );
 
-                    matchProduct = hasCat && hasSku && hasMatch;
+                    // Date Range Filter
+                    const matchDate = (!startDate || !endDate) || c.purchasedProducts.some(p => {
+                        if (!p.purchaseDate) return false;
+                        // Basic string comparison if dates are in ISO/YYYY-MM-DD or parseable
+                        // Assuming the date might be flexible, we'll try to normalize
+                        const pDate = new Date(p.purchaseDate);
+                        const sDate = new Date(startDate);
+                        const eDate = new Date(endDate);
+                        // Reset hours for date-only comparison
+                        sDate.setHours(0, 0, 0, 0);
+                        eDate.setHours(23, 59, 59, 999);
+                        return pDate >= sDate && pDate <= eDate;
+                    });
+
+                    matchProduct = hasCat && hasSku && hasMatch && matchDate;
                 }
             }
 
@@ -106,7 +122,7 @@ export const useFilters = (
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, filterOnlyWithPurchases, users, currentUser]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, searchQuery, filterProductCategory, filterProductSku, searchProductQuery, filterSalesCategory, filterOnlyWithPurchases, users, currentUser, startDate, endDate]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
@@ -160,6 +176,8 @@ export const useFilters = (
         setFilterProductSku('Todos');
         setSearchProductQuery('');
         setFilterOnlyWithPurchases(false);
+        setStartDate('');
+        setEndDate('');
     };
 
     return {
@@ -177,6 +195,8 @@ export const useFilters = (
         searchProductQuery, setSearchProductQuery,
         showProductSuggestions, setShowProductSuggestions,
         filterOnlyWithPurchases, setFilterOnlyWithPurchases,
+        startDate, setStartDate,
+        endDate, setEndDate,
 
         // Computed
         filteredClients,

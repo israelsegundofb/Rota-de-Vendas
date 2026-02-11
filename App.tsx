@@ -8,7 +8,7 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
 import type { AppUser } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
@@ -96,6 +96,8 @@ const App: React.FC = () => {
     productCategories,
     filterOnlyWithPurchases,
     setFilterOnlyWithPurchases,
+    startDate, setStartDate,
+    endDate, setEndDate,
     resetFilters
   } = useFilters(masterClientList, users, currentUser, products);
 
@@ -1006,7 +1008,7 @@ const App: React.FC = () => {
               );
 
               if (masterProd) {
-                return { ...masterProd };
+                return { ...masterProd, purchaseDate: rec.purchaseDate };
               } else {
                 // Fallback for missing product in catalog
                 return {
@@ -1015,7 +1017,8 @@ const App: React.FC = () => {
                   brand: 'Desconhecido',
                   category: 'Manual',
                   price: 0,
-                  factoryCode: ''
+                  factoryCode: '',
+                  purchaseDate: rec.purchaseDate
                 };
               }
             });
@@ -1604,6 +1607,39 @@ const App: React.FC = () => {
                           <option key={c} value={c}>{c.length > 40 ? c.substring(0, 40) + '...' : c}</option>
                         ))}
                       </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg shadow-sm px-2 py-1">
+                      <div className="flex items-center gap-1.5 border-r pr-2 border-gray-200">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Período</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="text-[11px] bg-transparent border-none outline-none focus:ring-0 p-0 w-[100px] text-gray-700 font-medium"
+                          title="Data inicial da compra"
+                        />
+                        <span className="text-gray-400 text-[10px]">até</span>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="text-[11px] bg-transparent border-none outline-none focus:ring-0 p-0 w-[100px] text-gray-700 font-medium"
+                          title="Data final da compra"
+                        />
+                        {(startDate || endDate) && (
+                          <button
+                            onClick={() => { setStartDate(''); setEndDate(''); }}
+                            className="p-1 hover:bg-gray-100 rounded-full transition-colors ml-1"
+                            title="Limpar período"
+                          >
+                            <X className="w-3 h-3 text-gray-400" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

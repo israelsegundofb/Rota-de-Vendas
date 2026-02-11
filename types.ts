@@ -27,6 +27,7 @@ export interface Product {
   margin?: number;  // Optional
   discount?: number; // Optional: Discount percentage or value
   sourceFileId?: string; // ID of the file this product was imported from
+  purchaseDate?: string; // Optional: Date of purchase
 }
 
 export interface EnrichedClient {

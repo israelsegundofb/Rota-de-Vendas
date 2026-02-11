@@ -274,7 +274,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
   });
 };
 
-export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: string; sku: string; productName: string }[]> => {
+export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: string; sku: string; productName: string; purchaseDate: string }[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -282,7 +282,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
       encoding: "UTF-8",
       complete: (results) => {
         const data = results.data as any[];
-        const records: { companyName: string; sku: string; productName: string }[] = [];
+        const records: { companyName: string; sku: string; productName: string; purchaseDate: string }[] = [];
 
         data.forEach((row) => {
           const normalizedRow: Record<string, any> = {};
@@ -293,12 +293,14 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
           const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['empresa'] || '';
           const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || '';
           const productName = normalizedRow['nome do produto'] || normalizedRow['produto'] || normalizedRow['descricao'] || '';
+          const purchaseDate = normalizedRow['data da compra'] || normalizedRow['data'] || normalizedRow['emissao'] || '';
 
           if (companyName && (sku || productName)) {
             records.push({
               companyName: String(companyName).trim(),
               sku: String(sku).trim(),
-              productName: String(productName).trim()
+              productName: String(productName).trim(),
+              purchaseDate: String(purchaseDate).trim()
             });
           }
         });
