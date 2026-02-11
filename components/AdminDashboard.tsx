@@ -33,6 +33,9 @@ interface AdminDashboardProps {
     setFilterSalesCategory: (val: string) => void;
     filterCnae: string;
     setFilterCnae: (val: string) => void;
+    filterProductCategory: string;
+    setFilterProductCategory: (val: string) => void;
+    productCategories: string[];
     startDate: string;
     setStartDate: (val: string) => void;
     endDate: string;
@@ -81,6 +84,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     filterSalespersonId, setFilterSalespersonId,
     filterSalesCategory, setFilterSalesCategory,
     filterCnae, setFilterCnae,
+    filterProductCategory: activeProductCategory, setFilterProductCategory,
+    productCategories,
     startDate, setStartDate,
     endDate, setEndDate,
     availableStates, availableCities, availableCnaes,
@@ -330,7 +335,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <div className="relative">
                                 <Package className="w-3.5 h-3.5 text-on-surface-variant/50 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 <select
-                                    value={filterProductCategory}
+                                    value={activeProductCategory}
                                     onChange={(e) => setFilterProductCategory(e.target.value)}
                                     className="text-xs bg-transparent pl-7 pr-3 py-1 font-bold outline-none cursor-pointer max-w-[180px]"
                                     title="Filtrar por Marcas / Categorias de Produtos"

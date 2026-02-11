@@ -1537,6 +1537,9 @@ const App: React.FC = () => {
                   setFilterSalesCategory={setFilterSalesCategory}
                   filterCnae={filterCnae}
                   setFilterCnae={setFilterCnae}
+                  filterProductCategory={filterProductCategory}
+                  setFilterProductCategory={setFilterProductCategory}
+                  productCategories={productCategories}
                   startDate={startDate}
                   setStartDate={setStartDate}
                   endDate={endDate}
