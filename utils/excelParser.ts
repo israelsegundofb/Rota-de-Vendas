@@ -83,6 +83,7 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                                 (header.normalized.includes('endereco') ||
                                     header.normalized.includes('logradouro') ||
                                     header.normalized.includes('localizacao') ||
+                                    header.normalized.includes('comercial') ||
                                     header.normalized === 'rua' ||
                                     header.normalized === 'mapa' ||
                                     header.normalized === 'link')
@@ -98,7 +99,7 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     if (Object.keys(rowData).length === 0) continue;
 
                     // 3. Map to RawClient
-                    const addressInput = rowData['endereco'] || rowData['logradouro'] || rowData['localizacao'] ||
+                    const addressInput = rowData['endereco'] || rowData['endereco comercial'] || rowData['logradouro'] || rowData['localizacao'] ||
                         rowData['endereco completo'] || rowData['rua'] || rowData['end'] || '';
 
                     let { address, link, lat, lng } = parseHyperlink(addressInput);

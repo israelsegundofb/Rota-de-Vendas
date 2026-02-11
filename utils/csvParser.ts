@@ -133,9 +133,9 @@ const normalizeHeader = (header: string): string => {
 export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purchases' => {
   const normalizedHeaders = headers.map(h => normalizeHeader(h));
 
-  const purchaseKeywords = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs'];
-  const clientKeywords = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro'];
-  const productKeywords = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade'];
+  const purchaseKeywords = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados'];
+  const clientKeywords = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial'];
+  const productKeywords = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade', 'descricao'];
 
   let purchaseScore = normalizedHeaders.filter(h => purchaseKeywords.some(k => h.includes(k))).length;
   let clientScore = normalizedHeaders.filter(h => clientKeywords.some(k => h.includes(k))).length;
@@ -236,8 +236,8 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
           });
 
           // Parse hyperlink if present in address column
-          // Priority: Endereço > Logradouro > Localização > Endereço Cobrança > Link Google Maps (which often contains full address)
-          const addressInput = map['endereco'] || map['logradouro'] || map['localizacao'] || map['endereco cobranca'] || map['link google maps'] || '';
+          // Priority: Endereço > Endereço Comercial > Logradouro > Localização > Endereço Cobrança > Link Google Maps
+          const addressInput = map['endereco'] || map['endereco comercial'] || map['logradouro'] || map['localizacao'] || map['endereco cobranca'] || map['link google maps'] || '';
           let { address, link, lat, lng } = parseHyperlink(addressInput);
 
           // Force CEP inclusion if present in a separate column
@@ -326,7 +326,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
           const productName = normalizedRow['nome do produto'] || normalizedRow['produto'] || normalizedRow['descricao'] || '';
           const purchaseDate = normalizedRow['data da compra'] || normalizedRow['data'] || normalizedRow['emissao'] || '';
 
-          const quantity = parseFloat(normalizedRow['quantidade'] || normalizedRow['qtd'] || '1');
+          const quantity = parseFloat(normalizedRow['quantidade de skus / produtos comprados'] || normalizedRow['quantidade'] || normalizedRow['qtd'] || '1');
           const safeQuantity = isNaN(quantity) ? 1 : quantity;
           const price = parseMoney(normalizedRow['valor unitario'] || normalizedRow['preco'] || '0');
           const totalValue = parseMoney(normalizedRow['valor total'] || normalizedRow['total'] || (safeQuantity * price).toString());
