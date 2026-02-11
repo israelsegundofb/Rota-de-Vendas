@@ -1,5 +1,5 @@
 # Build Stage
-FROM node:22-alpine as build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Porta padrão enviada pelo Cloud Run (8080)
-ENV PORT 8080
+ENV PORT=8080
 EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

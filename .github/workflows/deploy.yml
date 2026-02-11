@@ -104,22 +104,10 @@ jobs:
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      - name: 'Authorize Docker'
-        run: gcloud auth configure-docker southamerica-east1-docker.pkg.dev
-
-      - name: 'Build and Push Container'
+      - name: 'Deploy to Cloud Run from Source'
         run: |-
-          docker build \
-            --build-arg VITE_GOOGLE_API_KEY="${{ secrets.GOOGLE_MAPS_API_KEY }}" \
-            --build-arg VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}" \
-            --build-arg VITE_FIREBASE_PROJECT_ID="gen-lang-client-0586123917" \
-            --build-arg VITE_RECAPTCHA_SITE_KEY="${{ secrets.VITE_RECAPTCHA_SITE_KEY }}" \
-            -t southamerica-east1-docker.pkg.dev/gen-lang-client-0586123917/cloud-run-source-deploy/rota-de-vendas/rota-de-vendas-ga:${{ github.sha }} .
-          docker push southamerica-east1-docker.pkg.dev/gen-lang-client-0586123917/cloud-run-source-deploy/rota-de-vendas/rota-de-vendas-ga:${{ github.sha }}
-
-      - name: 'Deploy to Cloud Run'
-        uses: 'google-github-actions/deploy-cloudrun@v2'
-        with:
-          service: 'rota-de-vendas-ga'
-          region: 'southamerica-east1'
-          image: 'southamerica-east1-docker.pkg.dev/gen-lang-client-0586123917/cloud-run-source-deploy/rota-de-vendas/rota-de-vendas-ga:${{ github.sha }}'
+          gcloud run deploy rota-de-vendas-ga \
+            --source . \
+            --region southamerica-east1 \
+            --allow-unauthenticated \
+            --set-build-env-vars VITE_GOOGLE_API_KEY="${{ secrets.GOOGLE_MAPS_API_KEY }}",VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}",VITE_FIREBASE_PROJECT_ID="gen-lang-client-0586123917",VITE_RECAPTCHA_SITE_KEY="${{ secrets.VITE_RECAPTCHA_SITE_KEY }}"
