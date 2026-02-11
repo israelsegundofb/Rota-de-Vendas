@@ -104,14 +104,14 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (setUsers) setUsers(usersToSave);
                         setMasterClientList(loadInitialClients());
 
-                        console.log("Saving initial data to cloud...");
-                        await saveToCloud(
+                        console.log("Saving initial data to cloud (background attempt)...");
+                        saveToCloud(
                             loadInitialClients(),
                             loadInitialProducts(),
                             loadInitialCategories(),
                             usersToSave,
                             loadInitialFiles()
-                        ).catch(cloudErr => console.warn("First cloud save failed, will retry later", cloudErr));
+                        ).catch(cloudErr => console.warn("Initial cloud save failed (expected in some offline cases), will retry later", cloudErr));
 
                         setLoadingMessage('Configuração concluída!');
                         setLoadingProgress(100);
