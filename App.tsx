@@ -38,6 +38,7 @@ import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+import CustomDialog, { DialogType } from './components/CustomDialog';
 
 
 // Initial Mock Data
@@ -130,22 +131,59 @@ const App: React.FC = () => {
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
   const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
+  // Custom Dialog State
+  const [dialogConfig, setDialogConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string | string[];
+    type: DialogType;
+    onConfirm?: () => void;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showAlert = (title: string, message: string | string[], type: DialogType = 'info') => {
+    setDialogConfig({
+      isOpen: true,
+      title,
+      message,
+      type,
+      confirmLabel: 'Entendi'
+    });
+  };
+
+  const showConfirm = (title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
+    setDialogConfig({
+      isOpen: true,
+      title,
+      message,
+      type: 'confirm',
+      onConfirm,
+      confirmLabel: labels?.confirm || 'Confirmar',
+      cancelLabel: labels?.cancel || 'Cancelar'
+    });
+  };
+
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
 
   // Handle View Navigation with Confirmation
   const handleViewNavigation = (newView: string) => {
     if (procState.isActive && procState.status === 'processing') {
-      const shouldStop = window.confirm("Gostaria de Parar de Enviar o Arquivo?\n\nClique em OK para PARAR o envio.\nClique em Cancelar para CONTINUAR o envio.");
-      if (shouldStop) {
-        // User chose "Sim" (OK) -> Stop Upload
-        isUploadCancelled.current = true;
-        // Allow navigation
-        setActiveView(newView as any);
-      } else {
-        // User chose "Não" (Cancel) -> Continue Upload
-        return;
-      }
+      showConfirm(
+        "Parar Envio?",
+        ["Gostaria de parar de enviar o arquivo?", "O progresso atual será perdido."],
+        () => {
+          isUploadCancelled.current = true;
+          setActiveView(newView as any);
+        },
+        { confirm: 'Parar Envio', cancel: 'Continuar' }
+      );
     } else {
       setActiveView(newView as any);
     }
@@ -165,43 +203,44 @@ const App: React.FC = () => {
 
 
   const handleCleanupDuplicates = () => {
-    const confirmCleanup = window.confirm(
-      '⚠️ Remover Clientes Duplicados?\n\n' +
-      'Esta ação irá:\n' +
-      '• Identificar clientes com mesmo nome e endereço\n' +
-      '• Manter apenas 1 registro de cada\n' +
-      '• Atualizar a contagem total\n\n' +
-      'Deseja continuar?'
-    );
+    showConfirm(
+      'Remover Clientes Duplicados?',
+      [
+        'Esta ação irá identificar clientes com mesmo nome e endereço.',
+        'Manteremos apenas 1 registro de cada e atualizaremos a contagem total.'
+      ],
+      () => {
+        const seen = new Map<string, EnrichedClient>();
+        const unique: EnrichedClient[] = [];
+        let duplicateCount = 0;
 
-    if (!confirmCleanup) return;
+        masterClientList.forEach((client) => {
+          const key = `${client.companyName || ''}-${client.cleanAddress || ''}`.toLowerCase().trim();
+          if (seen.has(key)) {
+            duplicateCount++;
+          } else {
+            seen.set(key, client);
+            unique.push(client);
+          }
+        });
 
-    const seen = new Map<string, EnrichedClient>();
-    const unique: EnrichedClient[] = [];
-    let duplicateCount = 0;
+        if (duplicateCount === 0) {
+          showAlert('Sucesso', 'Nenhum cliente duplicado encontrado!', 'success');
+          return;
+        }
 
-    masterClientList.forEach((client) => {
-      const key = `${client.companyName || ''}-${client.cleanAddress || ''}`.toLowerCase().trim();
-      if (seen.has(key)) {
-        duplicateCount++;
-      } else {
-        seen.set(key, client);
-        unique.push(client);
+        setMasterClientList(unique);
+
+        showAlert(
+          'Limpeza Concluída!',
+          [
+            `${duplicateCount} clientes duplicados removidos.`,
+            `Total anterior: ${masterClientList.length}`,
+            `Total atual: ${unique.length}`
+          ],
+          'success'
+        );
       }
-    });
-
-    if (duplicateCount === 0) {
-      alert('✅ Nenhum cliente duplicado encontrado!');
-      return;
-    }
-
-    setMasterClientList(unique);
-
-    alert(
-      `✅ Limpeza Concluída!\n\n` +
-      `${duplicateCount} clientes duplicados removidos\n` +
-      `Total anterior: ${masterClientList.length}\n` +
-      `Total atual: ${unique.length}`
     );
   };
 
@@ -211,98 +250,97 @@ const App: React.FC = () => {
    */
   const handleMassUpdateClients = async () => {
     if (masterClientList.length === 0) {
-      alert('⚠️ Nenhum cliente na base para atualizar.');
+      showAlert('Aviso', 'Nenhum cliente na base para atualizar.', 'warning');
       return;
     }
 
-    const confirmUpdate = window.confirm(
-      '🚀 Iniciar Atualização em Massa?\n\n' +
-      'Este processo irá utilizar sua API CNPJa para:\n' +
-      '• Buscar CNPJs faltantes via Razão Social\n' +
-      '• Atualizar CNAEs (Atividade Econômica)\n' +
-      '• Atualizar Telefones e Endereços Oficiais\n' +
-      '• Re-gerar Georreferenciamento (Lat/Lng)\n\n' +
-      `Total de clientes: ${masterClientList.length}\n\n` +
-      'Deseja continuar?'
-    );
+    showConfirm(
+      'Iniciar Atualização em Massa?',
+      [
+        'Este processo utilizará sua API CNPJa para:',
+        '• Buscar CNPJs faltantes via Razão Social',
+        '• Atualizar CNAEs (Atividade Econômica)',
+        '• Telefones, Endereços e Georreferenciamento',
+        `Total de clientes: ${masterClientList.length}`
+      ],
+      async () => {
+        setProcState({
+          isActive: true,
+          current: 0,
+          total: masterClientList.length,
+          status: 'processing',
+          fileName: 'Enriquecimento de Base (CNPJa Comercial)',
+          ownerName: currentUser?.name || 'Sistema'
+        });
 
-    if (!confirmUpdate) return;
+        const limit = pLimit(3);
+        let updatedCount = 0;
+        let errorCount = 0;
 
-    setProcState({
-      isActive: true,
-      current: 0,
-      total: masterClientList.length,
-      status: 'processing',
-      fileName: 'Enriquecimento de Base (CNPJa Comercial)',
-      ownerName: currentUser?.name || 'Sistema'
-    });
+        const tasks = masterClientList.map((client, index) => limit(async () => {
+          try {
+            let activeCnpj = client.cnpj?.replace(/\D/g, '');
 
-    const limit = pLimit(3); // Concorrência moderada
-    let updatedCount = 0;
-    let errorCount = 0;
-
-    const tasks = masterClientList.map((client, index) => limit(async () => {
-      try {
-        let activeCnpj = client.cnpj?.replace(/\D/g, '');
-
-        // 1. Se não tem CNPJ, tenta descobrir pelo nome
-        if (!activeCnpj || activeCnpj.length !== 14) {
-          const searchResults = await pesquisarEmpresaPorEndereco({
-            filtros: client.companyName,
-            uf: client.state
-          });
-          if (searchResults && searchResults.length > 0) {
-            activeCnpj = searchResults[0].taxId;
-          }
-        }
-
-        // 2. Com o CNPJ, busca os dados completos
-        if (activeCnpj && activeCnpj.length === 14) {
-          const fullData = await consultarCNPJ(activeCnpj);
-          if (fullData) {
-            // 3. Atualiza o cliente na lista
-            setMasterClientList(prev => prev.map(c => {
-              if (c.id === client.id) {
-                return {
-                  ...c,
-                  cnpj: fullData.cnpj,
-                  companyName: fullData.nome_fantasia || fullData.razao_social || c.companyName,
-                  contact: fullData.ddd_telefone_1 || c.contact,
-                  cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
-                  mainCnae: fullData.cnae_fiscal,
-                  secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || [],
-                  lat: fullData.latitude || c.lat,
-                  lng: fullData.longitude || c.lng,
-                  googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
-                };
+            if (!activeCnpj || activeCnpj.length !== 14) {
+              const searchResults = await pesquisarEmpresaPorEndereco({
+                filtros: client.companyName,
+                uf: client.state
+              });
+              if (searchResults && searchResults.length > 0) {
+                activeCnpj = searchResults[0].taxId;
               }
-              return c;
-            }));
-            updatedCount++;
+            }
+
+            if (activeCnpj && activeCnpj.length === 14) {
+              const fullData = await consultarCNPJ(activeCnpj);
+              if (fullData) {
+                setMasterClientList(prev => prev.map(c => {
+                  if (c.id === client.id) {
+                    return {
+                      ...c,
+                      cnpj: fullData.cnpj,
+                      companyName: fullData.nome_fantasia || fullData.razao_social || c.companyName,
+                      contact: fullData.ddd_telefone_1 || c.contact,
+                      cleanAddress: `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`,
+                      mainCnae: fullData.cnae_fiscal,
+                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || [],
+                      lat: fullData.latitude || c.lat,
+                      lng: fullData.longitude || c.lng,
+                      googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
+                    };
+                  }
+                  return c;
+                }));
+                updatedCount++;
+              }
+            }
+          } catch (err) {
+            console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
+            errorCount++;
+          } finally {
+            setProcState(prev => ({ ...prev, current: index + 1 }));
           }
-        }
-      } catch (err) {
-        console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
-        errorCount++;
-      } finally {
-        setProcState(prev => ({ ...prev, current: index + 1 }));
+        }));
+
+        await Promise.all(tasks);
+
+        setProcState(prev => ({ ...prev, status: 'completed' }));
+
+        showAlert(
+          'Atualização Concluída!',
+          [
+            `Sucesso: ${updatedCount} clientes`,
+            `Erros/Não localizados: ${errorCount + (masterClientList.length - updatedCount - errorCount)}`,
+            'Sua base de dados agora está enriquecida!'
+          ],
+          'success'
+        );
+
+        setTimeout(() => {
+          setProcState(prev => ({ ...prev, isActive: false }));
+        }, 3000);
       }
-    }));
-
-    await Promise.all(tasks);
-
-    setProcState(prev => ({ ...prev, status: 'completed' }));
-
-    alert(
-      `✅ Atualização Concluída!\n\n` +
-      `• Sucesso: ${updatedCount} clientes\n` +
-      `• Erros/Não localizados: ${errorCount + (masterClientList.length - updatedCount - errorCount)}\n\n` +
-      'Sua base de dados agora está enriquecida e georreferenciada!'
     );
-
-    setTimeout(() => {
-      setProcState(prev => ({ ...prev, isActive: false }));
-    }, 3000);
   };
 
 
@@ -338,25 +376,18 @@ const App: React.FC = () => {
   };
 
   const handleClearAllClients = () => {
-    if (!window.confirm(
-      '⚠️ ATENÇÃO: Limpar TODOS os Clientes?\n\n' +
-      'Esta ação irá:\n' +
-      '• Remover TODOS os clientes do sistema\n' +
-      '• Limpar a listagem de arquivos\n' +
-      '• Resetar contadores\n\n' +
-      'Os vendedores, produtos e categorias não serão afetados.\n\n' +
-      'Deseja continuar?'
-    )) return;
-
-    // Clear all clients
-    setMasterClientList([]);
-
-    // Clear all uploaded client files
-    setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
-
-    alert(
-      '✅ Base de Clientes Limpa!\n\n' +
-      'Você pode agora fazer upload de novas planilhas de clientes.'
+    showConfirm(
+      'Limpar TODOS os Clientes?',
+      [
+        '⚠️ ATENÇÃO: Esta ação removerá TODOS os clientes do sistema.',
+        '• Limpeza da listagem de arquivos e reset de contadores.',
+        '• Vendedores, produtos e categorias NÃO serão afetados.'
+      ],
+      () => {
+        setMasterClientList([]);
+        setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+        showAlert('Sucesso', 'Base de clientes limpa com sucesso!', 'success');
+      }
     );
   };
 
@@ -380,50 +411,56 @@ const App: React.FC = () => {
     const clientsMissingPlusCode = masterClientList.filter(c => !c.plusCode && c.lat && c.lng && c.lat !== 0);
 
     if (clientsMissingPlusCode.length === 0) {
-      alert('✅ Todos os clientes com coordenadas já possuem Plus Code!');
+      showAlert('Aviso', 'Todos os clientes com coordenadas já possuem Plus Code!', 'info');
       return;
     }
 
-    const confirm = window.confirm(`Deseja gerar Plus Codes para ${clientsMissingPlusCode.length} clientes? \nIsso utilizará a cota da API de Geocoding do Google.`);
-    if (!confirm) return;
+    showConfirm(
+      'Gerar Plus Codes?',
+      [
+        `Deseja gerar Plus Codes para ${clientsMissingPlusCode.length} clientes?`,
+        'Isso utilizará a cota da API de Geocoding do Google.'
+      ],
+      async () => {
+        setProcState({
+          isActive: true,
+          current: 0,
+          total: clientsMissingPlusCode.length,
+          status: 'processing',
+          fileName: 'Geração de Plus Codes',
+          ownerName: currentUser?.name || 'Sistema'
+        });
 
-    setProcState({
-      isActive: true,
-      current: 0,
-      total: clientsMissingPlusCode.length,
-      status: 'processing',
-      fileName: 'Geração de Plus Codes',
-      ownerName: currentUser?.name || 'Sistema'
-    });
+        let updatedCount = 0;
+        const newList = [...masterClientList];
 
-    let updatedCount = 0;
-    const newList = [...masterClientList];
+        for (let i = 0; i < clientsMissingPlusCode.length; i++) {
+          if (isUploadCancelled.current) break;
 
-    for (let i = 0; i < clientsMissingPlusCode.length; i++) {
-      if (isUploadCancelled.current) break;
-
-      const client = clientsMissingPlusCode[i];
-      try {
-        const plusCode = await reverseGeocodePlusCode(client.lat, client.lng, googleMapsApiKey || '');
-        if (plusCode) {
-          const index = newList.findIndex(c => c.id === client.id);
-          if (index !== -1) {
-            newList[index] = { ...newList[index], plusCode };
-            updatedCount++;
+          const client = clientsMissingPlusCode[i];
+          try {
+            const plusCode = await reverseGeocodePlusCode(client.lat, client.lng, googleMapsApiKey || '');
+            if (plusCode) {
+              const index = newList.findIndex(c => c.id === client.id);
+              if (index !== -1) {
+                newList[index] = { ...newList[index], plusCode };
+                updatedCount++;
+              }
+            }
+          } catch (e) {
+            console.error(`Error generating Plus Code for ${client.companyName}:`, e);
           }
+
+          setProcState(prev => ({ ...prev, current: i + 1 }));
         }
-      } catch (e) {
-        console.error(`Error generating Plus Code for ${client.companyName}:`, e);
+
+        setMasterClientList(newList);
+        setProcState(prev => ({ ...prev, status: 'completed', isActive: true }));
+        isUploadCancelled.current = false;
+
+        showAlert('Sucesso', `Processo concluído! ${updatedCount} Plus Codes gerados.`, 'success');
       }
-
-      setProcState(prev => ({ ...prev, current: i + 1 }));
-    }
-
-    setMasterClientList(newList);
-    setProcState(prev => ({ ...prev, status: 'completed', isActive: true }));
-    isUploadCancelled.current = false;
-
-    alert(`✅ Processo concluído! ${updatedCount} Plus Codes gerados.`);
+    );
   };
 
   const handleUpdateClient = async (updatedClient: EnrichedClient) => {
@@ -536,26 +573,27 @@ const App: React.FC = () => {
     const isPartial = !!targetId;
 
     const message = isPartial
-      ? `⚠️ ATENÇÃO ⚠️\n\nDeseja remover APENAS os clientes de:\n\n👤 ${targetName}?\n\n(Os outros dados serão mantidos)`
-      : `⚠️ AVISO CRÍTICO ⚠️\n\nTem certeza que deseja DELETAR TODOS os clientes do sistema?\nIsso removerá todo o histórico e limpará o cache local.\n\nEsta ação não pode ser desfeita.`;
+      ? `Deseja remover APENAS os clientes de ${targetName}? (Os outros dados serão mantidos)`
+      : `Tem certeza que deseja DELETAR TODOS os clientes do sistema? Isso removerá todo o histórico.`;
 
-    const confirmClear = window.confirm(message);
+    showConfirm(
+      isPartial ? 'Limpeza Parcial' : 'AVISO CRÍTICO',
+      message,
+      () => {
+        if (isPartial && targetId) {
+          setMasterClientList(prev => prev.filter(c => c.salespersonId !== targetId));
+          showAlert('Sucesso', `Dados de ${targetName} removidos!`, 'success');
+        } else {
+          setMasterClientList([]);
+          localStorage.removeItem('vendas_ai_clients');
+          showAlert('Sucesso', 'Base de dados limpa com sucesso!', 'success');
+        }
 
-    if (confirmClear) {
-      if (isPartial && targetId) {
-        setMasterClientList(prev => prev.filter(c => c.salespersonId !== targetId));
-        alert(`Dados de ${targetName} removidos com sucesso!`);
-      } else {
-        setMasterClientList([]);
-        localStorage.removeItem('vendas_ai_clients');
-        alert("Base de dados limpa com sucesso!");
+        setProcState({
+          isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
+        });
       }
-
-      // Optional: Clear processing state if relevant
-      setProcState({
-        isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
-      });
-    }
+    );
   };
 
   // Simulate Sales Logic
@@ -1973,6 +2011,18 @@ const App: React.FC = () => {
 
         </main >
       </div >
+
+      {/* Custom Global Dialog System */}
+      <CustomDialog
+        isOpen={dialogConfig.isOpen}
+        onClose={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={dialogConfig.onConfirm}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        type={dialogConfig.type}
+        confirmLabel={dialogConfig.confirmLabel}
+        cancelLabel={dialogConfig.cancelLabel}
+      />
     </GoogleReCaptchaProvider>
   );
 }; // End of App component

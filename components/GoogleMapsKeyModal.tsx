@@ -31,45 +31,47 @@ const GoogleMapsKeyModal: React.FC<GoogleMapsKeyModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-scale-in">
-                <div className="bg-blue-600 p-6 text-center relative border-b border-blue-700">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-scale-in border border-white">
+                <div className="bg-blue-600 p-8 text-center relative">
                     <button
                         onClick={onClose}
-                        className="absolute right-4 top-4 text-white/50 hover:text-white transition-colors"
+                        className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors"
                         title="Fechar"
                     >
                         <X className="w-6 h-6" />
                     </button>
-                    <div className="mx-auto w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md">
+                    <div className="mx-auto w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md ring-4 ring-blue-500/30 shadow-inner">
                         <Key className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-xl font-bold text-white">Ativar Mapa do Google</h2>
-                    <p className="text-blue-100 text-sm mt-1">Para carregar o mapa, você precisa de uma chave ativa.</p>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Ativar Mapa</h2>
+                    <p className="text-blue-100 text-sm mt-2 font-medium">Configure seu acesso ao Google Maps</p>
                 </div>
 
                 <div className="p-8 space-y-6">
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                        <p className="text-sm text-blue-800 leading-relaxed">
+                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-4">
+                        <div className="bg-white p-2 rounded-lg shadow-sm shrink-0">
+                            <AlertCircle className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <p className="text-sm text-blue-800 leading-relaxed font-medium">
                             {isManual
-                                ? "Insira sua própria Chave de API do Google Maps abaixo para ativar as funcionalidades do mapa."
-                                : "Detectamos que seu mapa está aguardando ativação. Use a chave padrão do sistema para liberar o mapa agora."
+                                ? "Insira sua própria Chave de API do Google Maps abaixo para ativar as funcionalidades."
+                                : "Detectamos que seu mapa está aguardando ativação. Use a chave padrão do sistema."
                             }
                         </p>
                     </div>
 
                     {!isManual ? (
                         <div className="animate-fade-in">
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Chave Sugerida (Segura)</label>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">Chave Recomendada</label>
                             <div className="flex gap-2">
-                                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 font-mono text-sm text-gray-700 flex items-center justify-between">
+                                <div className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3.5 font-mono text-sm text-gray-700 flex items-center justify-between shadow-inner">
                                     <span className="truncate">
                                         {showKey ? suggestedKey : maskKey(suggestedKey)}
                                     </span>
                                     <button
                                         onClick={() => setShowKey(!showKey)}
-                                        className="text-gray-400 hover:text-gray-600 p-1"
+                                        className="text-gray-400 hover:text-gray-600 p-1 transition-colors"
                                         title={showKey ? "Esconder" : "Mostrar"}
                                     >
                                         {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -77,7 +79,7 @@ const GoogleMapsKeyModal: React.FC<GoogleMapsKeyModalProps> = ({
                                 </div>
                                 <button
                                     onClick={handleCopy}
-                                    className="bg-gray-100 hover:bg-gray-200 text-gray-600 p-3 rounded-lg transition-colors border border-gray-200"
+                                    className="bg-gray-50 hover:bg-gray-100 text-blue-600 p-3.5 rounded-xl transition-all border border-gray-100 shadow-sm active:scale-95"
                                     title="Copiar chave"
                                 >
                                     <Copy className="w-5 h-5" />
@@ -86,17 +88,17 @@ const GoogleMapsKeyModal: React.FC<GoogleMapsKeyModalProps> = ({
                         </div>
                     ) : (
                         <div className="animate-fade-in">
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Digite sua Chave</label>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">Configuração Manual</label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={manualKey}
                                     onChange={(e) => setManualKey(e.target.value)}
-                                    placeholder="AIza..."
-                                    className="w-full bg-white border border-blue-200 rounded-lg pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="Começa com AIza..."
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-4 py-4 text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                                     autoFocus
                                 />
-                                <Edit3 className="absolute left-3 top-3.5 w-4 h-4 text-blue-400" />
+                                <Edit3 className="absolute left-4 top-4.5 w-4 h-4 text-gray-400" />
                             </div>
                         </div>
                     )}
@@ -105,10 +107,10 @@ const GoogleMapsKeyModal: React.FC<GoogleMapsKeyModalProps> = ({
                         <button
                             onClick={() => onConfirm(isManual ? manualKey : suggestedKey)}
                             disabled={isManual && !manualKey.trim()}
-                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95"
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-500 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-[0.98]"
                         >
                             <Check className="w-5 h-5" />
-                            {isManual ? "Ativar com minha Chave" : "Confirmar e Usar esta Chave"}
+                            {isManual ? "Ativar Manualmente" : "Carregar Mapa Agora"}
                         </button>
 
                         <button
@@ -117,9 +119,9 @@ const GoogleMapsKeyModal: React.FC<GoogleMapsKeyModalProps> = ({
                                 setManualKey('');
                                 setShowKey(false);
                             }}
-                            className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 font-medium transition-colors flex items-center justify-center gap-2"
+                            className="w-full py-2 text-xs text-gray-400 hover:text-blue-600 font-bold uppercase tracking-widest transition-all"
                         >
-                            {isManual ? "Voltar para a chave sugerida" : "Digitar outra chave manualmente..."}
+                            {isManual ? "Voltar para recomendada" : "Usar outra chave (Manual)"}
                         </button>
                     </div>
                 </div>
