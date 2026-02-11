@@ -162,71 +162,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex flex-col h-full bg-background overflow-hidden animate-in fade-in duration-500">
             {/* 1. Header with Global Logic */}
             <div className="flex flex-col border-b border-outline-variant bg-surface/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
-                <div className="flex justify-between items-center px-8 py-4">
+                <div className="flex flex-wrap items-center justify-between px-8 py-4 gap-4">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 text-primary rounded-2xl shadow-inner">
-                            <Activity size={28} />
+                        <div className="p-2.5 bg-primary/10 text-primary rounded-2xl shadow-inner">
+                            <Activity size={24} />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black text-on-surface tracking-tight flex items-center gap-3">
+                            <h1 className="text-xl font-black text-on-surface tracking-tight flex items-center gap-2">
                                 Dashboard Pro
-                                <span className="text-[10px] bg-primary text-on-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-[0.2em] shadow-sm">Inteligência</span>
+                                <span className="hidden sm:inline-block text-[9px] bg-primary text-on-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-[0.1em] shadow-sm">Inteligência</span>
                             </h1>
-                            <div className="flex items-center gap-2 mt-0.5 text-on-surface-variant/60 text-xs font-medium">
-                                <span className="flex items-center gap-1"><RefreshCcw size={12} className="animate-spin-slow" /> Live Update</span>
+                            <div className="flex items-center gap-2 mt-0.5 text-on-surface-variant/50 text-[10px] font-medium">
+                                <span className="flex items-center gap-1"><RefreshCcw size={10} className="animate-spin-slow" /> Live Update</span>
                                 <span>•</span>
-                                <span>Sincronizado em {lastUpdate.toLocaleTimeString()}</span>
+                                <span>{lastUpdate.toLocaleTimeString()}</span>
                             </div>
                         </div>
                     </div>
+
+                    <div className="flex items-center flex-1 max-w-4xl gap-3">
+                        {/* Integrated Search */}
+                        <div className="relative group flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Buscar cliente ou empresa..."
+                                className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant/30 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                            />
+                        </div>
+
+                        {/* Integrated Date Picker */}
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${startDate || endDate ? 'bg-primary/5 border-primary/20' : 'bg-surface-container-low border-outline-variant/30'}`}>
+                            <Calendar className="w-3.5 h-3.5 text-primary" />
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="text-[10px] bg-transparent border-none outline-none text-on-surface font-bold w-24"
+                                    title="Data Inicial"
+                                />
+                                <span className="text-outline-variant/30">-</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="text-[10px] bg-transparent border-none outline-none text-on-surface font-bold w-24"
+                                    title="Data Final"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     <button
                         onClick={onClose}
-                        className="p-3 hover:bg-surface-container-highest rounded-2xl transition-all active:scale-95 group border border-transparent hover:border-outline-variant shadow-sm"
+                        className="p-2.5 hover:bg-surface-container-highest rounded-2xl transition-all active:scale-95 group border border-transparent hover:border-outline-variant shadow-sm"
                         title="Fechar Dashboard"
                     >
-                        <X className="w-6 h-6 text-on-surface-variant group-hover:text-primary" />
+                        <X className="w-5 h-5 text-on-surface-variant group-hover:text-primary" />
                     </button>
                 </div>
 
-                {/* 2. Enhanced Filter Bar (MD3 Style) */}
-                <div className="px-8 pb-4 flex flex-wrap gap-3 items-center">
-                    <div className="relative group max-w-xs flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant group-focus-within:text-primary transition-colors" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Buscar cliente ou empresa..."
-                            className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-secondary-container/30 px-3 py-1.5 rounded-xl border border-secondary-container/50">
-                        <Filter className="w-4 h-4 text-secondary" />
-                        <span className="text-xs font-bold text-secondary uppercase tracking-tight">Filtros</span>
-                    </div>
-
-                    {/* Date Picker (Period) */}
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${startDate || endDate ? 'bg-primary/5 border-primary/20' : 'bg-surface-container-low border-outline-variant/50'}`}>
-                        <Calendar className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black text-on-surface opacity-40 uppercase">Período</span>
-                        <div className="flex items-center gap-1">
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="text-[11px] bg-transparent border-none outline-none text-on-surface font-bold w-24"
-                                title="Data Inicial"
-                            />
-                            <span className="text-outline-variant">|</span>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="text-[11px] bg-transparent border-none outline-none text-on-surface font-bold w-24"
-                                title="Data Final"
-                            />
-                        </div>
+                {/* 2. Enhanced Filter Bar (Secondary Filters) */}
+                <div className="px-8 pb-4 flex flex-wrap gap-2 items-center">
+                    <div className="flex items-center gap-2 bg-secondary-container/20 px-2.5 py-1 rounded-lg border border-secondary-container/30 mr-2">
+                        <Filter className="w-3 h-3 text-secondary" />
+                        <span className="text-[10px] font-bold text-secondary uppercase tracking-tight">Refinar</span>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
