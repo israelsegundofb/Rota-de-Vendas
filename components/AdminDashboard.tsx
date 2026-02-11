@@ -324,6 +324,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </select>
                             </div>
                         </div>
+
+                        {/* Brands/Categories Filter */}
+                        <div className="flex items-center gap-1 bg-surface-container-low border border-outline-variant p-1 rounded-xl shadow-sm">
+                            <div className="relative">
+                                <Package className="w-3.5 h-3.5 text-on-surface-variant/50 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <select
+                                    value={filterProductCategory}
+                                    onChange={(e) => setFilterProductCategory(e.target.value)}
+                                    className="text-xs bg-transparent pl-7 pr-3 py-1 font-bold outline-none cursor-pointer max-w-[180px]"
+                                    title="Filtrar por Marcas / Categorias de Produtos"
+                                >
+                                    <option value="Todos">Todas Marcas / Cat.</option>
+                                    {productCategories.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
