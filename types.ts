@@ -1,9 +1,17 @@
 export interface RawClient {
   companyName: string;
-  cnpj?: string; // New: optional CNPJ for data enrichment
+  cnpj?: string;
   ownerName: string;
   phone: string;
+  whatsapp?: string;
   address: string;
+  street?: string;
+  number?: string;
+  district?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
   googleMapsLink?: string;
   latitude?: number;
   longitude?: number;
@@ -27,6 +35,7 @@ export interface EnrichedClient {
   companyName: string;
   ownerName: string;
   contact: string;
+  whatsapp?: string;
   originalAddress: string;
   cleanAddress: string;
   cnpj?: string;
@@ -36,6 +45,8 @@ export interface EnrichedClient {
   region: 'Norte' | 'Nordeste' | 'Centro-Oeste' | 'Sudeste' | 'Sul' | 'Indefinido';
   state: string;
   city: string;
+  zip?: string;
+  country?: string;
   lat: number;
   lng: number;
   googleMapsUri?: string;

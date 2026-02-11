@@ -203,20 +203,42 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                             />
                         </div>
 
-                        {/* Contato */}
+                        {/* Contato (Telefone) */}
                         <div className="space-y-1">
                             <label className="text-xs font-medium text-on-surface-variant ml-1">
-                                Contato
+                                Telefone Comercial
                             </label>
-                            <input
-                                type="text"
-                                name="contact"
-                                value={formData.contact}
-                                onChange={handleChange}
-                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
-                                title="Contato (Telefone/WhatsApp)"
-                                placeholder="Contato (Telefone/WhatsApp)"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    name="contact"
+                                    value={formData.contact}
+                                    onChange={handleChange}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 pl-10 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                                    title="Telefone Comercial"
+                                    placeholder="(00) 0000-0000"
+                                />
+                                <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                            </div>
+                        </div>
+
+                        {/* WhatsApp */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-on-surface-variant ml-1">
+                                WhatsApp
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    name="whatsapp"
+                                    value={formData.whatsapp || ''}
+                                    onChange={handleChange}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 pl-10 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                                    title="WhatsApp"
+                                    placeholder="(00) 00000-0000"
+                                />
+                                <Globe className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                            </div>
                         </div>
 
                         {/* Categoria/Segmento - MULTI SELECT */}
@@ -277,37 +299,59 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                             </div>
                         </div>
 
-                        {/* Município */}
-                        <div className="space-y-1">
-                            <label className="text-xs font-medium text-on-surface-variant ml-1">
-                                Município
-                            </label>
-                            <input
-                                type="text"
-                                name="city"
-                                value={formData.city}
-                                onChange={handleChange}
-                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
-                                title="Município"
-                                placeholder="Município"
-                            />
+                        {/* Cidade & Estado (Compact) */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-on-surface-variant ml-1 font-bold">Cidade</label>
+                                <input
+                                    type="text"
+                                    name="city"
+                                    value={formData.city}
+                                    onChange={handleChange}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary outline-none transition-all"
+                                    title="Município / Cidade"
+                                    placeholder="Cidade"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-on-surface-variant ml-1 font-bold">Estado (UF)</label>
+                                <input
+                                    type="text"
+                                    name="state"
+                                    value={formData.state}
+                                    onChange={handleChange}
+                                    maxLength={2}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary outline-none transition-all uppercase"
+                                    title="Estado (UF)"
+                                    placeholder="UF"
+                                />
+                            </div>
                         </div>
 
-                        {/* UF */}
-                        <div className="space-y-1">
-                            <label className="text-xs font-medium text-on-surface-variant ml-1">
-                                UF
-                            </label>
-                            <input
-                                type="text"
-                                name="state"
-                                maxLength={2}
-                                value={formData.state}
-                                onChange={handleChange}
-                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all uppercase"
-                                title="UF"
-                                placeholder="UF"
-                            />
+                        {/* CEP & País */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-on-surface-variant ml-1 font-bold">CEP</label>
+                                <input
+                                    type="text"
+                                    name="zip"
+                                    value={formData.zip || ''}
+                                    onChange={handleChange}
+                                    className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary outline-none transition-all"
+                                    placeholder="00000-000"
+                                    title="CEP / Código Postal"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-on-surface-variant ml-1 font-bold">País</label>
+                                <input
+                                    type="text"
+                                    value="Brasil"
+                                    readOnly
+                                    title="País (Padrão: Brasil)"
+                                    className="w-full bg-surface-container-highest/50 border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface-variant outline-none"
+                                />
+                            </div>
                         </div>
                     </div>
 

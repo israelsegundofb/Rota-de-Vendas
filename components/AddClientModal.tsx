@@ -25,13 +25,16 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
         cnpj: '',
         ownerName: '',
         contact: '',
-        category: ['Outros'], // Changed to array
+        whatsapp: '',
+        category: ['Outros'],
         region: 'Nordeste',
         state: 'CE',
         city: 'Fortaleza',
         originalAddress: '',
         cleanAddress: '',
         plusCode: '',
+        zip: '',
+        country: 'Brasil',
         lat: 0,
         lng: 0,
         mainCnae: '',
@@ -52,6 +55,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 cnpj: '',
                 ownerName: '',
                 contact: '',
+                whatsapp: '',
                 category: ['Outros'],
                 region: 'Nordeste',
                 state: 'CE',
@@ -59,6 +63,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 originalAddress: '',
                 cleanAddress: '',
                 plusCode: '',
+                zip: '',
+                country: 'Brasil',
                 lat: 0,
                 lng: 0,
                 mainCnae: '',
@@ -131,6 +137,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                     state: data.uf || prev.state,
                     region: data.uf ? getRegionByUF(data.uf) : prev.region,
                     contact: data.ddd_telefone_1 || prev.contact,
+                    whatsapp: data.ddd_telefone_1 || prev.whatsapp, // Fallback to phone as whatsapp if found
                     lat: data.latitude || 0,
                     lng: data.longitude || 0,
                     cleanAddress: hasNewAddress
@@ -172,6 +179,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             companyName: formData.companyName,
             ownerName: formData.ownerName || 'Não Informado',
             contact: formData.contact,
+            whatsapp: formData.whatsapp,
             category: formData.category,
             region: formData.region as any,
             state: formData.state,
@@ -184,7 +192,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             lat: formData.lat,
             lng: formData.lng,
             mainCnae: formData.mainCnae,
-            secondaryCnaes: formData.secondaryCnaes
+            secondaryCnaes: formData.secondaryCnaes,
+            zip: formData.zip,
+            country: 'Brasil'
         });
 
         setIsSubmitting(false);

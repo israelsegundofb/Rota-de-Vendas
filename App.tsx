@@ -792,9 +792,47 @@ const App: React.FC = () => {
         sourceFileId: fileId
       }));
 
-      // Update Master List - APPEND mode
+      // Update Master List - UPSERT mode (Merge existing clients)
       setMasterClientList(prev => {
-        return [...prev, ...taggedData];
+        const list = [...prev];
+        taggedData.forEach(newClient => {
+          const cleanNewCnpj = newClient.cnpj?.replace(/\D/g, '');
+
+          const existingIdx = list.findIndex(c => {
+            const cleanCnpj = c.cnpj?.replace(/\D/g, '');
+            if (cleanNewCnpj && cleanCnpj && cleanNewCnpj.length === 14 && cleanCnpj.length === 14) {
+              return cleanNewCnpj === cleanCnpj;
+            }
+            // Fallback to Name + City matching if CNPJ is missing
+            return c.companyName.toLowerCase().trim() === newClient.companyName.toLowerCase().trim() &&
+              c.city.toLowerCase().trim() === newClient.city.toLowerCase().trim();
+          });
+
+          if (existingIdx !== -1) {
+            // MERGE: Keep existing data if new is missing, but prefer new data for updates
+            const existing = list[existingIdx];
+            list[existingIdx] = {
+              ...existing,
+              ...newClient,
+              // Special preservation: don't overwrite with empty values if we have data
+              ownerName: newClient.ownerName || existing.ownerName,
+              contact: newClient.contact || existing.contact,
+              whatsapp: newClient.whatsapp || existing.whatsapp,
+              cnpj: newClient.cnpj || existing.cnpj,
+              mainCnae: newClient.mainCnae || existing.mainCnae,
+              secondaryCnaes: (newClient.secondaryCnaes && newClient.secondaryCnaes.length > 0) ? newClient.secondaryCnaes : existing.secondaryCnaes,
+              lat: (newClient.lat !== 0) ? newClient.lat : existing.lat,
+              lng: (newClient.lng !== 0) ? newClient.lng : existing.lng,
+              googleMapsUri: newClient.googleMapsUri || existing.googleMapsUri,
+              plusCode: newClient.plusCode || existing.plusCode,
+              // Keep original source file ID if the new one doesn't have a valid one? 
+              // Actually newClient always has the new fileId from taggedData.
+            };
+          } else {
+            list.push(newClient);
+          }
+        });
+        return list;
       });
 
       // We don't automatically switch filter here.

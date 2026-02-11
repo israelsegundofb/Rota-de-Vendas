@@ -121,7 +121,26 @@ export const processClientsWithAI = async (
       }
     }
 
-    const rawAddress = cnpjData?.logradouro ? `${cnpjData.logradouro}, ${cnpjData.numero}${cnpjData.complemento ? ` - ${cnpjData.complemento}` : ''}, ${cnpjData.bairro}, ${cnpjData.municipio} - ${cnpjData.uf}` : (client.address || "");
+    // Construct address from parts if the main address field is empty
+    let rawAddress = client.address || "";
+    if (!rawAddress && (client.street || client.city)) {
+      const parts = [
+        client.street,
+        client.number,
+        client.district,
+        client.city,
+        client.state,
+        client.zip,
+        client.country
+      ].filter(Boolean);
+      rawAddress = parts.join(", ");
+    }
+
+    // Override with CNPJ data if available (usually more accurate)
+    if (cnpjData?.logradouro) {
+      rawAddress = `${cnpjData.logradouro}, ${cnpjData.numero}${cnpjData.complemento ? ` - ${cnpjData.complemento}` : ''}, ${cnpjData.bairro}, ${cnpjData.municipio} - ${cnpjData.uf}`;
+    }
+
     const address = cleanAddress(rawAddress);
     const company = cnpjData?.nome_fantasia || cnpjData?.razao_social || client.companyName || "Empresa Desconhecida";
     const owner = client.ownerName || "";
@@ -149,6 +168,7 @@ export const processClientsWithAI = async (
 
       IMPORTANTE: Use o endereço "${address}" como âncora principal para a busca.
       ${cnpjData ? `DADO ADICIONAL: O CNPJ da empresa é ${cnpjData.cnpj}.` : ""}
+      ${client.city ? `DADO LOCALIDADE: Cidade: ${client.city}${client.state ? `, Estado: ${client.state}` : ''}` : ""}
 
       Retorne APENAS um objeto JSON válido com os dados encontrados:
       {
@@ -305,6 +325,8 @@ export const processClientsWithAI = async (
         city: finalCity,
         lat: finalLat,
         lng: finalLng,
+        whatsapp: client.whatsapp || aiData.phone || "",
+        plusCode: aiData.plusCode || "",
         googleMapsUri: client.googleMapsLink || googleMapsUri
       };
     } catch (finalError) {
@@ -322,8 +344,9 @@ export const processClientsWithAI = async (
         region: 'Indefinido',
         state: 'BR',
         city: 'Erro Critico',
-        lat: 0,
-        lng: 0,
+        lat: client.latitude || 0,
+        lng: client.longitude || 0,
+        whatsapp: client.whatsapp || "",
         googleMapsUri: client.googleMapsLink
       };
     }
