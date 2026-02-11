@@ -137,7 +137,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
             {/* Popover - MD3 Style */}
             {isOpen && (
-                <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-outline-variant rounded-2xl shadow-elevation-3 p-4 min-w-[320px] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-full right-0 mt-2 z-50 bg-white border border-outline-variant rounded-2xl shadow-elevation-3 p-4 min-w-[280px] sm:min-w-[320px] animate-in fade-in slide-in-from-top-2 duration-200">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-bold text-on-surface ml-2">
