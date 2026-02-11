@@ -9,11 +9,10 @@
 */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar } from 'lucide-react';
-import { RawClient, EnrichedClient, Product, UploadedFile } from './types';
-import type { AppUser } from './types';
+import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
-import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
+import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
@@ -42,6 +41,7 @@ import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import CustomDialog, { DialogType } from './components/CustomDialog';
+import SalesHistoryPanel from './components/SalesHistoryPanel';
 
 
 // Initial Mock Data
@@ -127,7 +127,7 @@ const App: React.FC = () => {
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
-  const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history'>('map');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
@@ -658,10 +658,10 @@ const App: React.FC = () => {
       const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, numProducts);
 
-      return { ...client, purchasedProducts: selected };
+      return { ...client, purchasedProducts: selected.map(p => ({ ...p, purchaseDate: new Date().toISOString() })) };
     });
 
-    setMasterClientList(updatedClients);
+    setMasterClientList(updatedClients as EnrichedClient[]);
   };
 
   const handleInvalidKey = async () => {
@@ -894,22 +894,54 @@ const App: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file || !currentUser) return;
 
-    let ownerId = currentUser.id;
-    let ownerName = currentUser.name;
+    await handleUnifiedFileUpload(file);
+    event.target.value = '';
+  };
 
-    if (isAdmin(currentUser.role)) {
-      if (!targetUploadUserId) {
-        alert("Selecione um vendedor para atribuir esta planilha.");
-        event.target.value = '';
-        return;
-      }
+  const handleUnifiedFileUpload = async (file: File) => {
+    if (!currentUser) return;
+
+    // 1. Detect Type
+    // For Excel files, we temporarily assume 'clients' or handle specifically if needed, 
+    // but the request focuses on CSV for now.
+    let type: 'clients' | 'products' | 'purchases' = 'clients';
+
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      // Need a quick peek at the headers
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target?.result as string;
+        const firstLine = text.split('\n')[0];
+        const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
+        type = detectCSVType(headers);
+        console.log(`[APP] Auto-Detected File Type: ${type}`);
+
+        await routeFileUpload(file, type);
+      };
+      reader.readAsText(file.slice(0, 1000));
+    } else {
+      // Standard Excel routing
+      await routeFileUpload(file, 'clients');
+    }
+  };
+
+  const routeFileUpload = async (file: File, type: 'clients' | 'products' | 'purchases') => {
+    let ownerId = currentUser!.id;
+    if (isAdmin(currentUser!.role) && targetUploadUserId) {
       ownerId = targetUploadUserId;
-      const targetUser = users.find(u => u.id === targetUploadUserId);
-      ownerName = targetUser?.name || 'Unknown';
     }
 
-    await handleClientFileDirect(file, ownerId);
-    event.target.value = '';
+    switch (type) {
+      case 'clients':
+        await handleClientFileDirect(file, ownerId);
+        break;
+      case 'products':
+        await handleProductFileUpload(file);
+        break;
+      case 'purchases':
+        await handlePurchaseUpdateUpload(file, ownerId);
+        break;
+    }
   };
 
 
@@ -1017,8 +1049,8 @@ const App: React.FC = () => {
             updatedCount++;
             const clientPurchases = groupedByClient[key];
 
-            // Map CSV records to Product objects
-            const newPurchasedProducts: Product[] = clientPurchases.map(rec => {
+            // Map CSV records to PurchaseRecord objects
+            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map(rec => {
               // Try to enrich with master catalog
               const masterProd = products.find(p =>
                 (rec.sku && p.sku === rec.sku) ||
@@ -1041,10 +1073,13 @@ const App: React.FC = () => {
               }
             });
 
-            // UPDATE CLIENT: Clear old and set new as requested
+            // UPDATE CLIENT: ACCUMULATE AND MERGE
             newList[clientIdx] = {
               ...newList[clientIdx],
-              purchasedProducts: newPurchasedProducts
+              purchasedProducts: [
+                ...(newList[clientIdx].purchasedProducts || []),
+                ...newPurchasedProducts
+              ]
             };
           }
         });
@@ -1302,6 +1337,17 @@ const App: React.FC = () => {
               >
                 <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
                 Listagem de Dados
+              </button>
+
+              <button
+                onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <ShoppingBag className={`w-5 h-5 ${activeView === 'history' ? 'fill-current' : ''}`} />
+                Histórico de Vendas
               </button>
             </nav>
 
@@ -2073,7 +2119,7 @@ const App: React.FC = () => {
                             </div>
                           }
                         />
-                      ) : (
+                      ) : activeView === 'table' ? (
                         <ClientList
                           clients={filteredClients}
                           onUpdateClient={handleUpdateClient}
@@ -2091,7 +2137,18 @@ const App: React.FC = () => {
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
                           onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
                         />
-                      )}
+                      ) : activeView === 'history' ? (
+                        <SalesHistoryPanel
+                          clients={filteredClients}
+                          users={users}
+                          startDate={startDate}
+                          endDate={endDate}
+                          onRangeChange={(start, end) => {
+                            setStartDate(start);
+                            setEndDate(end);
+                          }}
+                        />
+                      ) : null}
                     </div>
                   )}
                 </div>

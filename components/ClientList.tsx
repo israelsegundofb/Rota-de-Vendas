@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { EnrichedClient, UserRole, Product, AppUser, UploadedFile } from '../types';
+import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isAdmin, isSalesTeam } from '../utils/authUtils';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag, Briefcase } from 'lucide-react';
@@ -20,6 +20,9 @@ interface ClientListProps {
   uploadedFiles?: UploadedFile[];
   onGeneratePlusCodes?: () => void;
   onCNPJAuthError?: () => void;
+  filterOnlyWithPurchases?: boolean;
+  setFilterOnlyWithPurchases?: (value: boolean) => void;
+  resetFilters?: () => void;
 }
 
 const ClientList: React.FC<ClientListProps> = ({
@@ -34,7 +37,10 @@ const ClientList: React.FC<ClientListProps> = ({
   users = [],
   uploadedFiles = [],
   onGeneratePlusCodes,
-  onCNPJAuthError
+  onCNPJAuthError,
+  filterOnlyWithPurchases = false,
+  setFilterOnlyWithPurchases,
+  resetFilters
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('Todos');
@@ -119,7 +125,7 @@ const ClientList: React.FC<ClientListProps> = ({
     setIsProductModalOpen(true);
   };
 
-  const handleSaveProductAssignment = (clientId: string, assignedProducts: Product[]) => {
+  const handleSaveProductAssignment = (clientId: string, assignedProducts: PurchaseRecord[]) => {
     const clientToUpdate = clients.find(c => c.id === clientId);
     if (clientToUpdate) {
       const updatedClient = { ...clientToUpdate, purchasedProducts: assignedProducts };

@@ -124,6 +124,30 @@ const normalizeHeader = (header: string): string => {
     .trim();
 };
 
+/**
+ * Detects the type of CSV based on its headers.
+ */
+export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purchases' => {
+  const normalizedHeaders = headers.map(h => normalizeHeader(h));
+
+  const purchaseKeywords = ['data da compra', 'valor total', 'quantidade', 'item', 'sku'];
+  const clientKeywords = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia'];
+  const productKeywords = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica'];
+
+  let purchaseScore = normalizedHeaders.filter(h => purchaseKeywords.some(k => h.includes(k))).length;
+  let clientScore = normalizedHeaders.filter(h => clientKeywords.some(k => h.includes(k))).length;
+  let productScore = normalizedHeaders.filter(h => productKeywords.some(k => h.includes(k))).length;
+
+  // Prioritize purchases if date + (sku or value) are present
+  if (normalizedHeaders.some(h => h.includes('data')) && (normalizedHeaders.some(h => h.includes('valor')) || normalizedHeaders.some(h => h.includes('sku')))) {
+    purchaseScore += 3;
+  }
+
+  if (purchaseScore > clientScore && purchaseScore > productScore) return 'purchases';
+  if (productScore > clientScore) return 'products';
+  return 'clients';
+};
+
 export const parseProductCSV = (file: File): Promise<Product[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
@@ -274,7 +298,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
   });
 };
 
-export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: string; cnpj: string; sku: string; productName: string; purchaseDate: string }[]> => {
+export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -282,7 +306,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
       encoding: "UTF-8",
       complete: (results) => {
         const data = results.data as any[];
-        const records: { companyName: string; cnpj: string; sku: string; productName: string; purchaseDate: string }[] = [];
+        const records: any[] = [];
 
         data.forEach((row) => {
           const normalizedRow: Record<string, any> = {};
@@ -296,13 +320,23 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<{ companyName: stri
           const productName = normalizedRow['nome do produto'] || normalizedRow['produto'] || normalizedRow['descricao'] || '';
           const purchaseDate = normalizedRow['data da compra'] || normalizedRow['data'] || normalizedRow['emissao'] || '';
 
+          const quantity = parseFloat(normalizedRow['quantidade'] || normalizedRow['qtd'] || '1');
+          const price = parseMoney(normalizedRow['valor unitario'] || normalizedRow['preco'] || '0');
+          const totalValue = parseMoney(normalizedRow['valor total'] || normalizedRow['total'] || (quantity * price).toString());
+
           if (companyName && (sku || productName)) {
             records.push({
               companyName: String(companyName).trim(),
               cnpj: String(cnpj).trim().replace(/[.\-\/]/g, ""),
               sku: String(sku).trim(),
-              productName: String(productName).trim(),
-              purchaseDate: String(purchaseDate).trim()
+              name: String(productName).trim(), // Match Product interface
+              brand: normalizedRow['marca'] || 'N/A',
+              category: normalizedRow['categoria'] || normalizedRow['departamento'] || 'Venda',
+              price: price,
+              purchaseDate: String(purchaseDate).trim(),
+              quantity: quantity,
+              totalValue: totalValue,
+              factoryCode: normalizedRow['cod.fabrica'] || ''
             });
           }
         });

@@ -30,6 +30,13 @@ export interface Product {
   purchaseDate?: string; // Optional: Date of purchase
 }
 
+export interface PurchaseRecord extends Product {
+  purchaseDate: string; // ISO or YYYY-MM-DD
+  quantity?: number;
+  totalValue?: number;
+  salespersonId?: string; // For tracking who sold this
+}
+
 export interface EnrichedClient {
   id: string;
   salespersonId: string; // Links client to specific seller
@@ -52,7 +59,7 @@ export interface EnrichedClient {
   lat: number;
   lng: number;
   googleMapsUri?: string;
-  purchasedProducts?: Product[]; // History of products bought by this client
+  purchasedProducts?: PurchaseRecord[]; // History of products bought by this client
   sourceFileId?: string; // ID of the file this client was imported from
   plusCode?: string; // Google Plus Code for precise location
 }
