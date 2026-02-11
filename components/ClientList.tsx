@@ -50,8 +50,8 @@ const ClientList: React.FC<ClientListProps> = ({
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
       const matchesSearch =
-        client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.ownerName.toLowerCase().includes(searchTerm.toLowerCase());
+        (client.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (client.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesRegion = regionFilter === 'Todos' || client.region === regionFilter;
       const matchesCategory = categoryFilter === 'Todos' || (

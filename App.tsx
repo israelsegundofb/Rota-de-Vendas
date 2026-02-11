@@ -82,6 +82,7 @@ const App: React.FC = () => {
     filterProductCategory, setFilterProductCategory,
     filterProductSku, setFilterProductSku,
     searchProductQuery, setSearchProductQuery,
+    showProductSuggestions, setShowProductSuggestions,
     filteredClients,
     visibleClients, // Exposed if needed for counts
     availableStates,
@@ -177,7 +178,7 @@ const App: React.FC = () => {
     let duplicateCount = 0;
 
     masterClientList.forEach((client) => {
-      const key = `${client.companyName}-${client.cleanAddress}`.toLowerCase().trim();
+      const key = `${client.companyName || ''}-${client.cleanAddress || ''}`.toLowerCase().trim();
 
       if (seen.has(key)) {
         duplicateCount++;
@@ -466,9 +467,9 @@ const App: React.FC = () => {
 
       // Find products matching client category
       let eligibleProducts = allProducts.filter(p =>
-        client.category.some(cat =>
-          p.category.toLowerCase().includes(cat.toLowerCase()) ||
-          cat.toLowerCase().includes(p.category.toLowerCase())
+        (client.category || []).some(cat =>
+          (p.category || '').toLowerCase().includes((cat || '').toLowerCase()) ||
+          (cat || '').toLowerCase().includes((p.category || '').toLowerCase())
         )
       );
 
@@ -758,7 +759,7 @@ const App: React.FC = () => {
 
       // Group by client
       const groupedByClient = records.reduce((acc, rec) => {
-        const name = rec.companyName.toLowerCase().trim();
+        const name = (rec.companyName || '').toLowerCase().trim();
         if (!acc[name]) acc[name] = [];
         acc[name].push(rec);
         return acc;
@@ -775,7 +776,7 @@ const App: React.FC = () => {
           setProcState(prev => ({ ...prev, current: index + 1 }));
 
           // Find client index
-          const clientIdx = newList.findIndex(c => c.companyName.toLowerCase().trim() === clientName);
+          const clientIdx = newList.findIndex(c => (c.companyName || '').toLowerCase().trim() === clientName);
 
           if (clientIdx !== -1) {
             updatedCount++;
@@ -786,7 +787,7 @@ const App: React.FC = () => {
               // Try to enrich with master catalog
               const masterProd = products.find(p =>
                 (rec.sku && p.sku === rec.sku) ||
-                (p.name && rec.productName && p.name.toLowerCase().trim() === rec.productName.toLowerCase().trim())
+                (p.name && rec.productName && (p.name || '').toLowerCase().trim() === (rec.productName || '').toLowerCase().trim())
               );
 
               if (masterProd) {
@@ -1403,16 +1404,67 @@ const App: React.FC = () => {
                       </select>
                     </div>
 
-                    <div className="relative">
+                    <div className="relative group/search">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
                       <input
                         type="text"
                         value={searchProductQuery}
-                        onChange={e => setSearchProductQuery(e.target.value)}
+                        onChange={e => {
+                          setSearchProductQuery(e.target.value);
+                          setShowProductSuggestions(true);
+                        }}
+                        onFocus={() => setShowProductSuggestions(true)}
                         placeholder="SKU, Marca, Código ou Descrição..."
                         className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-56 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
                         title="Buscar produtos por SKU, Marca, Código ou Descrição"
                       />
+
+                      {/* Autocomplete Dropdown */}
+                      {showProductSuggestions && searchProductQuery.length >= 2 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
+                          {(() => {
+                            const suggestions = products
+                              .filter(p => {
+                                const term = searchProductQuery.toLowerCase();
+                                return (p.name || '').toLowerCase().includes(term) ||
+                                  (p.sku || '').toLowerCase().includes(term) ||
+                                  (p.brand || '').toLowerCase().includes(term);
+                              })
+                              .slice(0, 8);
+
+                            if (suggestions.length === 0) {
+                              return (
+                                <div className="p-3 text-xs text-gray-500 italic flex items-center gap-2">
+                                  <AlertCircle className="w-3 h-3 text-gray-400" />
+                                  Não Foi Encontrado
+                                </div>
+                              );
+                            }
+
+                            return suggestions.map(p => (
+                              <button
+                                key={p.sku}
+                                onClick={() => {
+                                  setSearchProductQuery(p.sku);
+                                  setShowProductSuggestions(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 flex flex-col border-b border-gray-50 last:border-0"
+                              >
+                                <span className="font-bold text-gray-800">{p.name}</span>
+                                <span className="text-[10px] text-gray-500 uppercase">{p.sku} • {p.brand}</span>
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Explicit "Not Found" message if list is empty and no suggestions */}
+                      {!showProductSuggestions && searchProductQuery && filteredClients.length === 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 animate-fade-in bg-rose-50 px-2 py-1 rounded border border-rose-100 italic">
+                          <AlertCircle className="w-3 h-3" />
+                          Não Foi Encontrado
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-1">

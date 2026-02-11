@@ -370,7 +370,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
     if (!hasTerm && !hasCat) return selectedClient.purchasedProducts;
 
-    const term = highlightProductTerm ? highlightProductTerm.toLowerCase() : '';
+    const term = (highlightProductTerm || '').toLowerCase();
     const cat = activeProductCategory || '';
 
     return [...selectedClient.purchasedProducts].sort((a, b) => {
@@ -383,16 +383,16 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
       // Search term match logic (Expanded for Brand, Code, SKU, Name)
       if (hasTerm) {
-        const matchA = a.name.toLowerCase().includes(term) ||
-          a.sku.toLowerCase().includes(term) ||
-          a.brand.toLowerCase().includes(term) ||
-          a.factoryCode.toLowerCase().includes(term);
+        const matchA = (a.name || '').toLowerCase().includes(term) ||
+          (a.sku || '').toLowerCase().includes(term) ||
+          (a.brand || '').toLowerCase().includes(term) ||
+          (a.factoryCode || '').toLowerCase().includes(term);
         if (matchA) scoreA += 1;
 
-        const matchB = b.name.toLowerCase().includes(term) ||
-          b.sku.toLowerCase().includes(term) ||
-          b.brand.toLowerCase().includes(term) ||
-          b.factoryCode.toLowerCase().includes(term);
+        const matchB = (b.name || '').toLowerCase().includes(term) ||
+          (b.sku || '').toLowerCase().includes(term) ||
+          (b.brand || '').toLowerCase().includes(term) ||
+          (b.factoryCode || '').toLowerCase().includes(term);
         if (matchB) scoreB += 1;
       }
 
@@ -622,10 +622,10 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                         {displayedProducts.slice(0, 3).map((prod, idx) => {
                           const term = highlightProductTerm?.toLowerCase() || '';
                           const isMatch = term && (
-                            prod.name.toLowerCase().includes(term) ||
-                            prod.sku.toLowerCase().includes(term) ||
-                            prod.brand.toLowerCase().includes(term) ||
-                            prod.factoryCode.toLowerCase().includes(term)
+                            (prod.name || '').toLowerCase().includes(term) ||
+                            (prod.sku || '').toLowerCase().includes(term) ||
+                            (prod.brand || '').toLowerCase().includes(term) ||
+                            (prod.factoryCode || '').toLowerCase().includes(term)
                           );
 
                           return (

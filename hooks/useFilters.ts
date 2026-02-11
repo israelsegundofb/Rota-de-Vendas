@@ -22,6 +22,7 @@ export const useFilters = (
     const [filterProductCategory, setFilterProductCategory] = useState<string>('Todos');
     const [filterProductSku, setFilterProductSku] = useState<string>('Todos');
     const [searchProductQuery, setSearchProductQuery] = useState<string>('');
+    const [showProductSuggestions, setShowProductSuggestions] = useState<boolean>(false);
 
     // --- Derived Data ---
 
@@ -60,14 +61,14 @@ export const useFilters = (
             }
 
             // Text Search
-            const query = searchQuery.toLowerCase();
+            const query = (searchQuery || '').toLowerCase();
             const matchSearch = searchQuery === '' ||
-                c.companyName.toLowerCase().includes(query) ||
-                (c.ownerName && c.ownerName.toLowerCase().includes(query));
+                (c.companyName || '').toLowerCase().includes(query) ||
+                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
-            const prodQuery = searchProductQuery.toLowerCase();
+            const prodQuery = (searchProductQuery || '').toLowerCase();
 
             if (filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || prodQuery !== '') {
                 // If filtering by product, client MUST have purchase history
@@ -155,6 +156,7 @@ export const useFilters = (
         filterProductCategory, setFilterProductCategory,
         filterProductSku, setFilterProductSku,
         searchProductQuery, setSearchProductQuery,
+        showProductSuggestions, setShowProductSuggestions,
         filterOnlyWithPurchases, setFilterOnlyWithPurchases,
 
         // Computed
