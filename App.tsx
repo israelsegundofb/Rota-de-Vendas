@@ -25,6 +25,7 @@ import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
 import AddClientModal from './components/AddClientModal';
 import EditClientModal from './components/EditClientModal';
+import DateRangePicker from './components/DateRangePicker';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminCategoryManagement from './components/AdminCategoryManagement';
 import AdminProductManagement from './components/AdminProductManagement';
@@ -1609,38 +1610,15 @@ const App: React.FC = () => {
                       </select>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg shadow-sm px-2 py-1">
-                      <div className="flex items-center gap-1.5 border-r pr-2 border-gray-200">
-                        <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Período</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className="text-[11px] bg-transparent border-none outline-none focus:ring-0 p-0 w-[100px] text-gray-700 font-medium"
-                          title="Data inicial da compra"
-                        />
-                        <span className="text-gray-400 text-[10px]">até</span>
-                        <input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className="text-[11px] bg-transparent border-none outline-none focus:ring-0 p-0 w-[100px] text-gray-700 font-medium"
-                          title="Data final da compra"
-                        />
-                        {(startDate || endDate) && (
-                          <button
-                            onClick={() => { setStartDate(''); setEndDate(''); }}
-                            className="p-1 hover:bg-gray-100 rounded-full transition-colors ml-1"
-                            title="Limpar período"
-                          >
-                            <X className="w-3 h-3 text-gray-400" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    <DateRangePicker
+                      startDate={startDate}
+                      endDate={endDate}
+                      onRangeChange={(start, end) => {
+                        setStartDate(start);
+                        setEndDate(end);
+                      }}
+                      label="Período"
+                    />
                   </div>
 
                   {/* Secondary Filters Row: Products */}
