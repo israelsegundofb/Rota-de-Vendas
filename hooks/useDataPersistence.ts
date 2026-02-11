@@ -82,7 +82,6 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (cloudData.products) setProducts(cloudData.products);
                         if (cloudData.categories) setCategories(cloudData.categories);
                         if (cloudData.users && setUsers) {
-                            // Migrate users before setting
                             setUsers(migrateUsers(cloudData.users));
                         }
                         if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
@@ -92,23 +91,16 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         setTimeout(() => setIsDataLoaded(true), 500);
                         return;
                     } else {
-                        // Cloud is empty - migrate localStorage or use defaults
                         console.log("Cloud is empty. Checking localStorage for migration...");
-
                         const savedUsers = localStorage.getItem('vendas_ai_users');
                         let usersToSave = savedUsers ? JSON.parse(savedUsers) : null;
 
                         if (!usersToSave || usersToSave.length === 0) {
-                            // Import INITIAL_USERS if localStorage is also empty
-                            console.log("No users in localStorage. Using INITIAL_USERS.");
                             const { INITIAL_USERS } = await import('./useAuth');
                             usersToSave = INITIAL_USERS;
                         }
 
-                        // Apply migration to initial/saved data
                         usersToSave = migrateUsers(usersToSave);
-
-                        // Save to cloud for first time
                         if (setUsers) setUsers(usersToSave);
                         setMasterClientList(loadInitialClients());
 
@@ -119,15 +111,16 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                             loadInitialCategories(),
                             usersToSave,
                             loadInitialFiles()
-                        );
+                        ).catch(cloudErr => console.warn("First cloud save failed, will retry later", cloudErr));
 
-                        setLoadingMessage('Migração concluída!');
+                        setLoadingMessage('Configuração concluída!');
                         setLoadingProgress(100);
                         setTimeout(() => setIsDataLoaded(true), 500);
                         return;
                     }
                 } catch (e) {
-                    console.error("Cloud load error", e);
+                    console.error("Cloud load error, falling back to local:", e);
+                    // Continue to fallback below
                 }
             }
 
