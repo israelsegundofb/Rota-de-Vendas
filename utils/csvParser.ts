@@ -103,10 +103,13 @@ const cleanAddress = (input: any): string => {
   return raw.trim();
 };
 
-const parseMoney = (value: string): number => {
-  if (!value) return 0;
-  const clean = String(value).replace(/[R$\s.]/g, '').replace(',', '.');
-  return parseFloat(clean) || 0;
+const parseMoney = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  const str = String(value).trim();
+  if (!str) return 0;
+  const clean = str.replace(/[R$\s.]/g, '').replace(',', '.');
+  const num = parseFloat(clean);
+  return isNaN(num) ? 0 : num;
 };
 
 const parsePercentage = (value: string): number => {
@@ -130,17 +133,20 @@ const normalizeHeader = (header: string): string => {
 export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purchases' => {
   const normalizedHeaders = headers.map(h => normalizeHeader(h));
 
-  const purchaseKeywords = ['data da compra', 'valor total', 'quantidade', 'item', 'sku'];
-  const clientKeywords = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia'];
-  const productKeywords = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica'];
+  const purchaseKeywords = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs'];
+  const clientKeywords = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro'];
+  const productKeywords = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade'];
 
   let purchaseScore = normalizedHeaders.filter(h => purchaseKeywords.some(k => h.includes(k))).length;
   let clientScore = normalizedHeaders.filter(h => clientKeywords.some(k => h.includes(k))).length;
   let productScore = normalizedHeaders.filter(h => productKeywords.some(k => h.includes(k))).length;
 
-  // Prioritize purchases if date + (sku or value) are present
-  if (normalizedHeaders.some(h => h.includes('data')) && (normalizedHeaders.some(h => h.includes('valor')) || normalizedHeaders.some(h => h.includes('sku')))) {
-    purchaseScore += 3;
+  // Prioritize purchases if date + (sku or value or quantity) are present
+  const hasDate = normalizedHeaders.some(h => h.includes('data') || h.includes('emissao'));
+  const hasVitals = normalizedHeaders.some(h => h.includes('valor') || h.includes('sku') || h.includes('quantidade'));
+
+  if (hasDate && hasVitals) {
+    purchaseScore += 5;
   }
 
   if (purchaseScore > clientScore && purchaseScore > productScore) return 'purchases';
@@ -321,8 +327,9 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
           const purchaseDate = normalizedRow['data da compra'] || normalizedRow['data'] || normalizedRow['emissao'] || '';
 
           const quantity = parseFloat(normalizedRow['quantidade'] || normalizedRow['qtd'] || '1');
+          const safeQuantity = isNaN(quantity) ? 1 : quantity;
           const price = parseMoney(normalizedRow['valor unitario'] || normalizedRow['preco'] || '0');
-          const totalValue = parseMoney(normalizedRow['valor total'] || normalizedRow['total'] || (quantity * price).toString());
+          const totalValue = parseMoney(normalizedRow['valor total'] || normalizedRow['total'] || (safeQuantity * price).toString());
 
           if (companyName && (sku || productName)) {
             records.push({

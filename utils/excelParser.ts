@@ -12,10 +12,13 @@ const normalizeHeader = (header: string): string => {
 };
 
 const parseMoney = (value: any): number => {
-    if (!value) return 0;
+    if (value === null || value === undefined) return 0;
     if (typeof value === 'number') return value;
-    const clean = String(value).replace(/[R$\s.]/g, '').replace(',', '.');
-    return parseFloat(clean) || 0;
+    const str = String(value).trim();
+    if (!str) return 0;
+    const clean = str.replace(/[R$\s.]/g, '').replace(',', '.');
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
 };
 
 const parsePercentage = (value: any): number => {

@@ -1054,33 +1054,44 @@ const App: React.FC = () => {
               // Try to enrich with master catalog
               const masterProd = products.find(p =>
                 (rec.sku && p.sku === rec.sku) ||
-                (p.name && rec.productName && (p.name || '').toLowerCase().trim() === (rec.productName || '').toLowerCase().trim())
+                (p.name && rec.name && (p.name || '').toLowerCase().trim() === (rec.name || '').toLowerCase().trim())
               );
 
               if (masterProd) {
-                return { ...masterProd, purchaseDate: rec.purchaseDate };
+                return { ...masterProd, purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue };
               } else {
                 // Fallback for missing product in catalog
                 return {
                   sku: rec.sku || 'N/A',
-                  name: rec.productName || 'Produto Desconhecido',
+                  name: rec.name || 'Produto Desconhecido',
                   brand: 'Desconhecido',
                   category: 'Manual',
-                  price: 0,
+                  price: rec.price || 0,
                   factoryCode: '',
-                  purchaseDate: rec.purchaseDate
+                  purchaseDate: rec.purchaseDate,
+                  quantity: rec.quantity,
+                  totalValue: rec.totalValue
                 };
               }
             });
 
-            // UPDATE CLIENT: ACCUMULATE AND MERGE
-            newList[clientIdx] = {
-              ...newList[clientIdx],
-              purchasedProducts: [
-                ...(newList[clientIdx].purchasedProducts || []),
-                ...newPurchasedProducts
-              ]
-            };
+            // UPDATE CLIENT: ACCUMULATE AND MERGE (With Duplicate Prevention)
+            const existingHistory = newList[clientIdx].purchasedProducts || [];
+
+            // Filter out records that already exist (Same SKU and Same Date)
+            const filteredNewProducts = newPurchasedProducts.filter(newP =>
+              !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate)
+            );
+
+            if (filteredNewProducts.length > 0) {
+              newList[clientIdx] = {
+                ...newList[clientIdx],
+                purchasedProducts: [
+                  ...existingHistory,
+                  ...filteredNewProducts
+                ]
+              };
+            }
           }
         });
         return newList;
