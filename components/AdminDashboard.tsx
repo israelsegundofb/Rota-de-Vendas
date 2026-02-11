@@ -108,7 +108,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             totalProducts: products.length,
             topProductsData: Object.values(productSales).sort((a, b) => b.revenue - a.revenue).slice(0, 5),
             sellerPerformanceData: Object.values(sellerSales).sort((a, b) => b.revenue - a.revenue).slice(0, 6),
-            categoryDistributionData: Object.entries(categorySales).map(([name, value]) => ({ name, value })),
+            categoryDistributionData: (() => {
+                const sorted = Object.entries(categorySales)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+
+                if (sorted.length <= 8) return sorted;
+
+                const top8 = sorted.slice(0, 7);
+                const othersValue = sorted.slice(7).reduce((acc, curr) => acc + curr.value, 0);
+
+                return [...top8, { name: 'Outros', value: othersValue }];
+            })(),
             regionalSalesData: Object.entries(regionalSales).map(([name, value]) => ({ name, value })),
             salesTrendData: Object.entries(dailySales).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date))
         };
@@ -346,34 +357,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
 
                     {/* Category Distribution Chart */}
-                    <div className="bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30">
+                    <div className="bg-surface p-8 rounded-3xl shadow-elevation-1 border border-outline-variant/30 overflow-hidden">
                         <h3 className="text-xl font-black text-on-surface mb-8 uppercase tracking-tighter">Mix por Categoria</h3>
-                        <div className="h-80 w-full relative">
+                        <div className="h-96 w-full relative">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
                                         data={stats.categoryDistributionData}
-                                        innerRadius={70}
-                                        outerRadius={95}
+                                        innerRadius={60}
+                                        outerRadius={85}
                                         paddingAngle={4}
                                         dataKey="value"
                                         stroke="none"
                                         animationDuration={1200}
+                                        cx="50%"
+                                        cy="40%"
                                     >
                                         {stats.categoryDistributionData.map((_entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none' }}
+                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                         formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Total']}
                                     />
-                                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '11px' }} />
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        layout="horizontal"
+                                        iconType="circle"
+                                        wrapperStyle={{
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            paddingTop: '20px',
+                                            maxWidth: '100%'
+                                        }}
+                                        formatter={(value) => <span className="text-on-surface-variant truncate inline-block max-w-[100px]">{value}</span>}
+                                    />
                                 </PieChart>
                             </ResponsiveContainer>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mb-10">
-                                <span className="text-xs text-on-surface-variant uppercase font-bold tracking-widest opacity-40">Liderança</span>
-                                <span className="text-lg font-black text-primary">
+                            <div className="absolute top-[32%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest opacity-40">Liderança</span>
+                                <span className="text-sm font-black text-primary text-center px-4 line-clamp-2">
                                     {stats.categoryDistributionData[0]?.name || '...'}
                                 </span>
                             </div>
