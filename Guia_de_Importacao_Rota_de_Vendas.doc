@@ -1,0 +1,89 @@
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>Guia de Importação - Rota de Vendas</title>
+<style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+    h1 { color: #0061A4; border-bottom: 2px solid #0061A4; padding-bottom: 10px; }
+    h2 { color: #0061A4; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #F0F4F8; color: #001D36; }
+    .note { background-color: #D1E4FF; padding: 15px; border-radius: 8px; border-left: 5px solid #0061A4; margin: 20px 0; }
+    .tip { color: #6B5778; font-weight: bold; }
+</style>
+</head>
+<body>
+    <h1>Guia de Importação de Dados - Rota de Vendas 🚀</h1>
+    <p>Este documento descreve o formato correto dos arquivos e os cabeçalhos (headers) aceitos para garantir que suas importações funcionem perfeitamente.</p>
+    
+    <div class="note">
+        <strong>NOTA:</strong> O sistema aceita arquivos nos formatos <strong>.CSV</strong>, <strong>.XLSX</strong> (Excel) e <strong>.XLS</strong>.<br>
+        Os nomes das colunas não precisam ser idênticos aos listados abaixo, pois o sistema realiza uma normalização automática (ignora acentos, espaços e maiúsculas/minúsculas).
+    </div>
+
+    <h2>1. Carteira de Clientes</h2>
+    <p>Utilizado para carregar a base de clientes no mapa e na listagem.</p>
+    
+    <h3>Campos Obrigatórios</h3>
+    <p>Para que um registro seja importado, ele deve conter pelo menos um destes dois campos:</p>
+    <ul>
+        <li><strong>Razão Social</strong> (ou Nome do Cliente)</li>
+        <li><strong>Endereço</strong></li>
+    </ul>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Cabeçalhos Aceitos (Exemplos)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Razão Social</strong></td><td>Razão Social, Cliente, Nome Fantasia, Empresa</td></tr>
+            <tr><td><strong>CNPJ</strong></td><td>CNPJ, Inscrição, TaxID</td></tr>
+            <tr><td><strong>Endereço</strong></td><td>Endereço, Logradouro, Localização, Endereço Comercial</td></tr>
+            <tr><td><strong>Bairro</strong></td><td>Bairro, Distrito</td></tr>
+            <tr><td><strong>Cidade</strong></td><td>Cidade, Município, Nome da Cidade</td></tr>
+            <tr><td><strong>Estado</strong></td><td>Estado, UF</td></tr>
+            <tr><td><strong>CEP</strong></td><td>CEP, Código Postal, Zip</td></tr>
+            <tr><td><strong>Telefone</strong></td><td>Telefone, Celular, Contato</td></tr>
+            <tr><td><strong>WhatsApp</strong></td><td>WhatsApp, Whats</td></tr>
+            <tr><td><strong>Link Maps</strong></td><td>Link Google Maps, Mapa, Coordenadas, URL</td></tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>2. Produtos Comprados no Mês (Histórico)</h2>
+    <p>Utilizado para atualizar o que cada cliente comprou e permitir a filtragem por data.</p>
+
+    <h3>Campos Obrigatórios</h3>
+    <ul>
+        <li><strong>Cliente</strong> (Razão Social) ou <strong>CNPJ</strong></li>
+        <li><strong>SKU</strong> ou <strong>Nome do Produto</strong></li>
+    </ul>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Cabeçalhos Aceitos (Exemplos)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Cliente</strong></td><td>Razão Social, Cliente, Empresa</td></tr>
+            <tr><td><strong>CNPJ</strong></td><td>CNPJ, CPF/CNPJ, CPF</td></tr>
+            <tr><td><strong>SKU</strong></td><td>SKU, Cód.Prod, Cód.Prod / SKU</td></tr>
+            <tr><td><strong>Produto</strong></td><td>Nome do Produto, Produto, Descrição</td></tr>
+            <tr><td><strong>Data Compra</strong></td><td>Data da Compra, Data, Emissão</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Dicas para uma Importação de Sucesso</h2>
+    <ul>
+        <li><span class="tip">Vínculo de Compras</span>: O sistema agora prioriza o <strong>CNPJ</strong> para vincular as compras aos clientes da sua carteira. Se o CNPJ não estiver presente no arquivo de compras, o sistema tentará o vínculo pelo nome do cliente (Razão Social).</li>
+        <li><span class="tip">Geolocalização</span>: Se o seu arquivo de clientes tiver uma coluna com o link direto do Google Maps ou coordenadas, a precisão do pin no mapa será muito maior.</li>
+        <li><span class="tip">Formatação de Datas</span>: Para a coluna de data de compra, utilize formatos padrão como DD/MM/AAAA ou AAAA-MM-DD.</li>
+        <li><span class="tip">Limpeza</span>: Antes de subir o histórico de compras, certifique-se de que os nomes dos clientes no arquivo de compras coincidam com os nomes já cadastrados no sistema.</li>
+    </ul>
+</body>
+</html>
