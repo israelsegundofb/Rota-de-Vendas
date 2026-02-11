@@ -6,7 +6,7 @@ import {
   InfoWindow,
   useMap
 } from '@vis.gl/react-google-maps';
-import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer';
+import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { EnrichedClient, AppUser } from '../types';
 import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -19,7 +19,7 @@ interface ClientMapProps {
   productFilterActive?: boolean;
   highlightProductTerm?: string;
   activeProductCategory?: string;
-  users?: AppUser[]; // Added users prop
+  users?: AppUser[];
   filterContent?: React.ReactNode;
 }
 
@@ -28,23 +28,17 @@ const MapBoundsUpdater: React.FC<{ clients: EnrichedClient[] }> = ({ clients }) 
   const prevClientsLength = useRef(0);
 
   useEffect(() => {
-    // Safety check for google object availability
     if (!map || !window.google || clients.length === 0) return;
-
-    // Only refit bounds if the number of clients changed significantly or it's the first load
     const shouldUpdate = Math.abs(clients.length - prevClientsLength.current) > 0;
-
     if (shouldUpdate) {
       const bounds = new google.maps.LatLngBounds();
       let hasValidCoords = false;
-
       clients.forEach(client => {
         if (client.lat && client.lng) {
           bounds.extend({ lat: client.lat, lng: client.lng });
           hasValidCoords = true;
         }
       });
-
       if (hasValidCoords) {
         map.fitBounds(bounds);
         const listener = google.maps.event.addListenerOnce(map, "idle", () => {
@@ -55,15 +49,12 @@ const MapBoundsUpdater: React.FC<{ clients: EnrichedClient[] }> = ({ clients }) 
       }
     }
   }, [map, clients]);
-
   return null;
 };
 
 const MapZoomControls: React.FC = () => {
   const map = useMap();
-
   if (!map) return null;
-
   return (
     <div className="absolute bottom-[75px] right-4 flex flex-row gap-2 z-10">
       <button
@@ -86,19 +77,17 @@ const MapZoomControls: React.FC = () => {
   );
 };
 
-// Colors by Region (Fallback)
 const getRegionColor = (region: string) => {
   switch (region) {
-    case 'Norte': return { bg: '#10B981', border: '#047857', glyph: '#fff' }; // Green
-    case 'Nordeste': return { bg: '#F97316', border: '#C2410C', glyph: '#fff' }; // Orange (Sun)
-    case 'Centro-Oeste': return { bg: '#EAB308', border: '#A16207', glyph: '#fff' }; // Yellow (Agro)
-    case 'Sudeste': return { bg: '#3B82F6', border: '#1D4ED8', glyph: '#fff' }; // Blue (Industrial)
-    case 'Sul': return { bg: '#8B5CF6', border: '#5B21B6', glyph: '#fff' }; // Purple (Cold)
-    default: return { bg: '#6B7280', border: '#374151', glyph: '#fff' }; // Gray
+    case 'Norte': return { bg: '#10B981', border: '#047857', glyph: '#fff' };
+    case 'Nordeste': return { bg: '#F97316', border: '#C2410C', glyph: '#fff' };
+    case 'Centro-Oeste': return { bg: '#EAB308', border: '#A16207', glyph: '#fff' };
+    case 'Sudeste': return { bg: '#3B82F6', border: '#1D4ED8', glyph: '#fff' };
+    case 'Sul': return { bg: '#8B5CF6', border: '#5B21B6', glyph: '#fff' };
+    default: return { bg: '#6B7280', border: '#374151', glyph: '#fff' };
   }
 };
 
-// Helper to generate consistent color from string
 const stringToColor = (str: string) => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -107,37 +96,6 @@ const stringToColor = (str: string) => {
   const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
   return '#' + '00000'.substring(0, 6 - c.length) + c;
 };
-
-// Helper determines color based on Salesperson
-const getPinColor = (client: EnrichedClient, users: AppUser[] = [], productFilterActive: boolean) => {
-  if (productFilterActive) {
-    return { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
-  }
-
-  const seller = users.find(u => u.id === client.salespersonId);
-
-  // DEBUG LOGGING (Throttle this effectively in console by only logging unique sellers or first few)
-  // if (Math.random() < 0.001) console.log('Pin Color Debug:', { clientOwner: client.ownerName, sellerFound: !!seller, sellerColor: seller?.color });
-
-  if (seller) {
-    // 1. Use assigned color
-    if (seller.color) {
-      return { bg: seller.color, border: 'black', glyph: '#fff' };
-    }
-    // 2. Generate color from ID or Name if no explicit color
-    const generatedColor = stringToColor(seller.id + seller.name);
-    return { bg: generatedColor, border: 'black', glyph: '#fff' };
-  }
-
-  // If we have an ownerName but no linked user (e.g. legacy data), try to generate color from name
-  if (client.ownerName) {
-    const generatedColor = stringToColor(client.ownerName);
-    return { bg: generatedColor, border: 'black', glyph: '#fff' };
-  }
-
-  return getRegionColor(client.region);
-};
-
 
 const shoppingBagSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -152,13 +110,12 @@ const ClientMapContent: React.FC<{
   onClientSelect: (id: string | null) => void,
   productFilterActive?: boolean,
   users?: AppUser[],
-  isClusteringEnabled: boolean // Added prop
+  isClusteringEnabled: boolean
 }> = ({ clients, onClientSelect, productFilterActive, users, isClusteringEnabled }) => {
   const map = useMap();
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const markersRef = useRef<any[]>([]);
 
-  // Optimization: Create a base DOM element for the glyph once, then clone it.
   const baseGlyphElement = useMemo(() => {
     const el = document.createElement('div');
     el.innerHTML = shoppingBagSvg;
@@ -168,7 +125,6 @@ const ClientMapContent: React.FC<{
     return el;
   }, []);
 
-  // Optimization: Pre-calculate user colors in a Map for O(1) lookup
   const userColorMap = useMemo(() => {
     const map = new Map<string, { bg: string, border: string, glyph: string }>();
     if (!users) return map;
@@ -187,42 +143,30 @@ const ClientMapContent: React.FC<{
 
   useEffect(() => {
     if (!map) return;
+    if (!google.maps.marker) return;
 
-    // DEFENSIVE CHECK: If the key is invalid, google.maps.marker might not be loaded.
-    if (!google.maps.marker) {
-      console.warn("Google Maps Marker library not loaded. Likely an invalid API Key.");
-      return;
-    }
-
-    // 1. Cleanup
     if (clustererRef.current) {
       clustererRef.current.clearMarkers();
       (clustererRef.current as any).setMap(null);
     }
-    // Remove markers from map if they were added directly
     markersRef.current.forEach(m => {
       m.map = null;
       google.maps.event.clearInstanceListeners(m);
     });
     markersRef.current = [];
 
-    // 2. Init Clusterer (Only if enabled)
     if (isClusteringEnabled) {
       clustererRef.current = new (MarkerClusterer as any)({
         map,
         markers: [],
-        // Removed custom algorithm options to ensure default behavior works first.
-        // Default behavior usually handles clustering/declustering gracefully.
       }) as MarkerClusterer;
     } else {
-      // Ensure clusterer is null/inactive
       clustererRef.current = null;
     }
 
-    // 3. Async Batch Processing (Optimization)
     let isActive = true;
     let index = 0;
-    const BATCH_SIZE = 200; // Smaller batch size to prevent frame drops
+    const BATCH_SIZE = 200;
 
     const processBatch = () => {
       if (!isActive) return;
@@ -238,9 +182,7 @@ const ClientMapContent: React.FC<{
           return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
         })
         .map(client => {
-          // Optimized Color Lookup
           let colors = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
-
           if (productFilterActive) {
             colors = { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
           } else {
@@ -273,12 +215,9 @@ const ClientMapContent: React.FC<{
           }
 
           const pin = new google.maps.marker.PinElement(pinOptions);
-
           const marker = new google.maps.marker.AdvancedMarkerElement({
             position: { lat: client.lat, lng: client.lng },
             content: pin.element,
-            // Important: If clustering is disabled, we set the map directly.
-            // If enabled, the clusterer will set it.
             map: isClusteringEnabled ? null : map,
             title: client.companyName
           });
@@ -286,7 +225,6 @@ const ClientMapContent: React.FC<{
           marker.addListener('click', () => {
             onClientSelect(client.id);
           });
-
           return marker;
         });
 
@@ -303,9 +241,7 @@ const ClientMapContent: React.FC<{
       }
     };
 
-    // Start processing
     processBatch();
-
     return () => {
       isActive = false;
       if (clustererRef.current) {
@@ -316,7 +252,7 @@ const ClientMapContent: React.FC<{
         m.map = null;
       });
     };
-  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, userColorMap, isClusteringEnabled]); // Added dependency
+  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, userColorMap, isClusteringEnabled]);
 
   return <MapBoundsUpdater clients={clients} />;
 };
@@ -326,14 +262,12 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isClusteringEnabled, setIsClusteringEnabled] = useState(true); // Default to true
+  const [isClusteringEnabled, setIsClusteringEnabled] = useState(true);
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   useEffect(() => {
-    // Reset error when key changes (optimistic)
     if (apiKey) setAuthError(false);
-    // ... rest of useEffect
     (window as any).gm_authFailure = () => {
       console.error("Google Maps Auth Failure detected via gm_authFailure.");
       setAuthError(true);
@@ -341,11 +275,6 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
     return () => {
       (window as any).gm_authFailure = () => { };
-
-      // CRITICAL FIX: Aggressively remove Google Maps scripts from DOM.
-      // This ensures that when the key changes (and this component unmounts/remounts),
-      // the APIProvider will fetch the script again with the NEW key.
-      // Without this, the browser keeps the old script (with the invalid key state) loaded.
       const scripts = document.getElementsByTagName('script');
       for (let i = scripts.length - 1; i >= 0; i--) {
         const script = scripts[i];
@@ -353,52 +282,8 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           script.parentNode?.removeChild(script);
         }
       }
-
-      // Also clear the global google maps object to force re-initialization
-      // if (window.google && window.google.maps) {
-      // @ts-ignore
-      // window.google.maps = undefined;
-      // }
     };
   }, [apiKey]);
-
-  const displayedProducts = useMemo(() => {
-    if (!selectedClient?.purchasedProducts) return [];
-
-    const hasTerm = !!highlightProductTerm;
-    const hasCat = activeProductCategory && activeProductCategory !== 'Todos';
-
-    if (!hasTerm && !hasCat) return selectedClient.purchasedProducts;
-
-    const term = (highlightProductTerm || '').toLowerCase();
-    const cat = activeProductCategory || '';
-
-    return [...selectedClient.purchasedProducts].sort((a, b) => {
-      let scoreA = 0;
-      let scoreB = 0;
-
-      // Category match logic
-      if (hasCat && a.category === cat) scoreA += 2;
-      if (hasCat && b.category === cat) scoreB += 2;
-
-      // Search term match logic (Expanded for Brand, Code, SKU, Name)
-      if (hasTerm) {
-        const matchA = (a.name || '').toLowerCase().includes(term) ||
-          (a.sku || '').toLowerCase().includes(term) ||
-          (a.brand || '').toLowerCase().includes(term) ||
-          (a.factoryCode || '').toLowerCase().includes(term);
-        if (matchA) scoreA += 1;
-
-        const matchB = (b.name || '').toLowerCase().includes(term) ||
-          (b.sku || '').toLowerCase().includes(term) ||
-          (b.brand || '').toLowerCase().includes(term) ||
-          (b.factoryCode || '').toLowerCase().includes(term);
-        if (matchB) scoreB += 1;
-      }
-
-      return scoreB - scoreA;
-    });
-  }, [selectedClient, highlightProductTerm, activeProductCategory]);
 
   const toggleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
@@ -460,16 +345,14 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             onClientSelect={setSelectedClientId}
             productFilterActive={productFilterActive}
             users={users}
-            isClusteringEnabled={isClusteringEnabled} // Pass the state
+            isClusteringEnabled={isClusteringEnabled}
           />
 
           <MapZoomControls />
 
-          {/* Fullscreen Filter Overlay */}
           {isFullScreen && filterContent && (
             <div className="absolute top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm shadow-md border-b border-gray-200">
               {filterContent}
-              {/* Control buttons inside overlay, below filters */}
               <div className="flex justify-end gap-2 px-3 py-1.5 border-t border-gray-100 bg-gray-50/80">
                 <button
                   onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
@@ -503,7 +386,6 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             </div>
           )}
 
-          {/* Buttons when NOT fullscreen (original position) */}
           {!isFullScreen && (
             <div className="absolute top-4 right-4 flex gap-2 z-10">
               <button
@@ -536,7 +418,6 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             </div>
           )}
 
-          {/* Buttons when fullscreen but NO filter content */}
           {isFullScreen && !filterContent && (
             <div className="absolute top-4 right-4 flex gap-2 z-10">
               <button
@@ -580,7 +461,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                 </div>
               }
             >
-              <div className="min-w-[200px] max-w-[280px] p-1">
+              <div className="min-w-[240px] max-w-[320px] p-1">
                 <div className="space-y-2 text-xs text-gray-600 mt-1">
                   <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-gray-400">
                     <Globe className="w-3 h-3" />
@@ -595,31 +476,30 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                     <span className="font-medium text-gray-700">{selectedClient.contact || "Sem contato"}</span>
                   </p>
 
-                  {/* PRODUCT STATS */}
-                  {selectedClient.purchasedProducts && selectedClient.purchasedProducts.length > 0 && (
-                    <div className="flex items-center gap-2 mt-1 mb-1 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100 w-fit">
-                      <span className="flex items-center gap-1" title="Total de itens comprados">
-                        <span className="font-bold text-gray-800">{selectedClient.purchasedProducts.length}</span> Prod.
-                      </span>
-                      <div className="h-3 w-px bg-gray-300"></div>
-                      <span className="flex items-center gap-1" title="Quantidade de SKUs únicos">
-                        <span className="font-bold text-gray-800">{new Set(selectedClient.purchasedProducts.map(p => p.sku)).size}</span> SKUs
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mt-1 mb-1 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100 w-fit">
+                    <span className="flex items-center gap-1" title="Total de itens comprados">
+                      <span className="font-bold text-gray-800">{selectedClient.purchasedProducts?.length || 0}</span> Prod.
+                    </span>
+                    <div className="h-3 w-px bg-gray-300"></div>
+                    <span className="flex items-center gap-1" title="Quantidade de SKUs únicos">
+                      <span className="font-bold text-gray-800">{new Set(selectedClient.purchasedProducts?.map(p => p.sku) || []).size}</span> SKUs
+                    </span>
+                  </div>
+
                   <p className="flex items-start gap-2">
                     <MapPin className="w-3 h-3 mt-0.5 text-gray-400 flex-shrink-0" />
                     <span className="leading-tight">{selectedClient.cleanAddress}</span>
                   </p>
 
-                  {productFilterActive && displayedProducts.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <p className="text-[10px] uppercase font-bold text-rose-600 mb-1 flex items-center gap-1">
-                        <ShoppingBag className="w-3 h-3" />
-                        Produtos Vendidos (Filtro)
+                  {/* SCROLLABLE PRODUCT LIST */}
+                  {selectedClient.purchasedProducts && selectedClient.purchasedProducts.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-[10px] uppercase font-bold text-blue-600 mb-1.5 flex items-center gap-1">
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        Produtos Adquiridos
                       </p>
-                      <div className="max-h-24 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                        {displayedProducts.slice(0, 3).map((prod, idx) => {
+                      <div className="max-h-40 overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
+                        {selectedClient.purchasedProducts.map((prod, idx) => {
                           const term = highlightProductTerm?.toLowerCase() || '';
                           const isMatch = term && (
                             (prod.name || '').toLowerCase().includes(term) ||
@@ -629,20 +509,23 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                           );
 
                           return (
-                            <div key={idx} className={`${isMatch ? 'bg-rose-100 border-rose-300' : 'bg-rose-50 border-rose-100'} p-1.5 rounded border flex justify-between items-center transition-colors`}>
-                              <div className="flex flex-col overflow-hidden max-w-[120px]">
-                                <span className={`truncate font-medium ${isMatch ? 'text-rose-950 font-bold' : 'text-rose-900'}`} title={prod.name}>
+                            <div key={idx} className={`${isMatch ? 'bg-amber-50 border-amber-200 ring-1 ring-amber-100' : 'bg-gray-50 border-gray-100'} p-2 rounded-lg border flex flex-col gap-0.5 transition-all shadow-sm`}>
+                              <div className="flex justify-between items-start gap-2">
+                                <span className={`text-[10px] font-black leading-tight ${isMatch ? 'text-amber-900' : 'text-gray-800'} line-clamp-2`} title={prod.name}>
                                   {prod.name}
                                 </span>
-                                <span className="text-[9px] text-gray-500 truncate">{prod.sku} • {prod.brand}</span>
+                                <span className="text-[10px] font-black text-blue-700 whitespace-nowrap">
+                                  {prod.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </span>
                               </div>
-                              <span className="text-rose-700 font-bold">{prod.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                              <div className="flex items-center gap-2 text-[9px] text-gray-500 font-bold uppercase tracking-tighter mt-0.5">
+                                <span className="flex items-center gap-0.5 bg-gray-200/50 px-1 rounded">SKU: {prod.sku}</span>
+                                <span className="text-gray-300">•</span>
+                                <span className="truncate">{prod.brand || 'Sem Marca'}</span>
+                              </div>
                             </div>
                           );
                         })}
-                        {displayedProducts.length > 3 && (
-                          <p className="text-[10px] text-center text-gray-400 italic">e mais {displayedProducts.length - 3} itens...</p>
-                        )}
                       </div>
                     </div>
                   )}
@@ -652,18 +535,14 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                       <Tag className="w-3 h-3 mr-1" />
                       {selectedClient.category.join(', ')}
                     </span>
-
                     {selectedClient.mainCnae && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-700 border border-purple-100 ml-1 truncate max-w-[120px]" title={selectedClient.mainCnae}>
                         {selectedClient.mainCnae}
                       </span>
                     )}
-
                     <a
                       href={selectedClient.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline font-medium"
+                      target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium"
                     >
                       Rota
                     </a>

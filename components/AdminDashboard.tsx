@@ -36,6 +36,9 @@ interface AdminDashboardProps {
     filterProductCategory: string;
     setFilterProductCategory: (val: string) => void;
     productCategories: string[];
+    filterOnlyWithPurchases?: boolean;
+    setFilterOnlyWithPurchases?: (value: boolean) => void;
+    resetFilters?: () => void;
     startDate: string;
     setStartDate: (val: string) => void;
     endDate: string;
@@ -86,6 +89,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     filterCnae, setFilterCnae,
     filterProductCategory: activeProductCategory, setFilterProductCategory,
     productCategories,
+    filterOnlyWithPurchases, setFilterOnlyWithPurchases,
+    resetFilters,
     startDate, setStartDate,
     endDate, setEndDate,
     availableStates, availableCities, availableCnaes,
@@ -346,6 +351,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     ))}
                                 </select>
                             </div>
+                        </div>
+
+                        {/* Action Buttons: Purchased Only & Reset */}
+                        <div className="flex items-center gap-2 ml-2">
+                            <button
+                                onClick={() => setFilterOnlyWithPurchases?.(!filterOnlyWithPurchases)}
+                                className={`text-[10px] font-black px-4 py-2 rounded-full transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${filterOnlyWithPurchases
+                                    ? 'bg-green-600 text-white ring-2 ring-green-200'
+                                    : 'bg-surface-container-low border border-outline-variant text-on-surface hover:bg-surface-container-high'
+                                    }`}
+                                title="Mostrar apenas clientes com histórico de compras"
+                            >
+                                <ShoppingBag className={`w-3 h-3 ${filterOnlyWithPurchases ? 'text-white' : 'text-green-600'}`} />
+                                SOMENTE COM COMPRAS
+                            </button>
+
+                            <button
+                                onClick={() => resetFilters?.()}
+                                className="text-[10px] font-black px-4 py-2 rounded-full bg-white border border-outline-variant text-on-surface hover:bg-surface-container-high transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                                title="Limpar todos os filtros"
+                            >
+                                MOSTRAR TODOS
+                            </button>
                         </div>
                     </div>
                 </div>

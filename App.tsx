@@ -2083,6 +2083,9 @@ const App: React.FC = () => {
                           currentUserName={currentUser?.name}
                           products={products}
                           productCategories={productCategories}
+                          filterOnlyWithPurchases={filterOnlyWithPurchases}
+                          setFilterOnlyWithPurchases={setFilterOnlyWithPurchases}
+                          resetFilters={resetFilters}
                           users={users}
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
