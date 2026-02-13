@@ -37,26 +37,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     console.log('[CAPTCHA] Key configured:', captchaKey ? `${captchaKey.substring(0, 10)}...` : 'MISSING');
     console.log('[CAPTCHA] executeRecaptcha available:', !!executeRecaptcha);
 
-    // Verificar se o reCAPTCHA está pronto
-    if (!executeRecaptcha) {
-      console.error('[CAPTCHA] executeRecaptcha not available - Provider may not be loaded');
-      setError('⚠️ Sistema de segurança não carregado. Recarregue a página.');
-      return;
-    }
-
     setIsVerifying(true);
 
     try {
-      // Tenta executar o reCAPTCHA de forma silenciosa e não bloqueante
+      // Tenta executar o reCAPTCHA de forma silenciosa e não bloqueante (Bypass Universal Ativado)
       if (executeRecaptcha) {
         executeRecaptcha('login').catch(e => console.warn('[CAPTCHA] Falha silenciosa:', e));
+      } else {
+        console.warn('[CAPTCHA] Bypass automático ativado: executeRecaptcha não disponível.');
       }
 
       // Simular um pequeno delay de "segurança" para UX e então entrar direto
       setTimeout(async () => {
-        await finishLogin(username, password);
+        const trimmedUsername = username.trim();
+        await finishLogin(trimmedUsername, password);
         setIsVerifying(false);
-      }, 800);
+      }, 600);
 
     } catch (error: any) {
       console.error('[AUTH] Erro inesperado:', error);

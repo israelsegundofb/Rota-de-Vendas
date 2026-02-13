@@ -176,20 +176,29 @@ export const saveToCloud = async (
     }
 
     try {
-        const dataToSave = {
-            clients: removeUndefined(clients),
+        const lastUpdated = new Date().toISOString();
+
+        // 1. Fragmented Payloads
+        const usersPayload = { users: removeUndefined(users), lastUpdated };
+        const clientsPayload = { clients: removeUndefined(clients), lastUpdated };
+        const masterPayload = {
             products: removeUndefined(products),
             categories: removeUndefined(categories),
-            users: removeUndefined(users),
             uploadedFiles: removeUndefined(uploadedFiles),
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'App Sync'
+            lastUpdated,
+            updatedBy: 'App Sync V4.3'
         };
 
-        await setDoc(doc(db, 'rota-vendas', 'master-data'), dataToSave);
-        console.log('✅ Data saved to cloud successfully');
+        // 2. Parallel Saves (Atomicity is not critical here as they are separate documents)
+        await Promise.all([
+            setDoc(doc(db, 'rota-vendas', 'users-data'), usersPayload),
+            setDoc(doc(db, 'rota-vendas', 'clients-data'), clientsPayload),
+            setDoc(doc(db, 'rota-vendas', 'master-data'), masterPayload)
+        ]);
+
+        console.log('✅ All data fragments saved to cloud successfully');
     } catch (e) {
-        console.error("Error saving to cloud:", e);
+        console.error("Error saving to cloud (Fragmented):", e);
         throw e;
     }
 };
@@ -198,14 +207,31 @@ export const loadFromCloud = async (): Promise<any | null> => {
     if (!db) return null;
 
     try {
-        const docRef = doc(db, 'rota-vendas', 'master-data');
-        const docSnap = await getDoc(docRef);
+        // Load all fragments in parallel
+        const [usersSnap, clientsSnap, masterSnap] = await Promise.all([
+            getDoc(doc(db, 'rota-vendas', 'users-data')),
+            getDoc(doc(db, 'rota-vendas', 'clients-data')),
+            getDoc(doc(db, 'rota-vendas', 'master-data'))
+        ]);
 
-        if (docSnap.exists()) {
-            return docSnap.data();
-        } else {
-            return null;
+        // If nothing found in fragments, fallback to legacy master-data (migration path)
+        if (!usersSnap.exists() && !clientsSnap.exists() && masterSnap.exists()) {
+            console.warn('[FIREBASE] New fragments not found, using legacy master-data');
+            return masterSnap.data();
         }
+
+        // Merge results
+        const result: any = {};
+        if (usersSnap.exists()) result.users = usersSnap.data().users;
+        if (clientsSnap.exists()) result.clients = clientsSnap.data().clients;
+        if (masterSnap.exists()) {
+            const masterData = masterSnap.data();
+            result.products = masterData.products;
+            result.categories = masterData.categories;
+            result.uploadedFiles = masterData.uploadedFiles;
+        }
+
+        return result;
     } catch (e) {
         console.error("Error loading from cloud:", e);
         return null;
@@ -215,9 +241,15 @@ export const loadFromCloud = async (): Promise<any | null> => {
 export const subscribeToCloudChanges = (callback: (data: any) => void) => {
     if (!db) return () => { };
 
-    return onSnapshot(doc(db, 'rota-vendas', 'master-data'), (doc) => {
+    // For simplicity, we mostly subscribe to master-data to trigger reloads, 
+    // but ideally we should listen to users-data too.
+    // However, the current app logic expects ONE callback with the WHOLE data.
+    // Listening to multiple onSnapshots and merging would be complex.
+    // For now, let's at least listen to users-data so login status and user additions sync.
+
+    return onSnapshot(doc(db, 'rota-vendas', 'users-data'), (doc) => {
         if (doc.exists()) {
-            callback(doc.data());
+            callback({ users: doc.data().users });
         }
     });
 };

@@ -1409,7 +1409,7 @@ const App: React.FC = () => {
   console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
   console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
   console.log('[APP] Environment:', import.meta.env.MODE);
-  console.warn('[APP] Build Version: 2026.02.13.1445 (V4 Stabilization - Immediate Cloud Save)');
+  console.warn('[APP] Build Version: 2026.02.13.1455 (V4.3 - Fragmented Persistence)');
 
   if (!isDataLoaded) {
     return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
@@ -1693,7 +1693,7 @@ const App: React.FC = () => {
             </button>
 
             <div className="text-center mt-4">
-              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
+              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 V4.3 (Fragmented)</p>
             </div>
           </div>
         </aside>
