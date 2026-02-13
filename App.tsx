@@ -16,7 +16,7 @@ import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } fro
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud } from './services/firebaseService';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 import ClientMap from './components/ClientMap';
@@ -139,6 +139,28 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
+
+  // --- Presence Effects ---
+  useEffect(() => {
+    if (currentUser && (!currentUser.status || currentUser.status === 'Offline')) {
+      const setOnline = async () => {
+        baseUpdateUser({ ...currentUser, status: 'Online' });
+        await updateUserStatusInCloud(currentUser.id, 'Online', users);
+      };
+      setOnline();
+    }
+  }, [currentUser?.id]); // Only run when user changes or logs in
+
+  useEffect(() => {
+    const handleUnload = () => {
+      if (currentUser && currentUser.status !== 'Offline') {
+        // Fire and forget status update on close
+        updateUserStatusInCloud(currentUser.id, 'Offline', users);
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [currentUser, users]);
   // isFirebaseConnected handled by hook
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
@@ -1456,6 +1478,9 @@ const App: React.FC = () => {
                     value={currentUser.status || 'Offline'}
                     onChange={async (e) => {
                       const newStatus = e.target.value as UserStatus;
+                      // Atualizar localmente primeiro para feedback instantâneo
+                      baseUpdateUser({ ...currentUser, status: newStatus });
+
                       const { updateUserStatusInCloud } = await import('./services/firebaseService');
                       await updateUserStatusInCloud(currentUser.id, newStatus, users);
                     }}

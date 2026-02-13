@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AppUser, UserRole } from '../types';
 
 export const INITIAL_USERS: AppUser[] = [
@@ -8,36 +8,37 @@ export const INITIAL_USERS: AppUser[] = [
 ];
 
 export const useAuth = () => {
-    // Usuários são gerenciados pelo useDataPersistence, que usa Firestore
-    // Este hook apenas gerencia o estado local e operações CRUD
     const [users, setUsers] = useState<AppUser[]>([]);
-    const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-    // NÃO persistimos mais aqui - useDataPersistence faz isso via Firestore
-    // Os usuários chegam via prop e são sincronizados automaticamente
+    const currentUser = useMemo(() => {
+        if (!currentUserId) return null;
+        return users.find(u => u.id === currentUserId) || null;
+    }, [users, currentUserId]);
 
     const login = (user: AppUser) => {
-        setCurrentUser(user);
+        // Garantir que o usuário exista na lista para que a derivação funcione
+        if (!users.find(u => u.id === user.id)) {
+            setUsers(prev => [...prev, user]);
+        }
+        setCurrentUserId(user.id);
     };
 
     const logout = () => {
-        setCurrentUser(null);
+        setCurrentUserId(null);
     };
 
     const addUser = (newUser: AppUser) => {
-        const updated = [...users, newUser];
-        setUsers(updated);
-        // Persistence is handled by useDataPersistence effect on 'users'
+        setUsers(prev => [...prev, newUser]);
     };
 
     const updateUser = (updatedUser: AppUser) => {
-        const updated = users.map(u => u.id === updatedUser.id ? updatedUser : u);
-        setUsers(updated);
+        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
     };
 
     const deleteUser = (userId: string) => {
-        const updated = users.filter(u => u.id !== userId);
-        setUsers(updated);
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        if (currentUserId === userId) setCurrentUserId(null);
     };
 
     return {
