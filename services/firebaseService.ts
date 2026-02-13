@@ -169,16 +169,10 @@ export const saveToCloud = async (
 ) => {
     if (!db) return;
 
-    // PROTECTION: Never save an empty dataset if we are in production, 
-    // to avoid wiping out the cloud database due to a local initialization race condition.
-    const isInitialData = clients.length === 0 && products.length === 0 && users.length <= 3;
-    if (isInitialData) {
-        const docRef = doc(db, 'rota-vendas', 'master-data');
-        const snap = await getDoc(docRef);
-        if (snap.exists() && (snap.data().clients?.length > 0)) {
-            console.warn('[FIREBASE] Prevented accidental overwrite of cloud data with local empty state.');
-            return;
-        }
+    // PROTECTION: Never save an empty user list to the cloud if we previously had data.
+    if (users.length === 0) {
+        console.warn('[FIREBASE] Blocked save attempt with 0 users. This is likely a race condition or state error.');
+        return;
     }
 
     try {

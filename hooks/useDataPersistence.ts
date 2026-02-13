@@ -175,11 +175,8 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         // Only save if we are connected, loaded, AND have actual data to save
         // We also check for users.length > 3 to avoid saving the default list over a populated cloud
         // Added check to ensure we don't save if clients were loaded but now we have 0 (unless explicit)
-        const hasUsers = users.length > 3; // Initial has 3
-        const hasClients = masterClientList.length > 0;
-        const hasFiles = uploadedFiles.length > 0;
-
-        const shouldSave = isFirebaseConnected && isDataLoaded && (hasUsers || hasClients || hasFiles);
+        // Only save if we are connected, loaded, AND have some users (never save if users are 0 as a safety measure)
+        const shouldSave = isFirebaseConnected && isDataLoaded && users.length > 0;
 
         if (shouldSave) {
             const timeout = setTimeout(() => {

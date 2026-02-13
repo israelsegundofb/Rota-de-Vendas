@@ -8,7 +8,7 @@ export const INITIAL_USERS: AppUser[] = [
 ];
 
 export const useAuth = () => {
-    const [users, setUsers] = useState<AppUser[]>([]);
+    const [users, setUsers] = useState<AppUser[]>(INITIAL_USERS);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     const currentUser = useMemo(() => {

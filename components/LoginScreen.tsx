@@ -68,6 +68,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
   const finishLogin = async (username: string, pass: string) => {
     // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
     let currentUsers = users;
+
+    console.log(`[AUTH] Tentativa de login: "${username}" | Lista de usuários carregada: ${currentUsers?.length || 0}`);
+
     if (!currentUsers || currentUsers.length === 0) {
       console.log('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
       const { INITIAL_USERS } = await import('../hooks/useAuth');
@@ -80,16 +83,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     // Fallback de emergência (Hardcoded): Se for o admin e não estiver na lista da nuvem, 
     // garante que o acesso padrão Admin DEV (123) funcione.
     if (!user && username.toLowerCase() === 'admin') {
-      console.log('[AUTH] Admin not found in cloud users, using hardcoded fallback');
+      console.log('[AUTH] Admin not found in current list, using hardcoded fallback');
       const { INITIAL_USERS } = await import('../hooks/useAuth');
       user = INITIAL_USERS.find(u => u.username === 'admin');
     }
 
-    if (user && user.password === pass) {
-      console.log('[AUTH] Login successful ✅');
-      onLogin(user);
+    if (user) {
+      if (user.password === pass) {
+        console.log('[AUTH] Login successful ✅');
+        onLogin(user);
+      } else {
+        console.warn(`[AUTH] Senha incorreta para o usuário: ${username}`);
+        setError('❌ Credenciais inválidas. Verifique usuário e senha.');
+      }
     } else {
-      console.warn('[AUTH] Invalid credentials');
+      console.warn(`[AUTH] Usuário não encontrado na lista (${currentUsers?.length} usuários verificados): ${username}`);
       setError('❌ Credenciais inválidas. Verifique usuário e senha.');
     }
   };
