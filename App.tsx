@@ -1410,13 +1410,15 @@ const App: React.FC = () => {
                   Arquivos
                 </button>
 
-                <button
-                  onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
-                >
-                  <Cloud className="w-5 h-5" />
-                  Backup & Cloud
-                </button>
+                {currentUser?.role === 'admin_dev' && (
+                  <button
+                    onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
+                  >
+                    <Cloud className="w-5 h-5" />
+                    Backup & Cloud
+                  </button>
+                )}
               </nav>
             )}
           </div>
