@@ -3,7 +3,7 @@ import { initializeApp, FirebaseApp, getApps, getApp, deleteApp } from 'firebase
 import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
-import { EnrichedClient, Product, AppUser, ChatMessage } from '../types';
+import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -73,6 +73,33 @@ export const markMessageAsReadInCloud = async (messageId: string) => {
     } catch (e) {
         console.error("Error marking message as read:", e);
     }
+};
+
+// -- LOG FUNCTIONS --
+
+export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
+    if (!db) return;
+    try {
+        const logRef = collection(db, 'system_logs');
+        await addDoc(logRef, removeUndefined(log));
+    } catch (e) {
+        console.error("Error saving log:", e);
+    }
+};
+
+export const subscribeToSystemLogs = (callback: (logs: SystemLog[]) => void) => {
+    if (!db) return () => { };
+    const logRef = collection(db, 'system_logs');
+    const q = query(logRef, orderBy('timestamp', 'desc'));
+
+    return onSnapshot(q, (snapshot) => {
+        const logs: SystemLog[] = [];
+        snapshot.forEach((doc) => {
+            logs.push({ id: doc.id, ...doc.data() } as SystemLog);
+        });
+        // Limit to last 500 logs for performance
+        callback(logs.slice(0, 500));
+    });
 };
 
 // -- DATA SYNC FUNCTIONS --

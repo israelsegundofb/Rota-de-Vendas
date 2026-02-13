@@ -117,3 +117,14 @@ export interface ChatConversation {
   unreadCount: number;
 }
 
+export interface SystemLog {
+  id: string;
+  timestamp: string; // ISO String
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'ERROR' | 'SYNC' | 'CHAT' | 'ACCESS';
+  category: 'CLIENTS' | 'PRODUCTS' | 'USERS' | 'SYSTEM' | 'CHAT' | 'AUTH';
+  details: string;
+  metadata?: any;
+}

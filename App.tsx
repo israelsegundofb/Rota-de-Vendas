@@ -8,7 +8,7 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare, Activity } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
@@ -16,7 +16,7 @@ import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } fro
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud } from './services/firebaseService';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 import ClientMap from './components/ClientMap';
@@ -35,6 +35,7 @@ import GoogleMapsKeyModal from './components/GoogleMapsKeyModal';
 import CNPJaKeyModal from './components/CNPJaKeyModal';
 import LoadingScreen from './components/LoadingScreen';
 import AdminDashboard from './components/AdminDashboard';
+import LogPanel from './components/LogPanel';
 import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
@@ -142,6 +143,7 @@ const App: React.FC = () => {
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
   const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
+  const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
   const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
   // Custom Dialog State
@@ -385,6 +387,18 @@ const App: React.FC = () => {
       const updated = [...prev, ...newProducts];
       // Distribute products to clients immediately for demo purposes
       distributeProductsToClients(masterClientList, updated);
+
+      if (currentUser) {
+        logActivityToCloud({
+          timestamp: new Date().toISOString(),
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userRole: currentUser.role,
+          action: 'CREATE',
+          category: 'PRODUCTS',
+          details: `Importou ${newProducts.length} novos produtos.`,
+        });
+      }
       return updated;
     });
   };
@@ -540,6 +554,20 @@ const App: React.FC = () => {
     }
 
     setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
+
+    // Log the update
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'CLIENTS',
+        details: `Atualizou o cliente: ${finalClient.companyName}`,
+        metadata: { clientId: finalClient.id }
+      });
+    }
   };
 
   const handleAddClient = async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'> & { id?: string; lat?: number; lng?: number }) => {
@@ -690,7 +718,19 @@ const App: React.FC = () => {
 
   // --- Actions ---
   const handleLogin = (user: AppUser) => {
-    login(user);
+    login(user); // Assuming 'user' object contains necessary info, or 'username' is derived from it
+
+    // Log login success (we might need to check if login was successful if the hook returns a result)
+    // For now, assume if the call is made it's a login attempt/success
+    logActivityToCloud({
+      timestamp: new Date().toISOString(),
+      userId: user.id, // Fallback if currentUser isn't set yet
+      userName: user.name,
+      userRole: 'UNKNOWN', // Will be populated in next log after session starts
+      action: 'LOGIN',
+      category: 'AUTH',
+      details: `Tentativa de login concluída para o usuário: ${user.name}`
+    });
     resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
@@ -968,6 +1008,64 @@ const App: React.FC = () => {
 
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
     // alert("Arquivo e dados associados foram removidos.");
+  };
+
+  const handleAddUser = (user: AppUser) => {
+    // Original action
+    setUsers(prev => [...prev, user]);
+
+    // Log the action
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'CREATE',
+        category: 'USERS',
+        details: `Adicionou um novo usuário: ${user.name} (${user.role})`,
+        metadata: { targetUserId: user.id }
+      });
+    }
+  };
+
+  const handleUpdateUser = (updatedUser: AppUser) => {
+    // Original action
+    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+
+    // Log the action
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'USERS',
+        details: `Atualizou os dados do usuário: ${updatedUser.name}`,
+        metadata: { targetUserId: updatedUser.id }
+      });
+    }
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    // Original action
+    setUsers(prev => prev.filter(u => u.id !== userId));
+
+    // Log the action
+    if (currentUser && targetUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'DELETE',
+        category: 'USERS',
+        details: `Removeu o usuário: ${targetUser.name}`,
+        metadata: { targetUserId: userId }
+      });
+    }
   };
 
   const handleReassignFileSalesperson = (fileId: string, newSalespersonId: string) => {
@@ -1441,6 +1539,21 @@ const App: React.FC = () => {
                   >
                     <Cloud className="w-5 h-5" />
                     Backup & Cloud
+                  </button>
+                )}
+                {currentUser?.role === 'admin_dev' && (
+                  <button
+                    onClick={() => {
+                      setIsLogPanelOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all hover:bg-slate-100 group"
+                    title="🖥️ Logs e Auditoria do Sistema"
+                  >
+                    <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Logs do Sistema</span>
                   </button>
                 )}
               </nav>
@@ -2207,6 +2320,14 @@ const App: React.FC = () => {
                 </div>
               </>
             )}
+
+          {/* System Logs Panel (Admin Dev Only) */}
+          {isLogPanelOpen && currentUser?.role === 'admin_dev' && (
+            <LogPanel
+              currentUser={currentUser}
+              onClose={() => setIsLogPanelOpen(false)}
+            />
+          )}
 
           {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
           {procState.isActive && (
