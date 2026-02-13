@@ -1,9 +1,9 @@
 
 import { initializeApp, FirebaseApp, getApps, getApp, deleteApp } from 'firebase/app';
-import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
-import { EnrichedClient, Product, AppUser } from '../types';
+import { EnrichedClient, Product, AppUser, ChatMessage } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -31,7 +31,45 @@ export const initializeFirebase = async (config?: FirebaseConfig): Promise<boole
     }
 };
 
+export const getFirestoreDb = () => db;
+
 export const isFirebaseInitialized = () => !!db;
+
+// -- CHAT FUNCTIONS --
+
+export const sendMessageToCloud = async (message: Omit<ChatMessage, 'id'>) => {
+    if (!db) return;
+    try {
+        const chatRef = collection(db, 'chats');
+        await addDoc(chatRef, removeUndefined(message));
+    } catch (e) {
+        console.error("Error sending message:", e);
+    }
+};
+
+export const subscribeToMessages = (callback: (messages: ChatMessage[]) => void) => {
+    if (!db) return () => { };
+    const chatRef = collection(db, 'chats');
+    const q = query(chatRef, orderBy('timestamp', 'asc'));
+
+    return onSnapshot(q, (snapshot) => {
+        const messages: ChatMessage[] = [];
+        snapshot.forEach((doc) => {
+            messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
+        });
+        callback(messages);
+    });
+};
+
+export const markMessageAsReadInCloud = async (messageId: string) => {
+    if (!db) return;
+    try {
+        const msgRef = doc(db, 'chats', messageId);
+        await updateDoc(msgRef, { read: true });
+    } catch (e) {
+        console.error("Error marking message as read:", e);
+    }
+};
 
 // -- DATA SYNC FUNCTIONS --
 

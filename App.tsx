@@ -8,7 +8,7 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
@@ -42,6 +42,8 @@ import { useFilters } from './hooks/useFilters';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import CustomDialog, { DialogType } from './components/CustomDialog';
 import SalesHistoryPanel from './components/SalesHistoryPanel';
+import ChatPanel from './components/ChatPanel';
+import { useChat } from './hooks/useChat';
 
 
 // Initial Mock Data
@@ -103,6 +105,11 @@ const App: React.FC = () => {
     resetFilters
   } = useFilters(masterClientList, users, currentUser, products);
 
+  const {
+    messages, conversations, activeConversationId, setActiveConversationId,
+    sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread
+  } = useChat(currentUser, users);
+
   // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
     isActive: false,
@@ -127,7 +134,7 @@ const App: React.FC = () => {
   const [keyVersion, setKeyVersion] = useState(0);
 
   // View State
-  const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat'>('map');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
@@ -1357,8 +1364,25 @@ const App: React.FC = () => {
                   : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
                   }`}
               >
-                <ShoppingBag className={`w-5 h-5 ${activeView === 'history' ? 'fill-current' : ''}`} />
                 Histórico de Vendas
+              </button>
+
+              <button
+                onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
+                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
+                  Mensagens Internas
+                </div>
+                {totalUnread > 0 && activeView !== 'chat' && (
+                  <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                    {totalUnread}
+                  </div>
+                )}
               </button>
             </nav>
 
@@ -1510,7 +1534,8 @@ const App: React.FC = () => {
                   activeView === 'table' ? 'Listagem de Clientes' :
                     activeView === 'dashboard' ? 'Dashboard Administrativo' :
                       activeView === 'admin_categories' ? 'Categorias de Clientes' :
-                        activeView === 'admin_products' ? 'Catálogo de Produtos' : 'Gestão de Usuários'}
+                        activeView === 'admin_products' ? 'Catálogo de Produtos' :
+                          activeView === 'chat' ? 'Mensagens Internas' : 'Gestão de Usuários'}
               </span>
             </div>
             <div className="flex items-center gap-6">
@@ -1571,6 +1596,21 @@ const App: React.FC = () => {
                   onDeleteFile={handleDeleteFile}
                   onReassignSalesperson={handleReassignFileSalesperson}
                   procState={procState}
+                />
+              </div>
+            ) : activeView === 'chat' && currentUser ? (
+              <div className="flex-1 p-4 md:p-6 overflow-hidden">
+                <ChatPanel
+                  currentUser={currentUser}
+                  allUsers={users}
+                  conversations={conversations}
+                  messages={messages}
+                  activeUserId={activeConversationId}
+                  onSelectUser={(userId) => {
+                    setActiveConversationId(userId);
+                    if (userId) handleChatMarkAsRead(userId);
+                  }}
+                  onSendMessage={handleChatSendMessage}
                 />
               </div>
             ) : activeView === 'dashboard' && isAdminUser ? (

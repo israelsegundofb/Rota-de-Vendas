@@ -102,3 +102,18 @@ export interface UploadedFile {
   errorMessage?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  timestamp: string; // ISO String
+  read: boolean;
+}
+
+export interface ChatConversation {
+  userId: string;
+  lastMessage?: ChatMessage;
+  unreadCount: number;
+}
+
