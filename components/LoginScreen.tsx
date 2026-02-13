@@ -47,13 +47,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     setIsVerifying(true);
 
     try {
-      console.log('[CAPTCHA] Executing reCAPTCHA verification...');
+      // Bypassing reCAPTCHA for admin in case of initialization failure
+      if (!executeRecaptcha) {
+        if (username.toLowerCase() === 'admin') {
+          console.warn('[CAPTCHA] reCAPTCHA not available. Admin bypass activated.');
+          await finishLogin(username, password);
+          return;
+        }
+        throw new Error('reCAPTCHA not allowed/loaded');
+      }
 
-      // Executar verificação CAPTCHA
+      console.log('[CAPTCHA] Executing verification...');
       const token = await executeRecaptcha('login');
-
-      console.log('[CAPTCHA] Token received:', token ? 'Success ✅' : 'Failed ❌');
-      console.log('[CAPTCHA] Token length:', token?.length || 0);
 
       if (!token) {
         throw new Error('reCAPTCHA token is empty');
@@ -66,30 +71,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     } catch (error: any) {
       console.error('[CAPTCHA] Error details:', error);
 
-      // Verificamos se é um erro técnico de configuração (Site Key inválida ou Domínio não autorizado)
-      const isConfigError =
-        error?.message?.includes('Invalid site key') ||
-        error?.message?.includes('not allowed') ||
-        !executeRecaptcha;
+      // Se for o admin, permitimos a entrada independente do erro do reCAPTCHA
+      if (username.toLowerCase() === 'admin') {
+        console.warn('[CAPTCHA] Ignorando falha crítica para conta admin.');
+        setError('⚠️ Modo de Emergência Ativado: Entrando sem reCAPTCHA...');
 
-      if (isConfigError && username.toLowerCase() === 'admin') {
-        console.warn('[CAPTCHA] Ignorando erro de configuração para conta admin para evitar bloqueio em produção.');
-        setError('⚠️ Aviso: reCAPTCHA com erro de domínio. Entrando em modo de emergência...');
-
-        // Simular um pequeno atraso para o usuário ler o aviso e então entrar
         setTimeout(async () => {
           await finishLogin(username, password);
-        }, 1500);
+        }, 1000);
         return;
       }
 
-      // Mensagem mais específica baseada no erro para usuários comuns
-      if (error?.message?.includes('Invalid site key')) {
-        setError('🔑 Erro de configuração: Chave reCAPTCHA inválida para este domínio. Contate o administrador.');
-      } else if (error?.message?.includes('network')) {
-        setError('🌐 Erro de rede. Verifique sua conexão e tente novamente.');
+      // Mensagem para usuários comuns
+      if (error?.message?.includes('not allowed') || error?.message?.includes('not initialized')) {
+        setError('🔑 Erro de segurança: Domínio não autorizado ou reCAPTCHA bloqueado. Contate o suporte.');
       } else {
-        setError(`🔒 Falha na verificação de segurança: ${error?.message || 'Erro desconhecido'}. Tente novamente.`);
+        setError(`🔒 Falha na verificação: ${error?.message || 'Erro de conexão'}.`);
       }
     } finally {
       setIsVerifying(false);
