@@ -3,7 +3,7 @@ import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
-import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog } from '../types';
+import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -219,5 +219,27 @@ export const uploadFileToCloud = async (file: File | Blob, path: string): Promis
     } catch (error) {
         console.error("Error uploading file to storage:", error);
         return null;
+    }
+};
+
+export const updateUserStatusInCloud = async (userId: string, status: UserStatus, allUsers: AppUser[]) => {
+    if (!db) return;
+    try {
+        const updatedUsers = allUsers.map(u => u.id === userId ? { ...u, status } : u);
+        const docRef = doc(db, 'rota-vendas', 'master-data');
+        const snap = await getDoc(docRef);
+
+        if (snap.exists()) {
+            const currentData = snap.data();
+            await setDoc(docRef, {
+                ...currentData,
+                users: removeUndefined(updatedUsers),
+                lastUpdated: new Date().toISOString(),
+                updatedBy: `Status Update: ${userId}`
+            });
+            console.log(`✅ Status for ${userId} updated to ${status}`);
+        }
+    } catch (e) {
+        console.error("Error updating user status:", e);
     }
 };

@@ -9,7 +9,7 @@
 */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare, Activity } from 'lucide-react';
-import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord } from './types';
+import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
@@ -1428,176 +1428,206 @@ const App: React.FC = () => {
             <div className="bg-surface-container-highest rounded-2xl p-4 mb-6 border border-outline-variant/30 shadow-sm relative overflow-hidden group">
               <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
               <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
-              <div className="flex items-center gap-3 relative z-10">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md overflow-hidden ${isAdminUser ? 'bg-tertiary' : 'bg-secondary'}`}>
-                  {currentUser.photoURL ? (
-                    <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <span>{currentUser.name.charAt(0)}</span>
-                  )}
+              <div className="flex flex-col gap-3 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md overflow-hidden ${isAdminUser ? 'bg-tertiary' : 'bg-secondary'}`}>
+                      {currentUser.photoURL ? (
+                        <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{currentUser.name.charAt(0)}</span>
+                      )}
+                    </div>
+                    {/* Status Indicator Badge */}
+                    <div className={`
+                      absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-surface-container-highest shadow-sm
+                      ${currentUser.status === 'Online' ? 'bg-green-500' : currentUser.status === 'Ocupado' ? 'bg-amber-500' : 'bg-slate-400'}
+                    `}></div>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>
+                    <p className="text-xs text-on-surface-variant truncate opacity-80">{currentUser.email}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>
-                  <p className="text-xs text-on-surface-variant truncate opacity-80">{currentUser.email}</p>
+
+                {/* Status Selector */}
+                <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/10">
+                  <select
+                    value={currentUser.status || 'Offline'}
+                    onChange={async (e) => {
+                      const newStatus = e.target.value as UserStatus;
+                      const { updateUserStatusInCloud } = await import('./services/firebaseService');
+                      await updateUserStatusInCloud(currentUser.id, newStatus, users);
+                    }}
+                    className={`
+                      text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded-full border transition-all cursor-pointer outline-none bg-surface/50
+                      ${currentUser.status === 'Online' ? 'border-green-200 text-green-700 hover:bg-green-50' :
+                        currentUser.status === 'Ocupado' ? 'border-amber-200 text-amber-700 hover:bg-amber-50' :
+                          'border-slate-200 text-slate-500 hover:bg-slate-50'}
+                    `}
+                  >
+                    <option value="Online">🟢 Online</option>
+                    <option value="Ocupado">🟡 Ocupado</option>
+                    <option value="Offline">⚪ Offline</option>
+                  </select>
                 </div>
               </div>
-            </div>
 
-            <nav className="space-y-1 mb-8">
-              <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
-              <button
-                onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
-                Mapa da Carteira
-              </button>
+              <nav className="space-y-1 mb-8">
+                <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
+                <button
+                  onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
+                  Mapa da Carteira
+                </button>
+
+                {isAdminUser && (
+                  <button
+                    onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
+                    Dashboard Admin
+                  </button>
+                )}
+
+                <button
+                  onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
+                  Listagem de Dados
+                </button>
+
+                <button
+                  onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  Histórico de Vendas
+                </button>
+
+                <button
+                  onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
+                    Mensagens Internas
+                  </div>
+                  {totalUnread > 0 && activeView !== 'chat' && (
+                    <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                      {totalUnread}
+                    </div>
+                  )}
+                </button>
+              </nav>
 
               {isAdminUser && (
-                <button
-                  onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
-                  Dashboard Admin
-                </button>
+                <nav className="space-y-1 mb-8">
+                  <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
+
+                  <button
+                    onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
+                    Gerenciar Usuários
+                  </button>
+
+                  <button
+                    onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
+                    Categorias
+                  </button>
+
+                  <button
+                    onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
+                    Produtos
+                  </button>
+
+                  <button
+                    onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
+                    Arquivos
+                  </button>
+
+                  {currentUser?.role === 'admin_dev' && (
+                    <button
+                      onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
+                    >
+                      <Cloud className="w-5 h-5" />
+                      Backup & Cloud
+                    </button>
+                  )}
+                  {currentUser?.role === 'admin_dev' && (
+                    <button
+                      onClick={() => {
+                        setIsLogPanelOpen(true);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all hover:bg-slate-100 group"
+                      title="🖥️ Logs e Auditoria do Sistema"
+                    >
+                      <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Logs do Sistema</span>
+                    </button>
+                  )}
+                </nav>
               )}
-
-              <button
-                onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
-                Listagem de Dados
-              </button>
-
-              <button
-                onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                Histórico de Vendas
-              </button>
-
-              <button
-                onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
-                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
-                  Mensagens Internas
-                </div>
-                {totalUnread > 0 && activeView !== 'chat' && (
-                  <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
-                    {totalUnread}
-                  </div>
-                )}
-              </button>
-            </nav>
-
-            {isAdminUser && (
-              <nav className="space-y-1 mb-8">
-                <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
-                  Gerenciar Usuários
-                </button>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
-                  Categorias
-                </button>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
-                  Produtos
-                </button>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
-                  Arquivos
-                </button>
-
-                {currentUser?.role === 'admin_dev' && (
-                  <button
-                    onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
-                  >
-                    <Cloud className="w-5 h-5" />
-                    Backup & Cloud
-                  </button>
-                )}
-                {currentUser?.role === 'admin_dev' && (
-                  <button
-                    onClick={() => {
-                      setIsLogPanelOpen(true);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all hover:bg-slate-100 group"
-                    title="🖥️ Logs e Auditoria do Sistema"
-                  >
-                    <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      <Activity className="w-5 h-5" />
-                    </div>
-                    <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Logs do Sistema</span>
-                  </button>
-                )}
-              </nav>
-            )}
-          </div>
-
-          <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
-              title="Encerrar sessão e sair do sistema"
-            >
-              <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
-            </button>
-
-            <div className="text-center mt-4">
-              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
             </div>
-          </div>
+
+            <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
+                title="Encerrar sessão e sair do sistema"
+              >
+                <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
+              </button>
+
+              <div className="text-center mt-4">
+                <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
+              </div>
+            </div>
         </aside>
 
         {/* TOP BAR FOR MOBILE */}

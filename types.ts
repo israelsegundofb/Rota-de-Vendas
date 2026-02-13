@@ -78,6 +78,8 @@ export type UserRole =
 
 export type SalesCategory = 'Externo' | 'Interno' | 'Mercado Livre' | 'N/A';
 
+export type UserStatus = 'Online' | 'Ocupado' | 'Offline';
+
 export interface AppUser {
   id: string;
   name: string;
@@ -88,6 +90,7 @@ export interface AppUser {
   password?: string; // For mock auth management
   salesCategory?: SalesCategory;
   color?: string; // Color for map pins and UI identification
+  status?: UserStatus;
 }
 
 export interface UploadedFile {

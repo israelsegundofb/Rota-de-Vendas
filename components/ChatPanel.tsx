@@ -147,8 +147,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                             onClick={() => onSelectUser(conv.userId)}
                                             className={`w-full p-4 flex items-center gap-3 border-b border-slate-50 transition-colors hover:bg-slate-50 ${activeUserId === conv.userId ? 'bg-blue-50/50' : ''}`}
                                         >
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-sm ${user.role.includes('admin') ? 'bg-tertiary' : 'bg-secondary'}`}>
-                                                {user.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-full" /> : <span>{getInitials(user.name)}</span>}
+                                            <div className="relative">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-sm ${user.role.includes('admin') ? 'bg-tertiary' : 'bg-secondary'}`}>
+                                                    {user.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-full" /> : <span>{getInitials(user.name)}</span>}
+                                                </div>
+                                                {/* Status Indicator */}
+                                                <div className={`
+                                                    absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white shadow-sm
+                                                    ${user.status === 'Online' ? 'bg-green-500' : user.status === 'Ocupado' ? 'bg-amber-500' : 'bg-slate-400'}
+                                                `}></div>
                                             </div>
                                             <div className="flex-1 text-left min-w-0">
                                                 <div className="flex justify-between items-baseline mb-0.5">
@@ -182,8 +189,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                     onClick={() => onSelectUser(user.id)}
                                     className={`w-full p-4 flex items-center gap-3 border-b border-slate-50 transition-colors hover:bg-slate-50 ${activeUserId === user.id ? 'bg-blue-50/50' : ''}`}
                                 >
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-sm ${user.role.includes('admin') ? 'bg-tertiary' : 'bg-secondary'}`}>
-                                        {user.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-full" /> : <span>{getInitials(user.name)}</span>}
+                                    <div className="relative">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-sm ${user.role.includes('admin') ? 'bg-tertiary' : 'bg-secondary'}`}>
+                                            {user.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-full" /> : <span>{getInitials(user.name)}</span>}
+                                        </div>
+                                        {/* Status Indicator */}
+                                        <div className={`
+                                            absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white shadow-sm
+                                            ${user.status === 'Online' ? 'bg-green-500' : user.status === 'Ocupado' ? 'bg-amber-500' : 'bg-slate-400'}
+                                        `}></div>
                                     </div>
                                     <div className="flex-1 text-left">
                                         <h4 className="font-bold text-xs text-slate-800">{user.name}</h4>
