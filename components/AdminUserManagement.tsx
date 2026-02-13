@@ -103,6 +103,17 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
     e.preventDefault();
     if (!name || !username || !password) return;
 
+    // Check for duplicate username (case-insensitive) - only for NEW users or if username changed
+    const usernameExists = users.some(u =>
+      u.id !== editingId &&
+      u.username.toLowerCase() === username.toLowerCase()
+    );
+
+    if (usernameExists) {
+      alert(`⚠️ O usuário "${username}" já está cadastrado no sistema. Escolha outro nome de usuário.`);
+      return;
+    }
+
     // Security check logic again just in case
     const isSalesRole = ROLE_HIERARCHY[role] >= 4; // Managers and below
 

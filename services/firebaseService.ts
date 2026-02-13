@@ -1,6 +1,6 @@
 
 import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc } from 'firebase/firestore';
+import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
 import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus } from '../types';
@@ -71,6 +71,32 @@ export const markMessageAsReadInCloud = async (messageId: string) => {
         await updateDoc(msgRef, { read: true });
     } catch (e) {
         console.error("Error marking message as read:", e);
+    }
+};
+
+export const deleteMessageFromCloud = async (messageId: string) => {
+    if (!db) return;
+    try {
+        const msgRef = doc(db, 'chats', messageId);
+        await deleteDoc(msgRef);
+        console.log(`✅ Message ${messageId} deleted from cloud`);
+    } catch (e) {
+        console.error("Error deleting message:", e);
+        throw e;
+    }
+};
+
+export const clearAllMessagesFromCloud = async () => {
+    if (!db) return;
+    try {
+        const chatRef = collection(db, 'chats');
+        const snapshot = await getDocs(chatRef);
+        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        console.log("✅ All chat messages cleared from cloud");
+    } catch (e) {
+        console.error("Error clearing chat history:", e);
+        throw e;
     }
 };
 

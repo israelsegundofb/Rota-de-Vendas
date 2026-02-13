@@ -174,9 +174,14 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
     useEffect(() => {
         // Only save if we are connected, loaded, AND have actual data to save
         // We also check for users.length > 3 to avoid saving the default list over a populated cloud
-        const hasData = masterClientList.length > 0 || users.length > 3 || uploadedFiles.length > 0;
+        // Added check to ensure we don't save if clients were loaded but now we have 0 (unless explicit)
+        const hasUsers = users.length > 3; // Initial has 3
+        const hasClients = masterClientList.length > 0;
+        const hasFiles = uploadedFiles.length > 0;
 
-        if (isFirebaseConnected && isDataLoaded && hasData) {
+        const shouldSave = isFirebaseConnected && isDataLoaded && (hasUsers || hasClients || hasFiles);
+
+        if (shouldSave) {
             const timeout = setTimeout(() => {
                 console.log('[SYNC] Auto-saving to cloud...');
                 saveToCloud(masterClientList, products, categories, users, uploadedFiles)

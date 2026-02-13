@@ -108,7 +108,8 @@ const App: React.FC = () => {
 
   const {
     messages, conversations, activeConversationId, setActiveConversationId,
-    sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread
+    sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread,
+    deleteMessage: handleChatDeleteMessage, clearMessages: handleChatClearMessages
   } = useChat(currentUser, users);
 
   // Background Processing State (Local to App as it handles UI feedback)
@@ -605,13 +606,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddClient = async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'> & { id?: string; lat?: number; lng?: number }) => {
+  const handleAddClient = async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
     let finalClient: EnrichedClient = {
       ...newClient,
       id: (newClient as any).id || crypto.randomUUID(),
       lat: newClient.lat || 0,
-      lng: newClient.lng || 0
+      lng: newClient.lng || 0,
+      cleanAddress: newClient.cleanAddress || ''
     };
 
     if ((!finalClient.lat || !finalClient.lng) || finalClient.lat === 0) {
@@ -795,15 +797,26 @@ const App: React.FC = () => {
     showAlert("Sucesso", "Chave CNPJa atualizada! Tente realizar a consulta novamente.", "success");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (procState.isActive && procState.status === 'processing') {
-      if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
+      if (window.confirm("📦 O sistema está processando dados no momento. Gostaria de Parar de Enviar o Arquivo? Se sair agora, o progresso será perdido.")) {
         isUploadCancelled.current = true;
         // Continue logout
       } else {
         return;
       }
     }
+
+    // Tentar salvar uma última vez antes de sair para garantir que novos usuários ou mudanças recentes foram para a nuvem
+    if (isFirebaseConnected && users.length > 0) {
+      console.log('[AUTH] Salvando dados antes do Logout...');
+      try {
+        await saveToCloud(masterClientList, products, categories, users, uploadedFiles);
+      } catch (e) {
+        console.error("Falha ao salvar antes de sair:", e);
+      }
+    }
+
     authLogout();
     resetFilters();
   };
@@ -1202,7 +1215,7 @@ const App: React.FC = () => {
             const clientPurchases = groupedByClient[key];
 
             // Map CSV records to PurchaseRecord objects
-            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map(rec => {
+            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map((rec: any) => {
               // Try to enrich with master catalog
               const masterProd = products.find(p =>
                 (rec.sku && p.sku === rec.sku) ||
@@ -1369,6 +1382,10 @@ const App: React.FC = () => {
   console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
   console.log('[APP] Environment:', import.meta.env.MODE);
 
+  if (!isDataLoaded) {
+    return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
+  }
+
   if (!currentUser) {
     return (
       <GoogleReCaptchaProvider
@@ -1388,10 +1405,6 @@ const App: React.FC = () => {
   const isAdminUser = isAdmin(currentUser.role);
   const canViewAllData = hasFullDataVisibility(currentUser.role);
   const isProductFilterActive = filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || searchProductQuery !== '';
-
-  if (!isDataLoaded) {
-    return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
-  }
 
   return (
     <GoogleReCaptchaProvider
@@ -1804,6 +1817,8 @@ const App: React.FC = () => {
                     if (userId) handleChatMarkAsRead(userId);
                   }}
                   onSendMessage={handleChatSendMessage}
+                  onDeleteMessage={handleChatDeleteMessage}
+                  onClearMessages={handleChatClearMessages}
                 />
               </div>
             ) : activeView === 'dashboard' && isAdminUser ? (

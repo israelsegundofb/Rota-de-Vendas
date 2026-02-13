@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Send, Search, ArrowLeft, Check, CheckCheck, Clock, MessageSquare, Users } from 'lucide-react';
+import { User, Send, Search, ArrowLeft, Check, CheckCheck, Clock, MessageSquare, Users, Trash2 } from 'lucide-react';
 import { AppUser, ChatMessage, ChatConversation } from '../types';
 
 interface ChatPanelProps {
@@ -10,6 +10,8 @@ interface ChatPanelProps {
     activeUserId: string | null;
     onSelectUser: (userId: string) => void;
     onSendMessage: (userId: string, text: string) => void;
+    onDeleteMessage?: (messageId: string) => void;
+    onClearMessages?: () => void;
     onClose?: () => void;
 }
 
@@ -21,6 +23,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     activeUserId,
     onSelectUser,
     onSendMessage,
+    onDeleteMessage,
+    onClearMessages,
     onClose
 }) => {
     const [inputText, setInputText] = useState('');
@@ -29,7 +33,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const activeUser = allUsers.find(u => u.id === activeUserId);
-    const isMonitorMode = (currentUser.role === 'admin_dev' || currentUser.role === 'admin') && activeUserId;
+    const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
+    const isMonitorMode = isAdminDev && activeUserId;
 
     const filteredMessages = messages.filter(m => {
         if (!activeUserId) return false;
@@ -68,6 +73,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const handleClearClick = () => {
+        if (window.confirm('⚠️ Tem certeza que deseja apagar TODO o histórico de mensagens do chat? Esta ação não pode ser desfeita.')) {
+            onClearMessages?.();
+        }
+    };
+
+    const handleDeleteClick = (messageId: string) => {
+        if (window.confirm('Deseja excluir esta mensagem?')) {
+            onDeleteMessage?.(messageId);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
             {/* HEADER */}
@@ -93,15 +110,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         </p>
                     </div>
                 </div>
-                {onClose && (
-                    <button
-                        onClick={onClose}
-                        className="text-slate-400 hover:text-white transition-colors"
-                        title="Fechar chat"
-                    >
-                        <Clock className="w-5 h-5" />
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {isAdminDev && messages.length > 0 && (
+                        <button
+                            onClick={handleClearClick}
+                            className="p-2 text-rose-400 hover:text-rose-300 hover:bg-slate-700 rounded-full transition-all"
+                            title="Limpar TODO o histórico do chat"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                    )}
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="text-slate-400 hover:text-white transition-colors"
+                            title="Fechar chat"
+                        >
+                            <Clock className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="flex-1 flex overflow-hidden">
@@ -221,10 +249,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                         (msg.senderId === activeUserId && msg.receiverId === currentUser.id);
 
                                     return (
-                                        <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                                            <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-tr-none' :
+                                        <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in group/msg`}>
+                                            <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm relative ${isMe ? 'bg-blue-600 text-white rounded-tr-none' :
                                                 (isMonitorMode && !isDirect ? 'bg-slate-200 text-slate-700 border-dashed border-slate-400' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100')
                                                 }`}>
+                                                {isAdminDev && (
+                                                    <button
+                                                        onClick={() => msg.id && handleDeleteClick(msg.id)}
+                                                        className={`absolute -top-2 ${isMe ? '-left-2' : '-right-2'} p-1.5 bg-rose-500 text-white rounded-full opacity-0 group-hover/msg:opacity-100 transition-opacity shadow-md hover:bg-rose-600 z-10`}
+                                                        title="Excluir mensagem"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                                 {isMonitorMode && !isMe && (
                                                     <p className="text-[9px] font-black uppercase mb-1 opacity-60">
                                                         {allUsers.find(u => u.id === msg.senderId)?.name || 'Outro'} → {allUsers.find(u => u.id === msg.receiverId)?.name || 'Outro'}

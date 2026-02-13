@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChatMessage, ChatConversation, AppUser } from '../types';
-import { sendMessageToCloud, subscribeToMessages, markMessageAsReadInCloud } from '../services/firebaseService';
+import { sendMessageToCloud, subscribeToMessages, markMessageAsReadInCloud, deleteMessageFromCloud, clearAllMessagesFromCloud } from '../services/firebaseService';
 import { logActivityToCloud } from '../services/firebaseService';
 
 export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
@@ -116,6 +116,44 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
         }
     }, [currentUser, messages]);
 
+    const deleteMessage = useCallback(async (messageId: string) => {
+        if (!currentUser || (currentUser.role !== 'admin_dev' && currentUser.role !== 'admin')) return;
+
+        try {
+            await deleteMessageFromCloud(messageId);
+            logActivityToCloud({
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name,
+                userRole: currentUser.role,
+                action: 'DELETE',
+                category: 'CHAT',
+                details: `Excluiu uma mensagem individual no chat (ID: ${messageId})`
+            });
+        } catch (e) {
+            console.error("Failed to delete message:", e);
+        }
+    }, [currentUser]);
+
+    const clearMessages = useCallback(async () => {
+        if (!currentUser || (currentUser.role !== 'admin_dev' && currentUser.role !== 'admin')) return;
+
+        try {
+            await clearAllMessagesFromCloud();
+            logActivityToCloud({
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name,
+                userRole: currentUser.role,
+                action: 'DELETE',
+                category: 'CHAT',
+                details: `Limpou TODO o histórico de chat do sistema.`
+            });
+        } catch (e) {
+            console.error("Failed to clear messages:", e);
+        }
+    }, [currentUser]);
+
     return {
         messages,
         conversations,
@@ -123,6 +161,8 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
         setActiveConversationId,
         sendMessage,
         markAsRead,
+        deleteMessage,
+        clearMessages,
         totalUnread: conversations.reduce((acc, c) => acc + c.unreadCount, 0)
     };
 };
