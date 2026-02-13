@@ -1472,162 +1472,163 @@ const App: React.FC = () => {
                   </select>
                 </div>
               </div>
-
-              <nav className="space-y-1 mb-8">
-                <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
-                <button
-                  onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
-                  Mapa da Carteira
-                </button>
-
-                {isAdminUser && (
-                  <button
-                    onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
-                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                      }`}
-                  >
-                    <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
-                    Dashboard Admin
-                  </button>
-                )}
-
-                <button
-                  onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
-                  Listagem de Dados
-                </button>
-
-                <button
-                  onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  Histórico de Vendas
-                </button>
-
-                <button
-                  onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
-                    Mensagens Internas
-                  </div>
-                  {totalUnread > 0 && activeView !== 'chat' && (
-                    <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
-                      {totalUnread}
-                    </div>
-                  )}
-                </button>
-              </nav>
-
-              {isAdminUser && (
-                <nav className="space-y-1 mb-8">
-                  <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
-
-                  <button
-                    onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
-                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                      }`}
-                  >
-                    <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
-                    Gerenciar Usuários
-                  </button>
-
-                  <button
-                    onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
-                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                      }`}
-                  >
-                    <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
-                    Categorias
-                  </button>
-
-                  <button
-                    onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
-                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                      }`}
-                  >
-                    <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
-                    Produtos
-                  </button>
-
-                  <button
-                    onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
-                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                      }`}
-                  >
-                    <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
-                    Arquivos
-                  </button>
-
-                  {currentUser?.role === 'admin_dev' && (
-                    <button
-                      onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
-                    >
-                      <Cloud className="w-5 h-5" />
-                      Backup & Cloud
-                    </button>
-                  )}
-                  {currentUser?.role === 'admin_dev' && (
-                    <button
-                      onClick={() => {
-                        setIsLogPanelOpen(true);
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all hover:bg-slate-100 group"
-                      title="🖥️ Logs e Auditoria do Sistema"
-                    >
-                      <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                        <Activity className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Logs do Sistema</span>
-                    </button>
-                  )}
-                </nav>
-              )}
             </div>
 
-            <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
+            <nav className="space-y-1 mb-8">
+              <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
               <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
-                title="Encerrar sessão e sair do sistema"
+                onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
               >
-                <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
+                <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
+                Mapa da Carteira
               </button>
 
-              <div className="text-center mt-4">
-                <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
-              </div>
+              {isAdminUser && (
+                <button
+                  onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
+                  Dashboard Admin
+                </button>
+              )}
+
+              <button
+                onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
+                Listagem de Dados
+              </button>
+
+              <button
+                onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                Histórico de Vendas
+              </button>
+
+              <button
+                onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
+                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
+                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
+                  Mensagens Internas
+                </div>
+                {totalUnread > 0 && activeView !== 'chat' && (
+                  <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                    {totalUnread}
+                  </div>
+                )}
+              </button>
+            </nav>
+
+            {isAdminUser && (
+              <nav className="space-y-1 mb-8">
+                <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
+
+                <button
+                  onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
+                  Gerenciar Usuários
+                </button>
+
+                <button
+                  onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
+                  Categorias
+                </button>
+
+                <button
+                  onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
+                  Produtos
+                </button>
+
+                <button
+                  onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
+                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                    }`}
+                >
+                  <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
+                  Arquivos
+                </button>
+
+                {currentUser?.role === 'admin_dev' && (
+                  <button
+                    onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
+                  >
+                    <Cloud className="w-5 h-5" />
+                    Backup & Cloud
+                  </button>
+                )}
+                {currentUser?.role === 'admin_dev' && (
+                  <button
+                    onClick={() => {
+                      setIsLogPanelOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all hover:bg-slate-100 group"
+                    title="🖥️ Logs e Auditoria do Sistema"
+                  >
+                    <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Logs do Sistema</span>
+                  </button>
+                )}
+              </nav>
+            )}
+          </div>
+
+          <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
+              title="Encerrar sessão e sair do sistema"
+            >
+              <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
+            </button>
+
+            <div className="text-center mt-4">
+              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 (MD3)</p>
             </div>
+          </div>
         </aside>
 
         {/* TOP BAR FOR MOBILE */}
@@ -2451,7 +2452,6 @@ const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Custom Global Dialog System */}
       <CustomDialog
         isOpen={dialogConfig.isOpen}
         onClose={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
