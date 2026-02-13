@@ -74,7 +74,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
         currentUsers = migrateUsers(INITIAL_USERS);
       }
 
-      const user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+      // Procure o usuário na lista atual (pode vir da nuvem)
+      let user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+
+      // Fallback de emergência (Hardcoded): Se for o admin e não estiver na lista da nuvem, 
+      // garante que o acesso padrão Admin DEV (123) funcione.
+      if (!user && username.toLowerCase() === 'admin') {
+        console.log('[AUTH] Admin not found in cloud users, using hardcoded fallback');
+        const { INITIAL_USERS } = await import('../hooks/useAuth');
+        user = INITIAL_USERS.find(u => u.username === 'admin');
+      }
 
       if (user && user.password === password) {
         console.log('[AUTH] Login successful ✅');
