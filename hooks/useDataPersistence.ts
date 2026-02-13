@@ -195,12 +195,29 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         }
     }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
 
-    // Local Persistence Effects
-    useEffect(() => { localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList)); }, [masterClientList]);
-    useEffect(() => { localStorage.setItem('vendas_ai_categories', JSON.stringify(categories)); }, [categories]);
-    useEffect(() => { localStorage.setItem('vendas_ai_products', JSON.stringify(products)); }, [products]);
-    useEffect(() => { localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles)); }, [uploadedFiles]);
-    useEffect(() => { localStorage.setItem('vendas_ai_users', JSON.stringify(users)); }, [users]);
+    // Local Persistence Effects (Immediate Logic)
+    useEffect(() => {
+        if (masterClientList.length > 0) localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
+    }, [masterClientList]);
+
+    useEffect(() => {
+        localStorage.setItem('vendas_ai_categories', JSON.stringify(categories));
+    }, [categories]);
+
+    useEffect(() => {
+        localStorage.setItem('vendas_ai_products', JSON.stringify(products));
+    }, [products]);
+
+    useEffect(() => {
+        localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles));
+    }, [uploadedFiles]);
+
+    useEffect(() => {
+        if (users.length > 0) {
+            console.log(`[PERSISTENCE] Saving ${users.length} users to localStorage...`);
+            localStorage.setItem('vendas_ai_users', JSON.stringify(users));
+        }
+    }, [users]);
 
     return {
         masterClientList,

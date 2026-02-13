@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "deploy:firebase": "npm run build -- --base=/ && firebase deploy"
+    "deploy:firebase": "npm run build -- --base=/ && firebase deploy",
+    "deploy:all": "npm run deploy:firebase && npm run deploy"
   },
   "dependencies": {
     "@google/genai": "^1.40.0",

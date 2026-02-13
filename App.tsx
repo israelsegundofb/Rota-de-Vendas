@@ -1080,10 +1080,16 @@ const App: React.FC = () => {
   };
 
   const handleAddUser = (user: AppUser) => {
-    // Original action
+    // 1. Local update
     baseAddUser(user);
 
-    // Log the action
+    // 2. Immediate Cloud Save
+    const updatedUsers = [...users, user];
+    saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
+      .then(() => console.warn('[AUTH] Salvamento de novo usuário na nuvem concluído ✅'))
+      .catch(e => console.error('[AUTH] Falha no salvamento imediato do novo usuário:', e));
+
+    // 3. Log the action
     if (currentUser) {
       logActivityToCloud({
         timestamp: new Date().toISOString(),
@@ -1099,10 +1105,16 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = (updatedUser: AppUser) => {
-    // Original action
+    // 1. Local update
     baseUpdateUser(updatedUser);
 
-    // Log the action
+    // 2. Immediate Cloud Save
+    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
+      .then(() => console.warn('[AUTH] Atualização de usuário na nuvem concluída ✅'))
+      .catch(e => console.error('[AUTH] Falha no salvamento imediato da atualização:', e));
+
+    // 3. Log the action
     if (currentUser) {
       logActivityToCloud({
         timestamp: new Date().toISOString(),
@@ -1119,10 +1131,17 @@ const App: React.FC = () => {
 
   const handleDeleteUser = (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
-    // Original action
+
+    // 1. Local update
     baseDeleteUser(userId);
 
-    // Log the action
+    // 2. Immediate Cloud Save
+    const updatedUsers = users.filter(u => u.id !== userId);
+    saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
+      .then(() => console.warn('[AUTH] Exclusão de usuário na nuvem concluída ✅'))
+      .catch(e => console.error('[AUTH] Falha no salvamento imediato da exclusão:', e));
+
+    // 3. Log the action
     if (currentUser && targetUser) {
       logActivityToCloud({
         timestamp: new Date().toISOString(),
@@ -1390,7 +1409,7 @@ const App: React.FC = () => {
   console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
   console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
   console.log('[APP] Environment:', import.meta.env.MODE);
-  console.warn('[APP] Build Version: 2026.02.13.1435 (V3.1 Stabilization)');
+  console.warn('[APP] Build Version: 2026.02.13.1445 (V4 Stabilization - Immediate Cloud Save)');
 
   if (!isDataLoaded) {
     return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
