@@ -98,6 +98,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
       }
     } else {
       console.warn(`[AUTH] Usuário não encontrado na lista (${currentUsers?.length} usuários verificados): ${username}`);
+      console.log(`[AUTH] Usuários disponíveis: ${currentUsers.map(u => u.username).join(', ')}`);
       setError('❌ Credenciais inválidas. Verifique usuário e senha.');
     }
   };
