@@ -45,24 +45,28 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
 
         // Update with messages
         messages.forEach(msg => {
-            // For Admin Dev, messages between User A and User B need to be categorized.
-            // We'll show conversations indexed by "the other person" relative to current user.
-            // But for Admin Dev, "the other person" is arbitrary if they aren't part of it.
-            // Actually, let's keep it simple: Admin Dev sees a list of ALL users and their last messages globally.
-
-            const otherId = msg.senderId === currentUser.id ? msg.receiverId :
-                (msg.receiverId === currentUser.id ? msg.senderId : msg.senderId); // Fallback for admin monitoring
-
-            // If Admin is monitoring A <-> B, we decide who the "otherId" is for the list.
-            // Better: Admin Dev sees a list of all users, and clicking one shows conversations with THAT user.
-
-            const conv = convMap.get(otherId);
-            if (conv) {
-                if (!conv.lastMessage || msg.timestamp > conv.lastMessage.timestamp) {
-                    conv.lastMessage = msg;
-                }
-                if (!msg.read && msg.receiverId === currentUser.id) {
-                    conv.unreadCount++;
+            if (isAdminDev) {
+                // For Admin Dev, this message activity updates BOTH participants in their sidebar list
+                const participants = [msg.senderId, msg.receiverId];
+                participants.forEach(pId => {
+                    const conv = convMap.get(pId);
+                    if (conv && pId !== currentUser.id) {
+                        if (!conv.lastMessage || msg.timestamp > conv.lastMessage.timestamp) {
+                            conv.lastMessage = msg;
+                        }
+                    }
+                });
+            } else {
+                // Normal user: categorization relative to "me"
+                const otherId = msg.senderId === currentUser.id ? msg.receiverId : msg.senderId;
+                const conv = convMap.get(otherId);
+                if (conv) {
+                    if (!conv.lastMessage || msg.timestamp > conv.lastMessage.timestamp) {
+                        conv.lastMessage = msg;
+                    }
+                    if (!msg.read && msg.receiverId === currentUser.id) {
+                        conv.unreadCount++;
+                    }
                 }
             }
         });
