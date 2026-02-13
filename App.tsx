@@ -792,27 +792,42 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    console.log('[AUTH] Iniciando processo de Logout...');
+
     if (procState.isActive && procState.status === 'processing') {
       if (window.confirm("📦 O sistema está processando dados no momento. Gostaria de Parar de Enviar o Arquivo? Se sair agora, o progresso será perdido.")) {
         isUploadCancelled.current = true;
-        // Continue logout
       } else {
         return;
       }
     }
 
-    // Tentar salvar uma última vez antes de sair para garantir que novos usuários ou mudanças recentes foram para a nuvem
-    if (isFirebaseConnected && users.length > 0) {
-      console.log('[AUTH] Salvando dados antes do Logout...');
-      try {
-        await saveToCloud(masterClientList, products, categories, users, uploadedFiles);
-      } catch (e) {
-        console.error("Falha ao salvar antes de sair:", e);
+    try {
+      // 1. Marcar como Offline na nuvem antes de sair
+      if (currentUser) {
+        console.log('[AUTH] Atualizando status para Offline...');
+        await updateUserStatusInCloud(currentUser.id, 'Offline', users).catch(e => console.warn("Falha ao atualizar status:", e));
       }
-    }
 
-    authLogout();
-    resetFilters();
+      // 2. Tentar salvar dados uma última vez (com timeout para não travar o logout)
+      if (isFirebaseConnected && users.length > 0) {
+        console.log('[AUTH] Tentando salvamento final...');
+        const savePromise = saveToCloud(masterClientList, products, categories, users, uploadedFiles);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500));
+
+        await Promise.race([savePromise, timeoutPromise])
+          .then(() => console.log('[AUTH] Salvamento final concluído ✅'))
+          .catch(e => console.warn('[AUTH] Salvamento final ignorado ou demorou demais:', e.message));
+      }
+    } catch (e) {
+      console.error("[AUTH] Erro durante preparação do logout:", e);
+    } finally {
+      // 3. SEMPRE executar o logout do estado local
+      console.log('[AUTH] Finalizando sessão local.');
+      authLogout();
+      resetFilters();
+      setIsMobileMenuOpen(false);
+    }
   };
 
   const handleClientFileDirect = async (file: File, ownerId: string, skipConfirmation = false) => {
