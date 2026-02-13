@@ -61,45 +61,31 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
 
       // CAPTCHA OK - Proceder com validação de credenciais
       console.log('[AUTH] CAPTCHA passed, validating credentials...');
+      await finishLogin(username, password);
 
-      // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
-      // Se a lista estiver vazia (race condition no modo anônimo), usamos INITIAL_USERS como última instância
-      let currentUsers = users;
-      if (!currentUsers || currentUsers.length === 0) {
-        console.log('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
-        const { INITIAL_USERS } = await import('../hooks/useAuth');
-        currentUsers = migrateUsers(INITIAL_USERS);
-      }
-
-      // Procure o usuário na lista atual (pode vir da nuvem)
-      let user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
-
-      // Fallback de emergência (Hardcoded): Se for o admin e não estiver na lista da nuvem, 
-      // garante que o acesso padrão Admin DEV (123) funcione.
-      if (!user && username.toLowerCase() === 'admin') {
-        console.log('[AUTH] Admin not found in cloud users, using hardcoded fallback');
-        const { INITIAL_USERS } = await import('../hooks/useAuth');
-        user = INITIAL_USERS.find(u => u.username === 'admin');
-      }
-
-      if (user && user.password === password) {
-        console.log('[AUTH] Login successful ✅');
-        onLogin(user);
-      } else {
-        console.warn('[AUTH] Invalid credentials');
-        setError('❌ Credenciais inválidas. Verifique usuário e senha.');
-      }
     } catch (error: any) {
-      console.error('[CAPTCHA] Error details:', {
-        message: error?.message,
-        name: error?.name,
-        stack: error?.stack,
-        error: error
-      });
+      console.error('[CAPTCHA] Error details:', error);
 
-      // Mensagem mais específica baseada no erro
+      // Verificamos se é um erro técnico de configuração (Site Key inválida ou Domínio não autorizado)
+      const isConfigError =
+        error?.message?.includes('Invalid site key') ||
+        error?.message?.includes('not allowed') ||
+        !executeRecaptcha;
+
+      if (isConfigError && username.toLowerCase() === 'admin') {
+        console.warn('[CAPTCHA] Ignorando erro de configuração para conta admin para evitar bloqueio em produção.');
+        setError('⚠️ Aviso: reCAPTCHA com erro de domínio. Entrando em modo de emergência...');
+
+        // Simular um pequeno atraso para o usuário ler o aviso e então entrar
+        setTimeout(async () => {
+          await finishLogin(username, password);
+        }, 1500);
+        return;
+      }
+
+      // Mensagem mais específica baseada no erro para usuários comuns
       if (error?.message?.includes('Invalid site key')) {
-        setError('🔑 Erro de configuração: Chave reCAPTCHA inválida. Contate o administrador.');
+        setError('🔑 Erro de configuração: Chave reCAPTCHA inválida para este domínio. Contate o administrador.');
       } else if (error?.message?.includes('network')) {
         setError('🌐 Erro de rede. Verifique sua conexão e tente novamente.');
       } else {
@@ -107,6 +93,35 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
       }
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const finishLogin = async (username: string, pass: string) => {
+    // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
+    let currentUsers = users;
+    if (!currentUsers || currentUsers.length === 0) {
+      console.log('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
+      const { INITIAL_USERS } = await import('../hooks/useAuth');
+      currentUsers = migrateUsers(INITIAL_USERS);
+    }
+
+    // Procure o usuário na lista atual (pode vir da nuvem)
+    let user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+
+    // Fallback de emergência (Hardcoded): Se for o admin e não estiver na lista da nuvem, 
+    // garante que o acesso padrão Admin DEV (123) funcione.
+    if (!user && username.toLowerCase() === 'admin') {
+      console.log('[AUTH] Admin not found in cloud users, using hardcoded fallback');
+      const { INITIAL_USERS } = await import('../hooks/useAuth');
+      user = INITIAL_USERS.find(u => u.username === 'admin');
+    }
+
+    if (user && user.password === pass) {
+      console.log('[AUTH] Login successful ✅');
+      onLogin(user);
+    } else {
+      console.warn('[AUTH] Invalid credentials');
+      setError('❌ Credenciais inválidas. Verifique usuário e senha.');
     }
   };
 

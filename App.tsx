@@ -872,8 +872,6 @@ const App: React.FC = () => {
       const enrichedData = await processClientsWithAI(
         rawData,
         ownerId,
-        activeApiKey,
-        googleMapsApiKey, // Pass Google Maps Key explicitly
         categories,
         (processed, total) => {
           if (isUploadCancelled.current) throw new Error("CANCELLED_BY_USER");
@@ -1722,7 +1720,6 @@ const App: React.FC = () => {
                   onUploadProducts={handleUploadProducts}
                   onClearProducts={handleClearProducts}
                   onSaveProducts={handleSaveProducts}
-                  apiKey={activeApiKey}
                 />
               </div>
             ) : activeView === 'admin_files' && isAdminUser ? (

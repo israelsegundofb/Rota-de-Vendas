@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { EnrichedClient, RawClient, Product } from "../types";
 import { cleanAddress } from "../utils/csvParser";
 import { geocodeAddress } from "./geocodingService";
@@ -87,14 +86,10 @@ import pLimit from 'p-limit';
 export const processClientsWithAI = async (
   rawClients: RawClient[],
   salespersonId: string,
-  apiKey: string,
-  mapsApiKey: string, // New Param
   categories: string[],
   onProgress?: (processed: number, total: number) => void
 ): Promise<EnrichedClient[]> => {
 
-  const ai = new GoogleGenAI({ apiKey: apiKey || process.env.API_KEY });
-  const limit = pLimit(3); // Concurrency limit of 3 requests
   const total = rawClients.length;
   let processedCount = 0;
 
@@ -192,20 +187,27 @@ export const processClientsWithAI = async (
     let aiData: any = {};
     let googleMapsUri = "";
 
-    // 1. ATTEMPT AI ENRICHMENT (with Retries)
-    // If this fails (e.g. 403 Key Leaked), we catch the error but CONTINUE to geocoding.
+    // 1. ATTEMPT AI ENRICHMENT (with Proxy)
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
     while (!success && retries <= MAX_RETRIES) {
       try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
-          contents: prompt,
-          config: {
-            tools: [{ googleMaps: {} }],
-          }
+        const response = await fetch(`${backendUrl}/api/ai/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-2.0-flash',
+            prompt: prompt,
+            useMaps: true
+          })
         });
 
-        // Parse JSON Response
-        let text = response.text || "{}";
+        if (!response.ok) throw new Error(`Backend AI Error: ${response.status}`);
+
+        const data = await response.json();
+
+        // Parse JSON Response from the text returned by AI
+        let text = data.text || "{}";
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         try {
@@ -217,28 +219,19 @@ export const processClientsWithAI = async (
           }
         }
 
-        // Extract Google Maps Grounding URI
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks && Array.isArray(chunks)) {
-          const mapChunk = chunks.find((c: any) => c.maps?.uri);
-          if (mapChunk) googleMapsUri = mapChunk.maps.uri;
-        }
+        // Use the Maps URI returned by the backend proxy
+        googleMapsUri = data.mapsUri || "";
 
         success = true; // AI succeeded
 
       } catch (error: any) {
-        const isRateLimit = error.status === 429 || error.code === 429 ||
-          (error.message && (error.message.includes('quota') || error.message.includes('429')));
-        const isServerBusy = error.status === 503 || error.code === 503;
-
-        if ((isRateLimit || isServerBusy) && retries < MAX_RETRIES) {
+        if (retries < MAX_RETRIES) {
           retries++;
           const waitTime = 2000 * Math.pow(2, retries);
-          console.warn(`Retry ${retries}/${MAX_RETRIES} for client ${index}`);
           await delay(waitTime);
         } else {
-          console.error(`Failed to process client with AI ${index} (continuing to manual geocode)`, error);
-          break; // Exit retry loop, proceed with empty aiData
+          console.error(`Failed to process client with AI Proxy ${index}`, error);
+          break;
         }
       }
     }
@@ -263,33 +256,38 @@ export const processClientsWithAI = async (
         // Prioritize the raw address from CSV for geocoding to ensure we find "where the pin is" based on input
         const addressToGeocode = rawAddress || finalAddress;
 
-        if (addressToGeocode && addressToGeocode.length > 5 && mapsApiKey) {
+        if (addressToGeocode && addressToGeocode.length > 5) {
           try {
-            const geocodeResult = await geocodeAddress(addressToGeocode, mapsApiKey);
+            // We'll need a way to get the mapsApiKey here if it was removed from params.
+            // For now, I'll check if VITE_GOOGLE_MAPS_API_KEY is available in import.meta.env
+            const currentMapsKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string);
+            if (currentMapsKey) {
+              const geocodeResult = await geocodeAddress(addressToGeocode, currentMapsKey);
 
-            if (geocodeResult) {
-              // Always update coordinates if we didn't have them or if they were 0,0
-              if (!hasValidCoords) {
-                finalLat = geocodeResult.lat;
-                finalLng = geocodeResult.lng;
-              }
+              if (geocodeResult) {
+                // Always update coordinates if we didn't have them or if they were 0,0
+                if (!hasValidCoords) {
+                  finalLat = geocodeResult.lat;
+                  finalLng = geocodeResult.lng;
+                }
 
-              // Always update location details from the authoritative geocoding result
-              if (geocodeResult.addressComponents) {
-                const parsed = parseAddressComponents(geocodeResult.addressComponents);
-                finalCity = parsed.city;
-                finalState = parsed.state;
-                finalRegion = parsed.region as any;
-              }
+                // Always update location details from the authoritative geocoding result
+                if (geocodeResult.addressComponents) {
+                  const parsed = parseAddressComponents(geocodeResult.addressComponents);
+                  finalCity = parsed.city;
+                  finalState = parsed.state;
+                  finalRegion = parsed.region as any;
+                }
 
-              // Fallback to CEP if region is still undefined
-              if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
-                finalRegion = getRegionFromCEP(extractedCEP);
-              }
+                // Fallback to CEP if region is still undefined
+                if ((!finalRegion || finalRegion === 'Indefinido') && extractedCEP) {
+                  finalRegion = getRegionFromCEP(extractedCEP);
+                }
 
-              // Update formatted address if available
-              if (geocodeResult.formattedAddress) {
-                finalAddress = geocodeResult.formattedAddress;
+                // Update formatted address if available
+                if (geocodeResult.formattedAddress) {
+                  finalAddress = geocodeResult.formattedAddress;
+                }
               }
             }
           } catch (geoError) {
@@ -360,6 +358,7 @@ export const processClientsWithAI = async (
     return result;
   };
 
+  const limit = pLimit(3);
   // Map all clients to limited promises
   const promises = rawClients.map((client, index) => limit(() => processSingleClient(client, index)));
 
@@ -367,17 +366,13 @@ export const processClientsWithAI = async (
   const results = await Promise.all(promises);
 
   // Filter out nulls (skipped rows)
-  return results.filter((c): c is EnrichedClient => c !== null);
+  return results.filter((c: EnrichedClient | null): c is EnrichedClient => c !== null);
 };
 
 export const categorizeProductsWithAI = async (
   products: Product[],
-  apiKey: string,
   onProgress?: (processed: number, total: number) => void
 ): Promise<Product[]> => {
-  const ai = new GoogleGenAI({ apiKey: apiKey || process.env.API_KEY });
-  // const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" }); // OLD SDK
-
   const BATCH_SIZE = 10; // Process 10 products at a time for better accuracy
   const total = products.length;
   let processed = 0;
@@ -404,13 +399,22 @@ export const categorizeProductsWithAI = async (
     `;
 
     try {
-      // Correct API Usage for this version
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
+      // Use Backend Proxy instead of direct AI call
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+      const response = await fetch(`${backendUrl}/api/ai/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash',
+          prompt: prompt
+        })
       });
 
-      let text = response.text || "[]";
+      if (!response.ok) throw new Error(`Backend AI Error: ${response.status}`);
+
+      const data = await response.json();
+      let text = data.text || "[]";
       text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
       let categories: any[] = [];
@@ -418,7 +422,6 @@ export const categorizeProductsWithAI = async (
         categories = JSON.parse(text);
       } catch (e) {
         console.error("Failed to parse AI response", text);
-        // Try to salvage if it's a list inside an object
         const match = text.match(/\[.*\]/s);
         if (match) {
           try { categories = JSON.parse(match[0]); } catch (err) { }
@@ -428,7 +431,6 @@ export const categorizeProductsWithAI = async (
       // Update products
       if (Array.isArray(categories)) {
         categories.forEach((item: any) => {
-          // Ensure ID is string comparison
           const index = updatedProducts.findIndex(p => String(p.sku) === String(item.sku));
           if (index !== -1) {
             updatedProducts[index] = { ...updatedProducts[index], category: item.category };

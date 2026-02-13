@@ -10,7 +10,6 @@ interface AdminProductManagementProps {
   onUploadProducts: (products: Product[]) => void;
   onClearProducts: () => void;
   onSaveProducts?: (products: Product[]) => void;
-  apiKey?: string;
 }
 
 type SortKey = 'sku' | 'brand' | 'factoryCode' | 'name' | 'price' | 'category' | 'discount';
@@ -25,7 +24,6 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
   onUploadProducts,
   onClearProducts,
   onSaveProducts,
-  apiKey,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState('');
@@ -78,11 +76,6 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
   };
 
   const handleAICategorize = async () => {
-    if (!apiKey) {
-      alert('Configure sua API Key do Google Gemini nas configurações de Admin.');
-      return;
-    }
-
     if (localProducts.length === 0) {
       alert('Nenhum produto para categorizar.');
       return;
@@ -98,7 +91,6 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
     try {
       const categorized = await categorizeProductsWithAI(
         localProducts,
-        apiKey,
         (current, total) => {
           setAiProgress({ current, total });
         }

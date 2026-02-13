@@ -12,6 +12,8 @@ export default defineConfig(({ mode }) => {
   console.log('[VITE BUILD] VITE_GOOGLE_API_KEY:', env.VITE_GOOGLE_API_KEY ? 'SET (' + env.VITE_GOOGLE_API_KEY.substring(0, 10) + '...)' : 'NOT SET');
   console.log('[VITE BUILD] VITE_FIREBASE_API_KEY:', env.VITE_FIREBASE_API_KEY ? 'SET (' + env.VITE_FIREBASE_API_KEY.substring(0, 10) + '...)' : 'NOT SET');
   console.log('[VITE BUILD] VITE_FIREBASE_PROJECT_ID:', env.VITE_FIREBASE_PROJECT_ID ? 'SET' : 'NOT SET');
+  console.log('[VITE BUILD] VITE_RECAPTCHA_SITE_KEY:', env.VITE_RECAPTCHA_SITE_KEY ? 'SET' : 'NOT SET');
+  console.log('[VITE BUILD] VITE_BACKEND_URL:', env.VITE_BACKEND_URL ? 'SET' : 'NOT SET');
 
   // Determine base path based on environment variable (set in GitHub Actions)
   const basePath = process.env.VITE_BASE_URL || '/Rota-de-Vendas/';
