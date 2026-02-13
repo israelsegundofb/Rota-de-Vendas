@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AppUser, UserRole } from '../types';
 
 export const INITIAL_USERS: AppUser[] = [
-    { id: 'admin', name: 'Admin DEV', username: 'admin', email: 'admin@vendas.ai', role: 'admin_dev', password: '123', salesCategory: 'N/A', color: '#6B7280' },
+    { id: 'admin_dev', name: 'Admin DEV', username: 'admin', email: 'admin@vendas.ai', role: 'admin_dev', password: '123', salesCategory: 'N/A', color: '#6B7280' },
     { id: '1', name: 'João Silva (Vendedor A)', username: 'vendedor_a', email: 'joao.silva@vendas.ai', role: 'sales_external', password: '123', salesCategory: 'Externo', color: '#EF4444' }, // Red
     { id: '2', name: 'Maria Santos (Vendedor B)', username: 'vendedor_b', email: 'maria.santos@vendas.ai', role: 'sales_internal', password: '123', salesCategory: 'Interno', color: '#3B82F6' }, // Blue
 ];

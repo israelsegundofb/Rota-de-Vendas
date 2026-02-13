@@ -203,12 +203,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                                 {filteredMessages.map((msg, idx) => {
                                     const isMe = msg.senderId === currentUser.id;
+                                    const isDirect = (msg.senderId === currentUser.id && msg.receiverId === activeUserId) ||
+                                        (m.senderId === activeUserId && m.receiverId === currentUser.id);
+
                                     return (
                                         <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                                            <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
+                                            <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-tr-none' :
+                                                    (isMonitorMode && !isDirect ? 'bg-slate-200 text-slate-700 border-dashed border-slate-400' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100')
+                                                }`}>
                                                 {isMonitorMode && !isMe && (
-                                                    <p className="text-[10px] font-bold mb-1 text-blue-600">
-                                                        {allUsers.find(u => u.id === msg.senderId)?.name || 'Desconhecido'}
+                                                    <p className="text-[9px] font-black uppercase mb-1 opacity-60">
+                                                        {allUsers.find(u => u.id === msg.senderId)?.name || 'Outro'} → {allUsers.find(u => u.id === msg.receiverId)?.name || 'Outro'}
                                                     </p>
                                                 )}
                                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
