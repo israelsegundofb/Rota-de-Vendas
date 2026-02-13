@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { EnrichedClient, Product, UploadedFile, AppUser } from '../types';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from '../services/firebaseService';
 import { CATEGORIES, getRegionByUF } from '../utils/constants';
@@ -59,8 +59,11 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
     const [loadingMessage, setLoadingMessage] = useState('Iniciando sistema...');
 
     // Initialize Data
+    const lastUsersString = useRef<string>('');
+
     useEffect(() => {
         const initData = async () => {
+            // ... (rest of the code)
             // 1. Try to init Firebase
             setLoadingMessage('Conectando ao Firebase...');
             setLoadingProgress(10);
@@ -157,8 +160,12 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (newData.products) setProducts(newData.products);
                         if (newData.categories) setCategories(newData.categories);
                         if (newData.users && setUsers) {
-                            // Only update if users are significantly different to avoid loops
-                            setUsers(migrateUsers(newData.users));
+                            const newUsersString = JSON.stringify(newData.users);
+                            if (newUsersString !== lastUsersString.current) {
+                                console.log(`[SYNC] Users changed in cloud (${newData.users.length} users). Updating local state.`);
+                                lastUsersString.current = newUsersString;
+                                setUsers(migrateUsers(newData.users));
+                            }
                         }
                         if (newData.uploadedFiles) setUploadedFiles(newData.uploadedFiles);
                     }
