@@ -78,12 +78,29 @@ export const markMessageAsReadInCloud = async (messageId: string) => {
 // -- LOG FUNCTIONS --
 
 export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
-    if (!db) return;
-    try {
-        const logRef = collection(db, 'system_logs');
-        await addDoc(logRef, removeUndefined(log));
-    } catch (e) {
-        console.error("Error saving log:", e);
+    // 1. Gravar no Firestore (Lógica atual - Fallback de segurança)
+    if (db) {
+        try {
+            const logRef = collection(db, 'system_logs');
+            await addDoc(logRef, removeUndefined(log));
+        } catch (e) {
+            console.error("Error saving log to Firestore:", e);
+        }
+    }
+
+    // 2. Enviar para o Backend (Nova Lógica Centralizada)
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    if (backendUrl) {
+        try {
+            // Chamada assíncrona que não bloqueia o fluxo principal do usuário
+            fetch(`${backendUrl}/api/logs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(log)
+            }).catch(err => console.warn('[BACKEND LOG] Servidor inacessível, log salvo apenas no Firebase.'));
+        } catch (e) {
+            // Ignoramos erros do backend para garantir "100% online"
+        }
     }
 };
 
