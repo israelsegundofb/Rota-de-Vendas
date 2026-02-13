@@ -1,5 +1,5 @@
 
-import { initializeApp, FirebaseApp, getApps, getApp, deleteApp } from 'firebase/app';
+import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
@@ -14,14 +14,13 @@ export const initializeFirebase = async (config?: FirebaseConfig): Promise<boole
         const firebaseConfig = config || getStoredFirebaseConfig();
         if (!firebaseConfig) return false;
 
-        // Check if app is already initialized
         if (getApps().length > 0) {
             app = getApp();
         } else {
             app = initializeApp(firebaseConfig);
         }
 
-        // Initialize Cloud Firestore with no-persistence settings for Incognito compatibility
+        // Initialize Cloud Firestore with default settings (persistence is enabled by default in many environments)
         db = initializeFirestore(app, {});
         storage = getStorage(app);
         return true;
@@ -78,7 +77,6 @@ export const markMessageAsReadInCloud = async (messageId: string) => {
 // -- LOG FUNCTIONS --
 
 export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
-    // 1. Gravar no Firestore (Lógica atual - Fallback de segurança)
     if (db) {
         try {
             const logRef = collection(db, 'system_logs');
@@ -88,18 +86,15 @@ export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
         }
     }
 
-    // 2. Enviar para o Backend (Nova Lógica Centralizada)
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
     if (backendUrl) {
         try {
-            // Chamada assíncrona que não bloqueia o fluxo principal do usuário
             fetch(`${backendUrl}/api/logs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(log)
             }).catch(err => console.warn('[BACKEND LOG] Servidor inacessível, log salvo apenas no Firebase.'));
         } catch (e) {
-            // Ignoramos erros do backend para garantir "100% online"
         }
     }
 };
@@ -114,14 +109,12 @@ export const subscribeToSystemLogs = (callback: (logs: SystemLog[]) => void) => 
         snapshot.forEach((doc) => {
             logs.push({ id: doc.id, ...doc.data() } as SystemLog);
         });
-        // Limit to last 500 logs for performance
         callback(logs.slice(0, 500));
     });
 };
 
 // -- DATA SYNC FUNCTIONS --
 
-// Helper: Remove undefined values (Firestore doesn't support undefined)
 const removeUndefined = (obj: any): any => {
     if (obj === null || obj === undefined) return null;
     if (Array.isArray(obj)) return obj.map(removeUndefined);
@@ -131,7 +124,7 @@ const removeUndefined = (obj: any): any => {
     for (const key in obj) {
         const value = obj[key];
         if (value === undefined) {
-            cleaned[key] = null; // Convert undefined to null
+            cleaned[key] = null;
         } else if (value !== null && typeof value === 'object') {
             cleaned[key] = removeUndefined(value);
         } else {
@@ -141,15 +134,26 @@ const removeUndefined = (obj: any): any => {
     return cleaned;
 };
 
-// Save Master Data (Clients, Products, Users, Categories, UploadedFiles)
 export const saveToCloud = async (
     clients: EnrichedClient[],
     products: Product[],
     categories: string[],
     users: AppUser[],
-    uploadedFiles: any[] = [] // uploadedFiles
+    uploadedFiles: any[] = []
 ) => {
     if (!db) return;
+
+    // PROTECTION: Never save an empty dataset if we are in production, 
+    // to avoid wiping out the cloud database due to a local initialization race condition.
+    const isInitialData = clients.length === 0 && products.length === 0 && users.length <= 3;
+    if (isInitialData) {
+        const docRef = doc(db, 'rota-vendas', 'master-data');
+        const snap = await getDoc(docRef);
+        if (snap.exists() && (snap.data().clients?.length > 0)) {
+            console.warn('[FIREBASE] Prevented accidental overwrite of cloud data with local empty state.');
+            return;
+        }
+    }
 
     try {
         const dataToSave = {
@@ -162,8 +166,6 @@ export const saveToCloud = async (
             updatedBy: 'App Sync'
         };
 
-        // We store extensive data in a single doc for MVP simplicity (like the JSON backup)
-        // In a real large-scale app, we would use subcollections.
         await setDoc(doc(db, 'rota-vendas', 'master-data'), dataToSave);
         console.log('✅ Data saved to cloud successfully');
     } catch (e) {
@@ -190,7 +192,6 @@ export const loadFromCloud = async (): Promise<any | null> => {
     }
 };
 
-// Real-time listener
 export const subscribeToCloudChanges = (callback: (data: any) => void) => {
     if (!db) return () => { };
 
@@ -203,11 +204,6 @@ export const subscribeToCloudChanges = (callback: (data: any) => void) => {
 
 // -- STORAGE FUNCTIONS --
 
-/**
- * Uploads a file to Firebase Storage and returns the download URL
- * @param file The file to upload
- * @param path The path in storage (e.g. 'uploads/csv/filename.csv')
- */
 export const uploadFileToCloud = async (file: File | Blob, path: string): Promise<string | null> => {
     if (!storage) {
         const initialized = await initializeFirebase();

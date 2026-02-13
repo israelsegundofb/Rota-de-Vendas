@@ -25,20 +25,24 @@ export const useAuth = () => {
     };
 
     const addUser = (newUser: AppUser) => {
-        setUsers([...users, newUser]);
+        const updated = [...users, newUser];
+        setUsers(updated);
+        // Persistence is handled by useDataPersistence effect on 'users'
     };
 
     const updateUser = (updatedUser: AppUser) => {
-        setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+        const updated = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+        setUsers(updated);
     };
 
     const deleteUser = (userId: string) => {
-        setUsers(users.filter(u => u.id !== userId));
+        const updated = users.filter(u => u.id !== userId);
+        setUsers(updated);
     };
 
     return {
         users,
-        setUsers, // Exposed for cloud sync override if needed
+        setUsers,
         currentUser,
         login,
         logout,

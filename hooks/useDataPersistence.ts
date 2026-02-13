@@ -143,15 +143,45 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         };
 
         initData();
-    }, []); // Run once on mount
+
+        // 4. Real-time Subscription
+        let unsubscribe: () => void = () => { };
+
+        const setupSubscription = async () => {
+            if (isFirebaseInitialized()) {
+                const { subscribeToCloudChanges } = await import('../services/firebaseService');
+                unsubscribe = subscribeToCloudChanges((newData: any) => {
+                    if (newData) {
+                        console.log('[SYNC] Real-time update received from cloud');
+                        if (newData.clients) setMasterClientList(newData.clients);
+                        if (newData.products) setProducts(newData.products);
+                        if (newData.categories) setCategories(newData.categories);
+                        if (newData.users && setUsers) {
+                            // Only update if users are significantly different to avoid loops
+                            setUsers(migrateUsers(newData.users));
+                        }
+                        if (newData.uploadedFiles) setUploadedFiles(newData.uploadedFiles);
+                    }
+                });
+            }
+        };
+
+        setupSubscription();
+        return () => { if (unsubscribe) unsubscribe(); };
+    }, [isFirebaseConnected]); // Re-run if connection status changes
 
     // Auto-Save to Cloud
     useEffect(() => {
-        if (isFirebaseConnected && isDataLoaded && (masterClientList.length > 0 || users.length > 0 || uploadedFiles.length > 0)) {
+        // Only save if we are connected, loaded, AND have actual data to save
+        // We also check for users.length > 3 to avoid saving the default list over a populated cloud
+        const hasData = masterClientList.length > 0 || users.length > 3 || uploadedFiles.length > 0;
+
+        if (isFirebaseConnected && isDataLoaded && hasData) {
             const timeout = setTimeout(() => {
+                console.log('[SYNC] Auto-saving to cloud...');
                 saveToCloud(masterClientList, products, categories, users, uploadedFiles)
                     .catch(err => console.error("Auto-save failed", err));
-            }, 2000);
+            }, 3000); // 3s debounce
             return () => clearTimeout(timeout);
         }
     }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
