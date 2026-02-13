@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChatMessage, ChatConversation, AppUser } from '../types';
 import { sendMessageToCloud, subscribeToMessages, markMessageAsReadInCloud } from '../services/firebaseService';
+import { logActivityToCloud } from '../services/firebaseService';
 
 export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -90,6 +91,19 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
         };
 
         await sendMessageToCloud(newMessage);
+
+        if (currentUser) {
+            logActivityToCloud({
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name,
+                userRole: currentUser.role,
+                action: 'CHAT',
+                category: 'CHAT',
+                details: `Enviou uma mensagem para o usuário ID: ${receiverId}`,
+                metadata: { receiverId }
+            });
+        }
     }, [currentUser]);
 
     const markAsRead = useCallback(async (otherUserId: string) => {

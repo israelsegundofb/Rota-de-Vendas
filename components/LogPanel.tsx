@@ -143,8 +143,14 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
                         </select>
                     </div>
 
-                    <div className="text-[10px] bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-black uppercase tracking-wider">
-                        {filteredLogs.length} Eventos encontrados
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-green-50 text-green-600 px-3 py-1.5 rounded-full font-black text-[10px] uppercase tracking-wider border border-green-100 shadow-sm animate-pulse">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                            LIVE
+                        </div>
+                        <div className="text-[10px] bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-black uppercase tracking-wider border border-blue-100">
+                            {filteredLogs.length} Eventos encontrados
+                        </div>
                     </div>
                 </div>
 

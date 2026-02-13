@@ -426,6 +426,19 @@ const App: React.FC = () => {
       () => {
         setMasterClientList([]);
         setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+
+        if (currentUser) {
+          logActivityToCloud({
+            timestamp: new Date().toISOString(),
+            userId: currentUser.id,
+            userName: currentUser.name,
+            userRole: currentUser.role,
+            action: 'DELETE',
+            category: 'CLIENTS',
+            details: `Limpou TODA a base de clientes do sistema.`,
+          });
+        }
+
         showAlert('Sucesso', 'Base de clientes limpa com sucesso!', 'success');
       }
     );
@@ -608,6 +621,20 @@ const App: React.FC = () => {
 
     // 2. Add to list
     setMasterClientList(prev => [...prev, finalClient]);
+
+    // Log the action
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'CREATE',
+        category: 'CLIENTS',
+        details: `Cadastrou manualmente o cliente: ${finalClient.companyName}`,
+        metadata: { clientId: finalClient.id }
+      });
+    }
 
     // 3. Scroll to bottom
     setTimeout(() => {
