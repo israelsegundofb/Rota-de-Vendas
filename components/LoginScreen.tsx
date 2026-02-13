@@ -9,7 +9,7 @@ interface LoginScreenProps {
   onLogin: (user: AppUser) => void;
 }
 
-type LoginView = 'login' | 'forgot_user' | 'forgot_pass';
+type LoginView = 'login' | 'forgot_pass';
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
   const [view, setView] = useState<LoginView>('login');
@@ -20,9 +20,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
   const [error, setError] = useState('');
 
   // Recovery Form State
-  const [recoveryEmail, setRecoveryEmail] = useState('');
-  const [recoveryUsername, setRecoveryUsername] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // CAPTCHA Hook
@@ -117,9 +114,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
 
   const resetRecoveryState = () => {
     setError('');
-    setSuccessMessage('');
-    setRecoveryEmail('');
-    setRecoveryUsername('');
   };
 
   const switchView = (newView: LoginView) => {
@@ -127,49 +121,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     setView(newView);
   };
 
-  const handleRecoverUsername = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // For security reasons, we usually say "If email exists..." but for this demo let's validate against mock data
-    const user = users.find(u => u.email?.toLowerCase() === recoveryEmail.toLowerCase());
-
-    if (user) {
-      setSuccessMessage(`Seu usuário foi enviado para: ${recoveryEmail}`);
-    } else {
-      // Even if not found, usually good UX/Security to pretend success or be specific. 
-      // For demo clarity, let's be specific or generic.
-      setSuccessMessage(`Se este e-mail estiver cadastrado, você receberá seu usuário em breve.`);
-    }
-
-    setIsLoading(false);
-  };
-
-  const handleRecoverPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Allow recovery by username OR email
-    const user = users.find(u =>
-      u.username.toLowerCase() === recoveryUsername.toLowerCase() ||
-      u.email?.toLowerCase() === recoveryUsername.toLowerCase()
-    );
-
-    if (user && user.email) {
-      setSuccessMessage(`Instruções de redefinição enviadas para: ${user.email}`);
-    } else {
-      setSuccessMessage(`Se os dados estiverem corretos, enviamos as instruções para o seu e-mail de cadastro.`);
-    }
-
-    setIsLoading(false);
-  };
+  const AUTHORIZED_ROLES = [
+    'Admin Dev',
+    'Admin Geral',
+    'Gerente Geral',
+    'Gerente de Vendas',
+    'Supervisor de Vendas'
+  ];
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
@@ -216,11 +174,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
-                  <div className="text-right mt-1">
-                    <button type="button" onClick={() => switchView('forgot_user')} className="text-[10px] text-blue-500 hover:text-blue-700 font-medium">
-                      Esqueci o usuário
-                    </button>
-                  </div>
                 </div>
 
                 <div>
@@ -234,11 +187,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
                       placeholder="••••••"
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
-                  </div>
-                  <div className="text-right mt-1">
-                    <button type="button" onClick={() => switchView('forgot_pass')} className="text-[10px] text-blue-500 hover:text-blue-700 font-medium">
-                      Esqueci a senha
-                    </button>
                   </div>
                 </div>
               </div>
@@ -266,116 +214,52 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
                   </>
                 )}
               </button>
+
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => switchView('forgot_pass')}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-bold bg-blue-50 hover:bg-blue-100 px-6 py-2 rounded-full transition-all active:scale-95 shadow-sm border border-blue-100"
+                >
+                  Esqueci a Senha
+                </button>
+              </div>
             </form>
           )}
 
-          {/* VIEW: FORGOT USERNAME */}
-          {view === 'forgot_user' && (
-            <div className="animate-fade-in space-y-6">
-              <div className="text-center">
-                <div className="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <User className="w-8 h-8 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-800">Recuperar Usuário</h3>
-                <p className="text-sm text-gray-500 mt-2">
-                  Informe seu e-mail cadastrado. Enviaremos seu nome de usuário para ele.
-                </p>
-              </div>
-
-              {!successMessage ? (
-                <form onSubmit={handleRecoverUsername} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">E-mail Cadastrado</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                      <input
-                        type="email"
-                        required
-                        value={recoveryEmail}
-                        onChange={(e) => setRecoveryEmail(e.target.value)}
-                        placeholder="exemplo@empresa.com"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md disabled:opacity-70 disabled:cursor-wait"
-                  >
-                    {isLoading ? 'Enviando...' : 'Recuperar Usuário'}
-                    {!isLoading && <Send className="w-4 h-4" />}
-                  </button>
-                </form>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center animate-fade-in">
-                  <Check className="w-10 h-10 text-green-500 mx-auto mb-3" />
-                  <h4 className="text-green-800 font-bold mb-2">E-mail Enviado!</h4>
-                  <p className="text-sm text-green-700">{successMessage}</p>
-                  <button
-                    onClick={() => switchView('login')}
-                    className="mt-4 text-sm font-bold text-green-700 hover:text-green-900 underline"
-                  >
-                    Voltar para o Login
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* VIEW: FORGOT PASSWORD */}
+          {/* VIEW: FORGOT PASSWORD INFO */}
           {view === 'forgot_pass' && (
             <div className="animate-fade-in space-y-6">
               <div className="text-center">
-                <div className="bg-orange-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="w-8 h-8 text-orange-600" />
+                <div className="bg-orange-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-orange-100">
+                  <Lock className="w-10 h-10 text-orange-600" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-800">Redefinir Senha</h3>
-                <p className="text-sm text-gray-500 mt-2">
-                  Informe seu usuário ou e-mail. Enviaremos as instruções de redefinição.
+                <h3 className="text-xl font-bold text-gray-800">Recuperação de Acesso</h3>
+                <p className="text-gray-600 mt-4 leading-relaxed">
+                  Solicite uma nova senha ao administrador do sistema.
                 </p>
               </div>
 
-              {!successMessage ? (
-                <form onSubmit={handleRecoverPassword} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Usuário ou E-mail</label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                      <input
-                        type="text"
-                        required
-                        value={recoveryUsername}
-                        onChange={(e) => setRecoveryUsername(e.target.value)}
-                        placeholder="Digite seu usuário ou email"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> Perfis Autorizados
+                </h4>
+                <ul className="space-y-3">
+                  {AUTHORIZED_ROLES.map((role, idx) => (
+                    <li key={idx} className="flex items-center gap-3 text-sm text-slate-700 font-medium">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      {role}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md disabled:opacity-70 disabled:cursor-wait"
-                  >
-                    {isLoading ? 'Enviando...' : 'Enviar Instruções'}
-                    {!isLoading && <Send className="w-4 h-4" />}
-                  </button>
-                </form>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center animate-fade-in">
-                  <Check className="w-10 h-10 text-green-500 mx-auto mb-3" />
-                  <h4 className="text-green-800 font-bold mb-2">Sucesso!</h4>
-                  <p className="text-sm text-green-700">{successMessage}</p>
-                  <button
-                    onClick={() => switchView('login')}
-                    className="mt-4 text-sm font-bold text-green-700 hover:text-green-900 underline"
-                  >
-                    Voltar para o Login
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={() => switchView('login')}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Voltar ao Login
+              </button>
             </div>
           )}
 
