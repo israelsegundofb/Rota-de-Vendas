@@ -71,10 +71,29 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     } catch (error: any) {
       console.error('[CAPTCHA] Error details:', error);
 
-      // Se for o admin, permitimos a entrada independente do erro do reCAPTCHA
+      const errorMessage = error?.message || '';
+      const isConfigError =
+        errorMessage.includes('Invalid site key') ||
+        errorMessage.includes('not allowed') ||
+        errorMessage.includes('not loaded') ||
+        !executeRecaptcha;
+
+      // Se for erro de CONFIGURAÇÃO (Chave ou Domínio), permitimos a entrada para todos
+      // Isso evita que usuários fiquem bloqueados por problemas técnicos do Google.
+      if (isConfigError) {
+        console.warn('[CAPTCHA] Falha técnica detectada. Permitindo login sem verificação para evitar bloqueio.');
+        setError('⚠️ Aviso: Sistema de segurança em manutenção. Entrando...');
+
+        setTimeout(async () => {
+          await finishLogin(username, password);
+        }, 1500);
+        return;
+      }
+
+      // Se for o admin, permitimos a entrada independente de QUALQUER erro
       if (username.toLowerCase() === 'admin') {
         console.warn('[CAPTCHA] Ignorando falha crítica para conta admin.');
-        setError('⚠️ Modo de Emergência Ativado: Entrando sem reCAPTCHA...');
+        setError('⚠️ Modo de Emergência Ativado: Entrando...');
 
         setTimeout(async () => {
           await finishLogin(username, password);
@@ -82,12 +101,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
         return;
       }
 
-      // Mensagem para usuários comuns
-      if (error?.message?.includes('not allowed') || error?.message?.includes('not initialized')) {
-        setError('🔑 Erro de segurança: Domínio não autorizado ou reCAPTCHA bloqueado. Contate o suporte.');
-      } else {
-        setError(`🔒 Falha na verificação: ${error?.message || 'Erro de conexão'}.`);
-      }
+      // Falha de verificação real (bot) ou erro de conexão
+      setError(`🔒 Falha na verificação de segurança: ${errorMessage || 'Erro de conexão'}.`);
     } finally {
       setIsVerifying(false);
     }
