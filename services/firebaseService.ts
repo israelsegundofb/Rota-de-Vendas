@@ -241,17 +241,38 @@ export const loadFromCloud = async (): Promise<any | null> => {
 export const subscribeToCloudChanges = (callback: (data: any) => void) => {
     if (!db) return () => { };
 
-    // For simplicity, we mostly subscribe to master-data to trigger reloads, 
-    // but ideally we should listen to users-data too.
-    // However, the current app logic expects ONE callback with the WHOLE data.
-    // Listening to multiple onSnapshots and merging would be complex.
-    // For now, let's at least listen to users-data so login status and user additions sync.
-
-    return onSnapshot(doc(db, 'rota-vendas', 'users-data'), (doc) => {
-        if (doc.exists()) {
-            callback({ users: doc.data().users });
+    // Create subscriptions for both fragments
+    const unsubUsers = onSnapshot(doc(db, 'rota-vendas', 'users-data'), (snapshot) => {
+        if (snapshot.exists()) {
+            callback({ users: snapshot.data().users });
         }
     });
+
+    const unsubMaster = onSnapshot(doc(db, 'rota-vendas', 'master-data'), (snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.data();
+            callback({
+                products: data.products,
+                categories: data.categories,
+                uploadedFiles: data.uploadedFiles
+            });
+        }
+    });
+
+    // Fallback/Legacy listener for migration period
+    const unsubLegacy = onSnapshot(doc(db, 'rota-vendas', 'master-data'), (snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.data();
+            // If it's the old combined doc, it will have 'clients'
+            if (data.clients) callback(data);
+        }
+    });
+
+    return () => {
+        unsubUsers();
+        unsubMaster();
+        unsubLegacy();
+    };
 };
 
 // -- STORAGE FUNCTIONS --
