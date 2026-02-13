@@ -68,7 +68,7 @@ const App: React.FC = () => {
   // --- Custom Hooks ---
   const {
     users, setUsers, currentUser, login, logout: authLogout,
-    addUser: handleAddUser, updateUser: handleUpdateUser, deleteUser: handleDeleteUser
+    addUser: baseAddUser, updateUser: baseUpdateUser, deleteUser: baseDeleteUser
   } = useAuth();
 
   const {
@@ -1012,7 +1012,7 @@ const App: React.FC = () => {
 
   const handleAddUser = (user: AppUser) => {
     // Original action
-    setUsers(prev => [...prev, user]);
+    baseAddUser(user);
 
     // Log the action
     if (currentUser) {
@@ -1031,7 +1031,7 @@ const App: React.FC = () => {
 
   const handleUpdateUser = (updatedUser: AppUser) => {
     // Original action
-    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    baseUpdateUser(updatedUser);
 
     // Log the action
     if (currentUser) {
@@ -1051,7 +1051,7 @@ const App: React.FC = () => {
   const handleDeleteUser = (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
     // Original action
-    setUsers(prev => prev.filter(u => u.id !== userId));
+    baseDeleteUser(userId);
 
     // Log the action
     if (currentUser && targetUser) {
