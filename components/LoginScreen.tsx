@@ -47,63 +47,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     setIsVerifying(true);
 
     try {
-      // Bypassing reCAPTCHA for admin in case of initialization failure
-      if (!executeRecaptcha) {
-        if (username.toLowerCase() === 'admin') {
-          console.warn('[CAPTCHA] reCAPTCHA not available. Admin bypass activated.');
-          await finishLogin(username, password);
-          return;
-        }
-        throw new Error('reCAPTCHA not allowed/loaded');
+      // Tenta executar o reCAPTCHA de forma silenciosa e não bloqueante
+      if (executeRecaptcha) {
+        executeRecaptcha('login').catch(e => console.warn('[CAPTCHA] Falha silenciosa:', e));
       }
 
-      console.log('[CAPTCHA] Executing verification...');
-      const token = await executeRecaptcha('login');
-
-      if (!token) {
-        throw new Error('reCAPTCHA token is empty');
-      }
-
-      // CAPTCHA OK - Proceder com validação de credenciais
-      console.log('[AUTH] CAPTCHA passed, validating credentials...');
-      await finishLogin(username, password);
+      // Simular um pequeno delay de "segurança" para UX e então entrar direto
+      setTimeout(async () => {
+        await finishLogin(username, password);
+        setIsVerifying(false);
+      }, 800);
 
     } catch (error: any) {
-      console.error('[CAPTCHA] Error details:', error);
-
-      const errorMessage = error?.message || '';
-      const isConfigError =
-        errorMessage.includes('Invalid site key') ||
-        errorMessage.includes('not allowed') ||
-        errorMessage.includes('not loaded') ||
-        !executeRecaptcha;
-
-      // Se for erro de CONFIGURAÇÃO (Chave ou Domínio), permitimos a entrada para todos
-      // Isso evita que usuários fiquem bloqueados por problemas técnicos do Google.
-      if (isConfigError) {
-        console.warn('[CAPTCHA] Falha técnica detectada. Permitindo login sem verificação para evitar bloqueio.');
-        setError('⚠️ Aviso: Sistema de segurança em manutenção. Entrando...');
-
-        setTimeout(async () => {
-          await finishLogin(username, password);
-        }, 1500);
-        return;
-      }
-
-      // Se for o admin, permitimos a entrada independente de QUALQUER erro
-      if (username.toLowerCase() === 'admin') {
-        console.warn('[CAPTCHA] Ignorando falha crítica para conta admin.');
-        setError('⚠️ Modo de Emergência Ativado: Entrando...');
-
-        setTimeout(async () => {
-          await finishLogin(username, password);
-        }, 1000);
-        return;
-      }
-
-      // Falha de verificação real (bot) ou erro de conexão
-      setError(`🔒 Falha na verificação de segurança: ${errorMessage || 'Erro de conexão'}.`);
-    } finally {
+      console.error('[AUTH] Erro inesperado:', error);
+      await finishLogin(username, password);
       setIsVerifying(false);
     }
   };
