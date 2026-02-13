@@ -101,16 +101,20 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !username || !password) return;
+    const trimmedName = name.trim();
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedName || !trimmedUsername || !trimmedPassword) return;
 
     // Check for duplicate username (case-insensitive) - only for NEW users or if username changed
     const usernameExists = users.some(u =>
       u.id !== editingId &&
-      u.username.toLowerCase() === username.toLowerCase()
+      u.username.toLowerCase() === trimmedUsername.toLowerCase()
     );
 
     if (usernameExists) {
-      alert(`⚠️ O usuário "${username}" já está cadastrado no sistema. Escolha outro nome de usuário.`);
+      alert(`⚠️ O usuário "${trimmedUsername}" já está cadastrado no sistema. Escolha outro nome de usuário.`);
       return;
     }
 
@@ -119,10 +123,10 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
 
     const userData: AppUser = {
       id: editingId || Date.now().toString(),
-      name,
-      username,
+      name: trimmedName,
+      username: trimmedUsername,
       role,
-      password,
+      password: trimmedPassword,
       salesCategory: isSalesRole ? salesCategory : 'N/A',
       color: isSalesRole ? color : undefined,
       photoURL

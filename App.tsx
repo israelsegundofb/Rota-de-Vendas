@@ -1390,7 +1390,7 @@ const App: React.FC = () => {
   console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
   console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
   console.log('[APP] Environment:', import.meta.env.MODE);
-  console.log('[APP] Build Version: 2026.02.13.1420 (V3 Stabilization)');
+  console.warn('[APP] Build Version: 2026.02.13.1435 (V3.1 Stabilization)');
 
   if (!isDataLoaded) {
     return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;

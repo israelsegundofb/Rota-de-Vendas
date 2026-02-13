@@ -60,7 +60,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
 
     } catch (error: any) {
       console.error('[AUTH] Erro inesperado:', error);
-      await finishLogin(username, password);
+      const trimmedUsername = username.trim();
+      await finishLogin(trimmedUsername, password);
       setIsVerifying(false);
     }
   };
@@ -69,10 +70,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
     let currentUsers = users;
 
-    console.log(`[AUTH] Tentativa de login: "${username}" | Lista de usuários carregada: ${currentUsers?.length || 0}`);
+    console.warn(`[AUTH] Tentativa de login: "${username}" | Lista de usuários carregada: ${currentUsers?.length || 0}`);
 
     if (!currentUsers || currentUsers.length === 0) {
-      console.log('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
+      console.warn('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
       const { INITIAL_USERS } = await import('../hooks/useAuth');
       currentUsers = migrateUsers(INITIAL_USERS);
     }
@@ -83,22 +84,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     // Fallback de emergência (Hardcoded): Se for o admin e não estiver na lista da nuvem, 
     // garante que o acesso padrão Admin DEV (123) funcione.
     if (!user && username.toLowerCase() === 'admin') {
-      console.log('[AUTH] Admin not found in current list, using hardcoded fallback');
+      console.warn('[AUTH] Admin not found in current list, using hardcoded fallback');
       const { INITIAL_USERS } = await import('../hooks/useAuth');
       user = INITIAL_USERS.find(u => u.username === 'admin');
     }
 
     if (user) {
       if (user.password === pass) {
-        console.log('[AUTH] Login successful ✅');
+        console.warn('[AUTH] Login successful ✅');
         onLogin(user);
       } else {
         console.warn(`[AUTH] Senha incorreta para o usuário: ${username}`);
         setError('❌ Credenciais inválidas. Verifique usuário e senha.');
       }
     } else {
-      console.warn(`[AUTH] Usuário não encontrado na lista (${currentUsers?.length} usuários verificados): ${username}`);
-      console.log(`[AUTH] Usuários disponíveis: ${currentUsers.map(u => u.username).join(', ')}`);
+      console.error(`[AUTH] Usuário NÃO encontrado na lista (${currentUsers?.length} usuários verificados): ${username}`);
+      console.warn(`[AUTH] LISTA DE USUÁRIOS PRESENTES: [ ${currentUsers.map(u => u.username).join(', ')} ]`);
       setError('❌ Credenciais inválidas. Verifique usuário e senha.');
     }
   };
