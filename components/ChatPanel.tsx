@@ -29,10 +29,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const activeUser = allUsers.find(u => u.id === activeUserId);
-    const filteredMessages = messages.filter(m =>
-        (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
-        (m.senderId === activeUserId && m.receiverId === currentUser.id)
-    );
+    const isMonitorMode = (currentUser.role === 'admin_dev' || currentUser.role === 'admin') && activeUserId;
+
+    const filteredMessages = messages.filter(m => {
+        if (!activeUserId) return false;
+
+        // If normal user: see only messages with the other party
+        // If Admin Dev: see ALL messages where the activeUserId is involved
+        if (currentUser.role === 'admin_dev' || currentUser.role === 'admin') {
+            return m.senderId === activeUserId || m.receiverId === activeUserId;
+        }
+
+        return (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
+            (m.senderId === activeUserId && m.receiverId === currentUser.id);
+    });
 
     const filteredUsers = allUsers.filter(u =>
         u.id !== currentUser.id &&
@@ -196,6 +206,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                     return (
                                         <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in`}>
                                             <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
+                                                {isMonitorMode && !isMe && (
+                                                    <p className="text-[10px] font-bold mb-1 text-blue-600">
+                                                        {allUsers.find(u => u.id === msg.senderId)?.name || 'Desconhecido'}
+                                                    </p>
+                                                )}
                                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                                                 <div className={`flex items-center gap-1 mt-1 justify-end ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>
                                                     <span className="text-[9px]">{formatTime(msg.timestamp)}</span>

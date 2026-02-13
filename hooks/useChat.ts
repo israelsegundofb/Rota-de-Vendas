@@ -14,7 +14,8 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
         const unsubscribe = subscribeToMessages((allMsgsFromCloud) => {
             const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
 
-            // Filter messages: Admin Dev sees ALL, others see only their own
+            // Filter messages: Admin Dev sees ALL messages in the system
+            // Others see only their own (sent or received)
             const visibleMsgs = allMsgsFromCloud.filter(msg =>
                 isAdminDev || msg.senderId === currentUser.id || msg.receiverId === currentUser.id
             );

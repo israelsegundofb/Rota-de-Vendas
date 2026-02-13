@@ -38,10 +38,14 @@ export const isFirebaseInitialized = () => !!db;
 // -- CHAT FUNCTIONS --
 
 export const sendMessageToCloud = async (message: Omit<ChatMessage, 'id'>) => {
-    if (!db) return;
+    if (!db) {
+        console.error("❌ Firebase not initialized. Cannot send message.");
+        return;
+    }
     try {
         const chatRef = collection(db, 'chats');
         await addDoc(chatRef, removeUndefined(message));
+        console.log("✅ Message sent to cloud");
     } catch (e) {
         console.error("Error sending message:", e);
     }
