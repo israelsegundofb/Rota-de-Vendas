@@ -78,7 +78,7 @@ export const canManageRole = (currentUserRole: UserRole, targetUserRole: UserRol
  * Verifica se tem permissão de Admin (Nível 1 ou 2)
  */
 export const isAdmin = (role: UserRole): boolean => {
-    return ROLE_HIERARCHY[role] <= 2;
+    return ROLE_HIERARCHY[role] <= 5;
 };
 
 /**
