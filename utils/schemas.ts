@@ -14,11 +14,11 @@ export const ClientSchema = z.object({
 });
 
 export const ProductSchema = z.object({
-    name: z.string().min(1),
-    price: z.number().nonnegative(),
-    category: z.string().min(1),
+    name: z.string().default(''),
+    price: z.number().nonnegative().default(0),
+    category: z.string().default('Geral'),
     sku: z.string().optional(),
-    brand: z.string().min(1),
+    brand: z.string().default('Genérico'),
 });
 
 export type ValidatedClient = z.infer<typeof ClientSchema>;

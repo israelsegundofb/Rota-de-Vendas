@@ -180,6 +180,7 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
         const headers = rows[headerRowIndex].map(h => normalizeHeader(h));
         const dataRows = rows.slice(headerRowIndex + 1);
         const products: Product[] = [];
+        let rejected = 0;
 
         dataRows.forEach((rowArray, rowIndex) => {
           if (!rowArray || rowArray.length === 0) return;
@@ -193,7 +194,8 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
 
           const category = normalizedRow['departamento'] || normalizedRow['categoria'] || normalizedRow['grupo'] || normalizedRow['familia'] || 'Geral';
           const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || normalizedRow['codigo'] || normalizedRow['codigo produto'] || normalizedRow['id'] || normalizedRow['ref'] || normalizedRow['referencia'] || normalizedRow['cod'] || '';
-          const name = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
+          const rawName = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
+          const name = rawName || sku || `Produto ${rowIndex + 1}`;
           const brand = normalizedRow['marca'] || normalizedRow['fabricante'] || 'Genérico';
           const price = parseMoney(normalizedRow['preco de venda'] || normalizedRow['preco'] || '0');
           const factoryCode = normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '';
@@ -203,12 +205,12 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
           const discount = parsePercentage(normalizedRow['desconto'] || normalizedRow['discount'] || '0');
 
           const rawProduct = {
-            category,
-            sku,
-            brand,
+            category: category || 'Geral',
+            sku: sku || '',
+            brand: brand || 'Genérico',
             factoryCode,
             name,
-            price,
+            price: isNaN(price) ? 0 : price,
             margin,
             discount
           };
@@ -218,12 +220,14 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
           if (result.success) {
             products.push(result.data as Product);
           } else {
-            // Log error but continue logic? Or skip?
-            // For strict validation we skip
-            console.warn(`Row ${rowIndex + 1} invalid:`, result.error.issues);
+            rejected++;
+            if (rejected <= 5) {
+              console.warn(`[CSV] Linha ${rowIndex + 1} rejeitada:`, result.error.issues);
+            }
           }
         });
 
+        console.log(`[CSV Produtos] Total linhas: ${dataRows.length} | Aceitos: ${products.length} | Rejeitados: ${rejected}`);
         resolve(products);
       },
       error: (error: any) => reject(error)
