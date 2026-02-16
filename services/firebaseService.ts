@@ -213,6 +213,11 @@ export const saveToCloud = async (
 
             await batch.commit();
             console.warn(`[FIREBASE] Chunk ${Math.floor(i / CHUNK_SIZE) + 1} saved ✅`);
+
+            // Add delay between batches to prevent resource-exhausted errors
+            if (i + CHUNK_SIZE < operations.length) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
         }
 
         // 3. Save Metadata (Final Batch)
