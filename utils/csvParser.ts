@@ -182,6 +182,31 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
         const products: Product[] = [];
         let rejected = 0;
 
+        // DEBUG: Log detected headers so we can diagnose mapping issues
+        console.log(`[CSV Produtos] Header row index: ${headerRowIndex}`);
+        console.log(`[CSV Produtos] Raw headers:`, rows[headerRowIndex]);
+        console.log(`[CSV Produtos] Normalized headers:`, headers);
+        if (dataRows.length > 0) {
+          console.log(`[CSV Produtos] First data row:`, dataRows[0]);
+        }
+
+        // Helper: find value by trying multiple possible header names
+        const findValue = (row: Record<string, any>, keys: string[]): any => {
+          for (const key of keys) {
+            // Try exact match first
+            if (row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key];
+          }
+          // Try partial match (header contains the key)
+          for (const key of keys) {
+            for (const headerKey of Object.keys(row)) {
+              if (headerKey.includes(key) && row[headerKey] !== undefined && row[headerKey] !== null && row[headerKey] !== '') {
+                return row[headerKey];
+              }
+            }
+          }
+          return undefined;
+        };
+
         dataRows.forEach((rowArray, rowIndex) => {
           if (!rowArray || rowArray.length === 0) return;
 
@@ -190,15 +215,21 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
             if (h) normalizedRow[h] = rowArray[colIdx];
           });
 
-          // Mapping based on new structure: "Departamento | Cód.Prod / SKU | Nome do Produto | Marca | Preço de Venda"
+          // Mapping with comprehensive header name variations
+          const skuKeys = ['cod.prod / sku', 'cod.prod/sku', 'codprod/sku', 'codprod / sku', 'cod.prod', 'codprod', 'cod prod', 'sku', 'codigo sku', 'numero do sku', 'codigo', 'codigo produto', 'cod produto', 'id', 'ref', 'referencia', 'cod', 'codigo do produto', 'cod.', 'item'];
+          const nameKeys = ['nome do produto', 'nome produto', 'descricao', 'descricao do produto', 'desc. produto', 'desc produto', 'nome', 'produto', 'descricao completa', 'desc', 'name', 'product'];
+          const brandKeys = ['marca', 'fabricante', 'brand', 'fornecedor'];
+          const priceKeys = ['preco de venda', 'preco venda', 'precovenda', 'preco', 'valor', 'valor venda', 'valor de venda', 'price', 'preco unitario', 'valor unitario', 'prc venda', 'prc.venda', 'preco unit'];
+          const categoryKeys = ['departamento', 'categoria', 'grupo', 'familia', 'dept', 'depto', 'secao', 'class', 'classificacao', 'tipo', 'category'];
+          const factoryCodeKeys = ['cod.fabrica', 'cod fabrica', 'codigo fabrica', 'codfabrica', 'factory'];
 
-          const category = normalizedRow['departamento'] || normalizedRow['categoria'] || normalizedRow['grupo'] || normalizedRow['familia'] || 'Geral';
-          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || normalizedRow['codigo'] || normalizedRow['codigo produto'] || normalizedRow['id'] || normalizedRow['ref'] || normalizedRow['referencia'] || normalizedRow['cod'] || '';
-          const rawName = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
+          const category = findValue(normalizedRow, categoryKeys) || 'Geral';
+          const sku = findValue(normalizedRow, skuKeys) || '';
+          const rawName = findValue(normalizedRow, nameKeys) || '';
           const name = rawName || sku || `Produto ${rowIndex + 1}`;
-          const brand = normalizedRow['marca'] || normalizedRow['fabricante'] || 'Genérico';
-          const price = parseMoney(normalizedRow['preco de venda'] || normalizedRow['preco'] || '0');
-          const factoryCode = normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '';
+          const brand = findValue(normalizedRow, brandKeys) || 'Genérico';
+          const price = parseMoney(findValue(normalizedRow, priceKeys) || '0');
+          const factoryCode = findValue(normalizedRow, factoryCodeKeys) || '';
 
           // Optional margin & discount
           const margin = parsePercentage(normalizedRow['margem'] || '0');
@@ -206,14 +237,20 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
 
           const rawProduct = {
             category: category || 'Geral',
-            sku: sku || '',
+            sku: String(sku),
             brand: brand || 'Genérico',
             factoryCode,
-            name,
+            name: String(name),
             price: isNaN(price) ? 0 : price,
             margin,
             discount
           };
+
+          // Log first product for debugging
+          if (rowIndex === 0) {
+            console.log(`[CSV Produtos] First product mapped:`, rawProduct);
+            console.log(`[CSV Produtos] normalizedRow keys:`, Object.keys(normalizedRow));
+          }
 
           const result = ProductSchema.safeParse(rawProduct);
 

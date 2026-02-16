@@ -19,6 +19,9 @@ export const ProductSchema = z.object({
     category: z.string().default('Geral'),
     sku: z.string().optional(),
     brand: z.string().default('Genérico'),
+    factoryCode: z.string().optional(),
+    margin: z.number().optional(),
+    discount: z.number().optional(),
 });
 
 export type ValidatedClient = z.infer<typeof ClientSchema>;

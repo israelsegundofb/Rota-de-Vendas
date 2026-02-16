@@ -21,10 +21,15 @@ export const geocodeAddress = async (
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
         const encodedAddress = encodeURIComponent(address);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         const data = await response.json();
 
         if (data.status === 'OK' && data.results && data.results.length > 0) {
@@ -42,8 +47,12 @@ export const geocodeAddress = async (
             console.warn(`Geocoding failed for address "${address}":`, data.status, data.error_message);
             return null;
         }
-    } catch (error) {
-        console.error(`Geocoding fetch error for address "${address}":`, error);
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            console.error(`Geocoding fetch timeout for address "${address}"`);
+        } else {
+            console.error(`Geocoding fetch error for address "${address}":`, error);
+        }
         return null;
     }
 };
@@ -58,8 +67,13 @@ export const reverseGeocodePlusCode = async (
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
         const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         const data = await response.json();
 
         if (data.status === 'OK' && data.plus_code) {
@@ -67,8 +81,12 @@ export const reverseGeocodePlusCode = async (
             return data.plus_code.compound_code || data.plus_code.global_code || null;
         }
         return null;
-    } catch (error) {
-        console.error("Reverse geocoding error:", error);
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            console.error("Reverse geocoding timeout");
+        } else {
+            console.error("Reverse geocoding error:", error);
+        }
         return null;
     }
 };

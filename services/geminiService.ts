@@ -194,6 +194,9 @@ export const processClientsWithAI = async (
       if ((globalThis as any).isUploadCancelled?.current) throw new Error("CANCELLED_BY_USER");
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         const response = await fetch(`${backendUrl}/api/ai/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -201,8 +204,11 @@ export const processClientsWithAI = async (
             model: 'gemini-2.0-flash',
             prompt: prompt,
             useMaps: true
-          })
+          }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) throw new Error(`Backend AI Error: ${response.status}`);
 
@@ -227,6 +233,10 @@ export const processClientsWithAI = async (
         success = true; // AI succeeded
 
       } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error(`Request timed out for client ${index}`);
+        }
+
         if (retries < MAX_RETRIES) {
           retries++;
           const waitTime = 2000 * Math.pow(2, retries);
@@ -402,14 +412,20 @@ export const categorizeProductsWithAI = async (
       // Use Backend Proxy instead of direct AI call
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
       const response = await fetch(`${backendUrl}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'gemini-2.5-flash',
           prompt: prompt
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) throw new Error(`Backend AI Error: ${response.status}`);
 
