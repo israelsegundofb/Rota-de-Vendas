@@ -50,14 +50,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
       // Simular um pequeno delay de "segurança" para UX e então entrar direto
       setTimeout(async () => {
         const trimmedUsername = username.trim();
-        await finishLogin(trimmedUsername, password);
+        const trimmedPassword = password.trim();
+        await finishLogin(trimmedUsername, trimmedPassword);
         setIsVerifying(false);
       }, 600);
 
     } catch (error: any) {
       console.error('[AUTH] Erro inesperado:', error);
       const trimmedUsername = username.trim();
-      await finishLogin(trimmedUsername, password);
+      const trimmedPassword = password.trim();
+      await finishLogin(trimmedUsername, trimmedPassword);
       setIsVerifying(false);
     }
   };
@@ -66,7 +68,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
     let currentUsers = users;
 
-    console.warn(`[AUTH] Tentativa de login: "${username}" | Lista de usuários carregada: ${currentUsers?.length || 0}`);
+    console.warn(`[AUTH] Login Attempt: User="${username}" | List Size: ${currentUsers?.length || 0}`);
 
     if (!currentUsers || currentUsers.length === 0) {
       console.warn('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
@@ -74,28 +76,37 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
       currentUsers = migrateUsers(INITIAL_USERS);
     }
 
-    // Procure o usuário na lista atual (pode vir da nuvem)
-    let user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
-
-    // Fallback de emergência (Hardcoded): Se for o admin e não estiver na lista da nuvem, 
-    // garante que o acesso padrão Admin DEV (123) funcione.
-    if (!user && username.toLowerCase() === 'admin') {
-      console.warn('[AUTH] Admin not found in current list, using hardcoded fallback');
-      const { INITIAL_USERS } = await import('../hooks/useAuth');
-      user = INITIAL_USERS.find(u => u.username === 'admin');
-    }
+    // Procura o usuário (Case-Insensitive)
+    const user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
 
     if (user) {
-      if (user.password === pass) {
+      const storedPass = (user.password || '').trim();
+      const inputPass = pass.trim();
+
+      console.warn(`[AUTH] User found: ${user.username}. Checking password...`);
+
+      if (storedPass === inputPass) {
         console.warn('[AUTH] Login successful ✅');
         onLogin(user);
       } else {
-        console.warn(`[AUTH] Senha incorreta para o usuário: ${username}`);
+        console.error(`[AUTH] Senha INCORRETA. Digitada: "${inputPass}" | Esperada: (oculta)`);
         setError('❌ Credenciais inválidas. Verifique usuário e senha.');
       }
     } else {
-      console.error(`[AUTH] Usuário NÃO encontrado na lista (${currentUsers?.length} usuários verificados): ${username}`);
-      console.warn(`[AUTH] LISTA DE USUÁRIOS PRESENTES: [ ${currentUsers.map(u => u.username).join(', ')} ]`);
+      console.error(`[AUTH] Usuário "${username}" NÃO encontrado.`);
+      console.warn('[AUTH] Lista de usuários disponíveis:', currentUsers.map(u => u.username).join(', '));
+
+      // Fallback de emergência para Admin hardcoded se tudo falhar
+      if (username.toLowerCase() === 'admin' && pass === '123') {
+        const { INITIAL_USERS } = await import('../hooks/useAuth');
+        const admin = INITIAL_USERS.find(u => u.username === 'admin');
+        if (admin) {
+          console.warn('[AUTH] Emergency Admin bypass activated');
+          onLogin(admin);
+          return;
+        }
+      }
+
       setError('❌ Credenciais inválidas. Verifique usuário e senha.');
     }
   };

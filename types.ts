@@ -126,8 +126,13 @@ export interface SystemLog {
   userId: string;
   userName: string;
   userRole: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'ERROR' | 'SYNC' | 'CHAT' | 'ACCESS';
-  category: 'CLIENTS' | 'PRODUCTS' | 'USERS' | 'SYSTEM' | 'CHAT' | 'AUTH';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'ERROR' | 'SYNC' | 'CHAT' | 'ACCESS' | 'VIEW' | 'CLICK';
+  category: 'CLIENTS' | 'PRODUCTS' | 'USERS' | 'SYSTEM' | 'CHAT' | 'AUTH' | 'NAVIGATION' | 'INTERACTION';
   details: string;
-  metadata?: any;
+  metadata?: {
+    duration?: number; // Duration in seconds
+    elementId?: string; // ID for clicks
+    path?: string; // Path for navigation
+    [key: string]: any;
+  };
 }

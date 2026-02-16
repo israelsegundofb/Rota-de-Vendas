@@ -191,6 +191,8 @@ export const processClientsWithAI = async (
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
     while (!success && retries <= MAX_RETRIES) {
+      if ((globalThis as any).isUploadCancelled?.current) throw new Error("CANCELLED_BY_USER");
+
       try {
         const response = await fetch(`${backendUrl}/api/ai/generate`, {
           method: 'POST',
@@ -249,7 +251,7 @@ export const processClientsWithAI = async (
 
       // Check if we need to force geocoding (Missing coords or (0,0))
       // We strictly trust the "Endereço Completo" (rawAddress) from the CSV as the source of truth if AI fails.
-      const hasValidCoords = finalLat !== 0 && finalLng !== 0;
+      const hasValidCoords = typeof finalLat === 'number' && typeof finalLng === 'number' && finalLat !== 0 && finalLng !== 0;
       const needsGeocoding = !hasValidCoords || finalCity === 'Desconhecido' || finalState === 'BR';
 
       if (needsGeocoding) {
@@ -262,6 +264,7 @@ export const processClientsWithAI = async (
             // For now, I'll check if VITE_GOOGLE_MAPS_API_KEY is available in import.meta.env
             const currentMapsKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string);
             if (currentMapsKey) {
+              if ((globalThis as any).isUploadCancelled?.current) throw new Error("CANCELLED_BY_USER");
               const geocodeResult = await geocodeAddress(addressToGeocode, currentMapsKey);
 
               if (geocodeResult) {
@@ -352,13 +355,10 @@ export const processClientsWithAI = async (
     processedCount++;
     if (onProgress) onProgress(processedCount, total);
 
-    // Slight delay between successful requests to be polite to the API even within limits
-    await delay(500);
-
     return result;
   };
 
-  const limit = pLimit(3);
+  const limit = pLimit(10);
   // Map all clients to limited promises
   const promises = rawClients.map((client, index) => limit(() => processSingleClient(client, index)));
 

@@ -118,9 +118,14 @@ const parsePercentage = (value: string): number => {
   return parseFloat(clean) || 0;
 };
 
+const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario'];
+const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular'];
+const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
+
 // Helper to normalize headers (remove accents, lowercase)
-const normalizeHeader = (header: string): string => {
-  return header
+const normalizeHeader = (header: any): string => {
+  if (header === null || header === undefined) return '';
+  return String(header)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove accents
@@ -133,13 +138,9 @@ const normalizeHeader = (header: string): string => {
 export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purchases' => {
   const normalizedHeaders = headers.map(h => normalizeHeader(h));
 
-  const purchaseKeywords = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados'];
-  const clientKeywords = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial'];
-  const productKeywords = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade', 'descricao'];
-
-  let purchaseScore = normalizedHeaders.filter(h => purchaseKeywords.some(k => h.includes(k))).length;
-  let clientScore = normalizedHeaders.filter(h => clientKeywords.some(k => h.includes(k))).length;
-  let productScore = normalizedHeaders.filter(h => productKeywords.some(k => h.includes(k))).length;
+  let purchaseScore = normalizedHeaders.filter(h => PURCHASE_KEYWORDS.some(k => h.includes(k))).length;
+  let clientScore = normalizedHeaders.filter(h => CLIENT_KEYWORDS.some(k => h.includes(k))).length;
+  let productScore = normalizedHeaders.filter(h => PRODUCT_KEYWORDS.some(k => h.includes(k))).length;
 
   // Prioritize purchases if date + (sku or value or quantity) are present
   const hasDate = normalizedHeaders.some(h => h.includes('data') || h.includes('emissao'));
@@ -157,25 +158,41 @@ export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purc
 export const parseProductCSV = (file: File): Promise<Product[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
       encoding: "UTF-8",
       complete: (results) => {
-        const data = results.data as any[];
-        const products: Product[] = [];
-        const errors: string[] = [];
+        const rows = results.data as any[][];
+        if (rows.length === 0) return resolve([]);
 
-        data.forEach((row, index) => {
-          // Normalize row keys for flexible matching
+        // 1. Find Header Row
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+          const rowValues = rows[i].map(h => normalizeHeader(h));
+          if (rowValues.some(h => PRODUCT_KEYWORDS.some(k => h.includes(k)))) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) headerRowIndex = 0;
+
+        const headers = rows[headerRowIndex].map(h => normalizeHeader(h));
+        const dataRows = rows.slice(headerRowIndex + 1);
+        const products: Product[] = [];
+
+        dataRows.forEach((rowArray, rowIndex) => {
+          if (!rowArray || rowArray.length === 0) return;
+
           const normalizedRow: Record<string, any> = {};
-          Object.keys(row).forEach(k => {
-            normalizedRow[normalizeHeader(k)] = row[k];
+          headers.forEach((h, colIdx) => {
+            if (h) normalizedRow[h] = rowArray[colIdx];
           });
 
           // Mapping based on new structure: "Departamento | Cód.Prod / SKU | Nome do Produto | Marca | Preço de Venda"
 
-          const category = normalizedRow['departamento'] || normalizedRow['categoria'] || 'Geral';
-          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || '';
+          const category = normalizedRow['departamento'] || normalizedRow['categoria'] || normalizedRow['grupo'] || normalizedRow['familia'] || 'Geral';
+          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || normalizedRow['codigo'] || normalizedRow['codigo produto'] || normalizedRow['id'] || normalizedRow['ref'] || normalizedRow['referencia'] || normalizedRow['cod'] || '';
           const name = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
           const brand = normalizedRow['marca'] || normalizedRow['fabricante'] || 'Genérico';
           const price = parseMoney(normalizedRow['preco de venda'] || normalizedRow['preco'] || '0');
@@ -203,7 +220,7 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
           } else {
             // Log error but continue logic? Or skip?
             // For strict validation we skip
-            console.warn(`Row ${index + 1} invalid:`, result.error.issues);
+            console.warn(`Row ${rowIndex + 1} invalid:`, result.error.issues);
           }
         });
 
@@ -217,22 +234,36 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
 export const parseCSV = (file: File): Promise<RawClient[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
-      encoding: "UTF-8", // Explicitly try UTF-8, but PapaParse usually autodetects well
-      transformHeader: (header) => {
-        return header.trim().replace(/^\ufeff/, ''); // Remove BOM
-      },
+      encoding: "UTF-8",
       complete: (results) => {
-        const data = results.data as any[];
+        const rows = results.data as any[][];
+        if (rows.length === 0) return resolve([]);
+
+        // 1. Find Header Row
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+          const rowValues = rows[i].map(h => normalizeHeader(h));
+          const matchCount = rowValues.filter(h => CLIENT_KEYWORDS.some(k => h.includes(k))).length;
+          if (matchCount >= 1) { // Accept at least 1 keyword for clients
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) headerRowIndex = 0;
+
+        const headers = rows[headerRowIndex].map(h => normalizeHeader(h));
+        const dataRows = rows.slice(headerRowIndex + 1);
         const normalizedData: RawClient[] = [];
 
-        // Normalize Data Mapping
-        data.forEach(row => {
-          // Create a normalized map for this row to handle header variations
+        dataRows.forEach(rowArray => {
+          if (!rowArray || rowArray.length === 0) return;
+
           const map: Record<string, any> = {};
-          Object.keys(row).forEach(key => {
-            map[normalizeHeader(key)] = row[key];
+          headers.forEach((h, colIdx) => {
+            if (h) map[h] = rowArray[colIdx];
           });
 
           // Parse hyperlink if present in address column
@@ -261,7 +292,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
           const rawClient = {
             companyName: map['razao social'] || map['cliente'] || map['nome fantasia'] || map['fantasia'] || map['empresa'] || map['nome comercial'] || '',
             cnpj: map['cnpj'] || map['taxid'] || map['inscricao'] || '',
-            ownerName: map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
+            ownerName: map['responsavel'] || map['nome do proprietario'] || map['proprietario'] || map['dono'] || map['contato principal'] || '',
             phone: map['telefone comercial'] || map['contato'] || map['telefone'] || map['celular'] || '',
             whatsapp: map['whatsapp'] || map['whats'] || map['celular'] || '',
             address: map['endereco comercial'] || map['logradouro comercial'] || address || '',
@@ -307,17 +338,35 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
 export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
       encoding: "UTF-8",
       complete: (results) => {
-        const data = results.data as any[];
+        const rows = results.data as any[][];
+        if (rows.length === 0) return resolve([]);
+
+        // 1. Find Header Row
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+          const rowValues = rows[i].map(h => normalizeHeader(h));
+          if (rowValues.some(h => PURCHASE_KEYWORDS.some(k => h.includes(k)))) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) headerRowIndex = 0;
+
+        const headers = rows[headerRowIndex].map(h => normalizeHeader(h));
+        const dataRows = rows.slice(headerRowIndex + 1);
         const records: any[] = [];
 
-        data.forEach((row) => {
+        dataRows.forEach((rowArray) => {
+          if (!rowArray || rowArray.length === 0) return;
+
           const normalizedRow: Record<string, any> = {};
-          Object.keys(row).forEach(k => {
-            normalizedRow[normalizeHeader(k)] = row[k];
+          headers.forEach((h, colIdx) => {
+            if (h) normalizedRow[h] = rowArray[colIdx];
           });
 
           const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['empresa'] || '';

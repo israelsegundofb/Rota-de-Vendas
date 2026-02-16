@@ -45,10 +45,11 @@ import CustomDialog, { DialogType } from './components/CustomDialog';
 import SalesHistoryPanel from './components/SalesHistoryPanel';
 import ChatPanel from './components/ChatPanel';
 import { useChat } from './hooks/useChat';
-
+import { usePageTracking } from './hooks/useAnalytics'; // Import tracking hook
 
 // Initial Mock Data
 interface ProcessingState {
+
   isActive: boolean;
   total: number;
   current: number;
@@ -134,6 +135,12 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
+
+  // --- Analytics Tracking ---
+  usePageTracking(activeView); // Track main views
+  usePageTracking(isAddModalOpen ? 'modal-add-client' : 'none'); // Track Add Modal
+  usePageTracking(isEditModalOpen ? 'modal-edit-client' : 'none'); // Track Edit Modal
+  usePageTracking(isCloudConfigOpen ? 'modal-cloud-config' : 'none'); // Track Config Modal
 
   // --- Presence Effects ---
   useEffect(() => {
@@ -792,41 +799,43 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    console.log('[AUTH] Iniciando processo de Logout...');
+    console.warn('[AUTH] Logout iniciado pelo usuário.');
 
     if (procState.isActive && procState.status === 'processing') {
-      if (window.confirm("📦 O sistema está processando dados no momento. Gostaria de Parar de Enviar o Arquivo? Se sair agora, o progresso será perdido.")) {
-        isUploadCancelled.current = true;
-      } else {
+      if (!window.confirm("📦 O sistema está processando dados. Sair agora pode interromper o progresso. Deseja sair mesmo assim?")) {
         return;
       }
+      isUploadCancelled.current = true;
     }
 
     try {
-      // 1. Marcar como Offline na nuvem antes de sair
+      // 1. Marcar como Offline (Não bloqueante)
       if (currentUser) {
-        console.log('[AUTH] Atualizando status para Offline...');
-        await updateUserStatusInCloud(currentUser.id, 'Offline', users).catch(e => console.warn("Falha ao atualizar status:", e));
+        updateUserStatusInCloud(currentUser.id, 'Offline', users).catch(() => { });
       }
 
-      // 2. Tentar salvar dados uma última vez (com timeout para não travar o logout)
+      // 2. Salvamento final ultra-rápido (1.5s max)
       if (isFirebaseConnected && users.length > 0) {
-        console.log('[AUTH] Tentando salvamento final...');
         const savePromise = saveToCloud(masterClientList, products, categories, users, uploadedFiles);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
 
-        await Promise.race([savePromise, timeoutPromise])
-          .then(() => console.log('[AUTH] Salvamento final concluído ✅'))
-          .catch(e => console.warn('[AUTH] Salvamento final ignorado ou demorou demais:', e.message));
+        await Promise.race([savePromise, timeoutPromise]).catch(() => {
+          console.warn('[AUTH] Salvamento final ignorado para agilizar saída.');
+        });
       }
     } catch (e) {
-      console.error("[AUTH] Erro durante preparação do logout:", e);
+      console.error("[AUTH] Erro silencioso no logout:", e);
     } finally {
-      // 3. SEMPRE executar o logout do estado local
-      console.log('[AUTH] Finalizando sessão local.');
+      console.warn('[AUTH] Executando logout local e limpando filtros...');
       authLogout();
       resetFilters();
       setIsMobileMenuOpen(false);
+
+      // Pequeno delay para garantir que o estado do React atualize antes de um possível refresh manual ou automático
+      setTimeout(() => {
+        if (window.location.hash) window.location.hash = '';
+        // Opcional: window.location.reload(); // Só ativar se o usuário reportar que a tela de login não apareceu
+      }, 100);
     }
   };
 
@@ -1409,7 +1418,7 @@ const App: React.FC = () => {
   console.log('[APP] reCAPTCHA Key Source:', import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'ENV VAR' : 'FALLBACK');
   console.log('[APP] reCAPTCHA Key (first 10 chars):', recaptchaKey.substring(0, 10) + '...');
   console.log('[APP] Environment:', import.meta.env.MODE);
-  console.warn('[APP] Build Version: 2026.02.13.1455 (V4.3 - Fragmented Persistence)');
+  console.warn(`[APP] Build Version: 2026.02.13.1613 (V5.3.3 - Turbo Processing)`);
 
   if (!isDataLoaded) {
     return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
@@ -1693,7 +1702,7 @@ const App: React.FC = () => {
             </button>
 
             <div className="text-center mt-4">
-              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 V4.3 (Fragmented)</p>
+              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 V5.3.4 (Cancel Resilience)</p>
             </div>
           </div>
         </aside>

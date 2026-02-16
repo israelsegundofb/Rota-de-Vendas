@@ -3,6 +3,7 @@ import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase, AlertCircle
 import { AppUser, SalesCategory, UserRole } from '../types';
 import { getRoleLabel, getAvailableRoles, canManageRole, normalizeRole, ROLE_HIERARCHY, ROLE_LABELS } from '../utils/authUtils';
 import { resizeImageToBase64 } from '../utils/imageUtils';
+import { logActivityToCloud } from '../services/firebaseService';
 
 interface AdminUserManagementProps {
   currentUser: AppUser;
@@ -134,8 +135,26 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
 
     if (editingId) {
       onUpdateUser(userData);
+      logActivityToCloud({
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'USERS',
+        details: `Atualizou o usuário: ${userData.name} (${userData.username})`,
+        timestamp: new Date().toISOString()
+      });
     } else {
       onAddUser(userData);
+      logActivityToCloud({
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'CREATE',
+        category: 'USERS',
+        details: `Criou novo usuário: ${userData.name} (${userData.username})`,
+        timestamp: new Date().toISOString()
+      });
     }
 
     resetForm();

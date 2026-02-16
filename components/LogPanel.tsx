@@ -10,7 +10,10 @@ import {
     MessageSquare,
     RefreshCw,
     Shield,
-    X
+    X,
+    MousePointer2,
+    Eye,
+    Timer
 } from 'lucide-react';
 import { SystemLog, AppUser } from '../types';
 import { subscribeToSystemLogs } from '../services/firebaseService';
@@ -46,6 +49,8 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
             case 'UPDATE': return 'bg-blue-100 text-blue-700';
             case 'DELETE': return 'bg-red-100 text-red-700';
             case 'ERROR': return 'bg-orange-100 text-orange-700';
+            case 'VIEW': return 'bg-purple-100 text-purple-700';
+            case 'CLICK': return 'bg-indigo-100 text-indigo-700';
             default: return 'bg-slate-100 text-slate-700';
         }
     };
@@ -56,6 +61,8 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
             case 'PRODUCTS': return <FileText className="w-3.5 h-3.5" />;
             case 'CHAT': return <MessageSquare className="w-3.5 h-3.5" />;
             case 'AUTH': return <Shield className="w-3.5 h-3.5" />;
+            case 'NAVIGATION': return <Eye className="w-3.5 h-3.5" />;
+            case 'INTERACTION': return <MousePointer2 className="w-3.5 h-3.5" />;
             default: return <Activity className="w-3.5 h-3.5" />;
         }
     };
@@ -75,6 +82,14 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
         }
     };
 
+    const formatDuration = (seconds?: number) => {
+        if (!seconds) return null;
+        if (seconds < 60) return `${seconds.toFixed(1)}s`;
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = (seconds % 60).toFixed(0);
+        return `${minutes}m ${remainingSeconds}s`;
+    };
+
     return (
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-5xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
@@ -86,7 +101,7 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
                         </div>
                         <div>
                             <h2 className="text-xl font-black text-slate-800 tracking-tight">Logs e Auditoria</h2>
-                            <p className="text-xs text-slate-500 font-medium">Histórico de atualizações e mudanças em tempo real</p>
+                            <p className="text-xs text-slate-500 font-medium">Histórico de atualizações, acessos e usabilidade</p>
                         </div>
                     </div>
                     <button
@@ -124,6 +139,8 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
                             <option value="USERS">Usuários</option>
                             <option value="CHAT">Chat</option>
                             <option value="AUTH">Login/Segurança</option>
+                            <option value="NAVIGATION">Navegação</option>
+                            <option value="INTERACTION">Interações</option>
                             <option value="SYSTEM">Sistema</option>
                         </select>
 
@@ -137,7 +154,9 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
                             <option value="CREATE">Criação (+)</option>
                             <option value="UPDATE">Edição (✎)</option>
                             <option value="DELETE">Exclusão (×)</option>
-                            <option value="LOGIN">Acesso (→)</option>
+                            <option value="LOGIN">Acesso Login (→)</option>
+                            <option value="VIEW">Visualização (👁)</option>
+                            <option value="CLICK">Clique (👆)</option>
                             <option value="ERROR">Erro (⚠)</option>
                             <option value="SYNC">Sincronia (⇅)</option>
                         </select>
@@ -192,11 +211,29 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
                                     <p className="text-sm text-slate-600 font-medium leading-relaxed italic">
                                         "{log.details}"
                                     </p>
-                                    {log.metadata && (
-                                        <div className="mt-2 text-[10px] bg-slate-50 p-2 rounded-lg font-mono text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap border border-dashed border-slate-200">
-                                            {JSON.stringify(log.metadata)}
-                                        </div>
-                                    )}
+
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {/* Metadata Chips */}
+                                        {log.metadata?.duration && (
+                                            <div className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 text-purple-600 rounded-md text-[10px] font-bold border border-purple-100">
+                                                <Timer className="w-3 h-3" />
+                                                Tempo: {formatDuration(log.metadata.duration)}
+                                            </div>
+                                        )}
+
+                                        {log.metadata?.elementId && (
+                                            <div className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold border border-indigo-100">
+                                                <MousePointer2 className="w-3 h-3" />
+                                                Elemento: {log.metadata.elementId}
+                                            </div>
+                                        )}
+
+                                        {log.metadata && !log.metadata.duration && !log.metadata.elementId && Object.keys(log.metadata).length > 0 && (
+                                            <div className="text-[10px] bg-slate-50 p-1 px-2 rounded-lg font-mono text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap border border-dashed border-slate-200 max-w-[200px]">
+                                                {JSON.stringify(log.metadata)}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))

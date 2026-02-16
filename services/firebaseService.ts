@@ -1,6 +1,6 @@
 
 import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
 import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus } from '../types';
@@ -169,36 +169,68 @@ export const saveToCloud = async (
 ) => {
     if (!db) return;
 
-    // PROTECTION: Never save an empty user list to the cloud if we previously had data.
     if (users.length === 0) {
-        console.warn('[FIREBASE] Blocked save attempt with 0 users. This is likely a race condition or state error.');
+        console.warn('[FIREBASE] Blocked save attempt with 0 users.');
         return;
     }
 
     try {
         const lastUpdated = new Date().toISOString();
+        const operations: { ref: any, data: any }[] = [];
 
-        // 1. Fragmented Payloads
-        const usersPayload = { users: removeUndefined(users), lastUpdated };
-        const clientsPayload = { clients: removeUndefined(clients), lastUpdated };
-        const masterPayload = {
-            products: removeUndefined(products),
+        // 1. Prepare Operations
+        users.forEach(user => {
+            operations.push({
+                ref: doc(db!, 'rota-vendas-data', 'users', 'list', user.id),
+                data: { ...removeUndefined(user), lastUpdated }
+            });
+        });
+
+        clients.forEach(client => {
+            operations.push({
+                ref: doc(db!, 'rota-vendas-data', 'clients', 'list', client.id),
+                data: { ...removeUndefined(client), lastUpdated }
+            });
+        });
+
+        products.forEach(product => {
+            const productId = product.id || `prod_${product.sku.replace(/\s+/g, '_')}`;
+            operations.push({
+                ref: doc(db!, 'rota-vendas-data', 'products', 'list', productId),
+                data: { ...removeUndefined(product), id: productId, lastUpdated }
+            });
+        });
+
+        // 2. Commit in Chunks of 450 (Firestore limit is 500)
+        const CHUNK_SIZE = 450;
+        console.warn(`[FIREBASE] Total operations to save: ${operations.length}. Splitting into chunks...`);
+
+        for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = operations.slice(i, i + CHUNK_SIZE);
+
+            chunk.forEach(op => batch.set(op.ref, op.data));
+
+            await batch.commit();
+            console.warn(`[FIREBASE] Chunk ${Math.floor(i / CHUNK_SIZE) + 1} saved ✅`);
+        }
+
+        // 3. Save Metadata (Final Batch)
+        const metaBatch = writeBatch(db);
+        const metaRef = doc(db, 'rota-vendas-data', 'metadata');
+        metaBatch.set(metaRef, {
             categories: removeUndefined(categories),
             uploadedFiles: removeUndefined(uploadedFiles),
             lastUpdated,
-            updatedBy: 'App Sync V4.3'
-        };
+            version: 'V5.1',
+            totalClients: clients.length,
+            totalUsers: users.length
+        });
+        await metaBatch.commit();
 
-        // 2. Parallel Saves (Atomicity is not critical here as they are separate documents)
-        await Promise.all([
-            setDoc(doc(db, 'rota-vendas', 'users-data'), usersPayload),
-            setDoc(doc(db, 'rota-vendas', 'clients-data'), clientsPayload),
-            setDoc(doc(db, 'rota-vendas', 'master-data'), masterPayload)
-        ]);
-
-        console.log('✅ All data fragments saved to cloud successfully');
+        console.log('✅ V5.1: All data segments synchronized granullarly to cloud');
     } catch (e) {
-        console.error("Error saving to cloud (Fragmented):", e);
+        console.error("Error saving to cloud (V5.1):", e);
         throw e;
     }
 };
@@ -207,33 +239,53 @@ export const loadFromCloud = async (): Promise<any | null> => {
     if (!db) return null;
 
     try {
-        // Load all fragments in parallel
-        const [usersSnap, clientsSnap, masterSnap] = await Promise.all([
-            getDoc(doc(db, 'rota-vendas', 'users-data')),
-            getDoc(doc(db, 'rota-vendas', 'clients-data')),
-            getDoc(doc(db, 'rota-vendas', 'master-data'))
+        // Load Collections in Parallel
+        const [usersSnap, clientsSnap, productsSnap, metaSnap] = await Promise.all([
+            getDocs(collection(db, 'rota-vendas-data', 'users', 'list')),
+            getDocs(collection(db, 'rota-vendas-data', 'clients', 'list')),
+            getDocs(collection(db, 'rota-vendas-data', 'products', 'list')),
+            getDoc(doc(db, 'rota-vendas-data', 'metadata'))
         ]);
 
-        // If nothing found in fragments, fallback to legacy master-data (migration path)
-        if (!usersSnap.exists() && !clientsSnap.exists() && masterSnap.exists()) {
-            console.warn('[FIREBASE] New fragments not found, using legacy master-data');
-            return masterSnap.data();
+        // Fallback check: If new collection structure is empty, try V4 architecture
+        if (usersSnap.empty && clientsSnap.empty) {
+            console.warn('[FIREBASE] V5 collections empty, falling back to V4 document structure');
+            const [u4, c4, m4] = await Promise.all([
+                getDoc(doc(db, 'rota-vendas', 'users-data')),
+                getDoc(doc(db, 'rota-vendas', 'clients-data')),
+                getDoc(doc(db, 'rota-vendas', 'master-data'))
+            ]);
+
+            if (u4.exists() || c4.exists() || m4.exists()) {
+                const legacy: any = {};
+                if (u4.exists()) legacy.users = u4.data().users;
+                if (c4.exists()) legacy.clients = c4.data().clients;
+                if (m4.exists()) {
+                    const d = m4.data();
+                    legacy.products = d.products;
+                    legacy.categories = d.categories;
+                    legacy.uploadedFiles = d.uploadedFiles;
+                }
+                return legacy;
+            }
+            return null;
         }
 
-        // Merge results
-        const result: any = {};
-        if (usersSnap.exists()) result.users = usersSnap.data().users;
-        if (clientsSnap.exists()) result.clients = clientsSnap.data().clients;
-        if (masterSnap.exists()) {
-            const masterData = masterSnap.data();
-            result.products = masterData.products;
-            result.categories = masterData.categories;
-            result.uploadedFiles = masterData.uploadedFiles;
+        const result: any = {
+            users: usersSnap.docs.map(d => d.data()),
+            clients: clientsSnap.docs.map(d => d.data()),
+            products: productsSnap.docs.map(d => d.data())
+        };
+
+        if (metaSnap.exists()) {
+            const meta = metaSnap.data();
+            result.categories = meta.categories;
+            result.uploadedFiles = meta.uploadedFiles;
         }
 
         return result;
     } catch (e) {
-        console.error("Error loading from cloud:", e);
+        console.error("Error loading from cloud (V5.0):", e);
         return null;
     }
 };
@@ -241,37 +293,29 @@ export const loadFromCloud = async (): Promise<any | null> => {
 export const subscribeToCloudChanges = (callback: (data: any) => void) => {
     if (!db) return () => { };
 
-    // Create subscriptions for both fragments
-    const unsubUsers = onSnapshot(doc(db, 'rota-vendas', 'users-data'), (snapshot) => {
-        if (snapshot.exists()) {
-            callback({ users: snapshot.data().users });
-        }
+    // In V5, we subscribe to the collections
+    const unsubUsers = onSnapshot(collection(db, 'rota-vendas-data', 'users', 'list'), (snap) => {
+        if (!snap.empty) callback({ users: snap.docs.map(d => d.data()) });
     });
 
-    const unsubMaster = onSnapshot(doc(db, 'rota-vendas', 'master-data'), (snapshot) => {
-        if (snapshot.exists()) {
-            const data = snapshot.data();
+    const unsubClients = onSnapshot(collection(db, 'rota-vendas-data', 'clients', 'list'), (snap) => {
+        if (!snap.empty) callback({ clients: snap.docs.map(d => d.data()) });
+    });
+
+    const unsubMeta = onSnapshot(doc(db, 'rota-vendas-data', 'metadata'), (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
             callback({
-                products: data.products,
                 categories: data.categories,
                 uploadedFiles: data.uploadedFiles
             });
         }
     });
 
-    // Fallback/Legacy listener for migration period
-    const unsubLegacy = onSnapshot(doc(db, 'rota-vendas', 'master-data'), (snapshot) => {
-        if (snapshot.exists()) {
-            const data = snapshot.data();
-            // If it's the old combined doc, it will have 'clients'
-            if (data.clients) callback(data);
-        }
-    });
-
     return () => {
         unsubUsers();
-        unsubMaster();
-        unsubLegacy();
+        unsubClients();
+        unsubMeta();
     };
 };
 

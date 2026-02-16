@@ -15,7 +15,7 @@ export const ClientSchema = z.object({
 
 export const ProductSchema = z.object({
     name: z.string().min(1),
-    price: z.number().positive(),
+    price: z.number().nonnegative(),
     category: z.string().min(1),
     sku: z.string().optional(),
     brand: z.string().min(1),
