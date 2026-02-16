@@ -87,7 +87,22 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (cloudData.users && setUsers) {
                             setUsers(migrateUsers(cloudData.users));
                         }
-                        if (cloudData.uploadedFiles) setUploadedFiles(cloudData.uploadedFiles);
+                        if (cloudData.uploadedFiles) {
+                            // Recovery: Mark stale 'processing' files as 'error'
+                            const ONE_HOUR = 60 * 60 * 1000;
+                            const now = Date.now();
+                            const recoveredFiles = cloudData.uploadedFiles.map((f: UploadedFile) => {
+                                if (f.status === 'processing' && f.uploadDate) {
+                                    const uploadTime = new Date(f.uploadDate).getTime();
+                                    if (now - uploadTime > ONE_HOUR) {
+                                        console.warn(`[RECOVERY] File "${f.fileName}" was stuck in processing. Marking as error.`);
+                                        return { ...f, status: 'error' as const, errorMessage: 'Processamento interrompido. Reenvie o arquivo.' };
+                                    }
+                                }
+                                return f;
+                            });
+                            setUploadedFiles(recoveredFiles);
+                        }
 
                         setLoadingMessage('Finalizando sincronização...');
                         setLoadingProgress(100);

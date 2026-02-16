@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter, X } from 'lucide-react';
+import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter, X, RefreshCw } from 'lucide-react';
 import { isSalesTeam } from '../utils/authUtils';
 import { AppUser, UploadedFile } from '../types';
 
@@ -455,14 +455,28 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                 Processando
                                             </span>
                                         ) : (
-                                            <button
-                                                onClick={() => onDeleteFile(file.id)}
-                                                className="flex items-center gap-2 text-on-surface-variant hover:text-error hover:bg-error-container/20 px-3 py-2 rounded-lg transition-colors text-xs font-medium w-full sm:w-auto justify-center"
-                                                title="Excluir arquivo e dados associados"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                                <span className="sm:hidden">Excluir Arquivo</span>
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                {file.status === 'error' && (
+                                                    <button
+                                                        onClick={() => {
+                                                            onDeleteFile(file.id);
+                                                        }}
+                                                        className="flex items-center gap-1.5 text-primary hover:bg-primary-container/30 px-3 py-2 rounded-lg transition-colors text-xs font-medium"
+                                                        title="Remover registro com erro para reenviar"
+                                                    >
+                                                        <RefreshCw className="w-3.5 h-3.5" />
+                                                        <span>Reenviar</span>
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => onDeleteFile(file.id)}
+                                                    className="flex items-center gap-2 text-on-surface-variant hover:text-error hover:bg-error-container/20 px-3 py-2 rounded-lg transition-colors text-xs font-medium"
+                                                    title="Excluir arquivo e dados associados"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    <span className="sm:hidden">Excluir</span>
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
