@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isAdmin, isSalesTeam } from '../utils/authUtils';
@@ -7,8 +8,13 @@ import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
 import ClientProductAssignmentModal from './ClientProductAssignmentModal';
 
+import ClientListSkeleton from './skeletons/ClientListSkeleton';
+import ClientCard from './ClientCard';
+import { AnimatePresence } from 'framer-motion';
+
 interface ClientListProps {
   clients: EnrichedClient[];
+  isLoading?: boolean; // New Prop
   onUpdateClient: (updatedClient: EnrichedClient) => void;
   onAddClient?: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
   currentUserRole?: UserRole;
@@ -23,6 +29,14 @@ interface ClientListProps {
   filterOnlyWithPurchases?: boolean;
   setFilterOnlyWithPurchases?: (value: boolean) => void;
   resetFilters?: () => void;
+
+  // Controlled Filter Props
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+  regionFilter: string;
+  onRegionFilterChange: (value: string) => void;
+  categoryFilter: string;
+  onCategoryFilterChange: (value: string) => void;
 }
 
 const ClientList: React.FC<ClientListProps> = ({
@@ -40,11 +54,25 @@ const ClientList: React.FC<ClientListProps> = ({
   onCNPJAuthError,
   filterOnlyWithPurchases = false,
   setFilterOnlyWithPurchases,
-  resetFilters
+  resetFilters,
+
+  // Destructure new props
+  searchTerm,
+  onSearchChange,
+  regionFilter,
+  onRegionFilterChange,
+  categoryFilter,
+  onCategoryFilterChange,
+  isLoading = false
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [regionFilter, setRegionFilter] = useState('Todos');
-  const [categoryFilter, setCategoryFilter] = useState('Todos');
+  // Mobile Detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Modal State
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | null>(null);
@@ -55,21 +83,14 @@ const ClientList: React.FC<ClientListProps> = ({
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [clientForProductAssignment, setClientForProductAssignment] = useState<EnrichedClient | null>(null);
 
-  const filteredClients = useMemo(() => {
-    return clients.filter(client => {
-      const matchesSearch =
-        (client.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (client.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+  // Proactively check loading state
+  if (isLoading) {
+    return <ClientListSkeleton />;
+  }
 
-      const matchesRegion = regionFilter === 'Todos' || client.region === regionFilter;
-      const matchesCategory = categoryFilter === 'Todos' || (
-        Array.isArray(client.category) &&
-        client.category.some(cat => cat.trim() === categoryFilter.trim())
-      );
+  // filteredClientsLogic removed - clients prop is already filtered
+  const filteredClients = clients;
 
-      return matchesSearch && matchesRegion && matchesCategory;
-    });
-  }, [clients, searchTerm, regionFilter, categoryFilter]);
 
   const handleExportCSV = () => {
     const headers = [
@@ -125,204 +146,24 @@ const ClientList: React.FC<ClientListProps> = ({
     setIsProductModalOpen(true);
   };
 
-  const handleSaveProductAssignment = (clientId: string, assignedProducts: PurchaseRecord[]) => {
+  const handleSaveProductAssignment = (clientId: string, products: Product[]) => {
     const clientToUpdate = clients.find(c => c.id === clientId);
     if (clientToUpdate) {
+      const assignedProducts: PurchaseRecord[] = products.map(p => ({
+        ...p,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        quantity: 1,
+        totalValue: p.price
+      }));
       const updatedClient = { ...clientToUpdate, purchasedProducts: assignedProducts };
       onUpdateClient(updatedClient);
     }
   };
 
-  // Card Component for Grid
-  const ClientCard = ({ client, style }: { client: EnrichedClient, style: React.CSSProperties }) => (
-    <div style={style} className="p-1">
-      <div className="h-full bg-surface-container-low border border-outline-variant/30 rounded-lg p-3 hover:shadow-elevation-2 transition-shadow group relative overflow-hidden flex flex-col">
-        <div className="absolute top-0 right-0 p-0">
-          <span className={`px-3 py-1 rounded-bl-lg text-[10px] font-bold uppercase tracking-wider
-                        ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
-              client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
-                client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
-                  client.region === 'Norte' ? 'bg-green-100 text-green-800' :
-                    'bg-yellow-100 text-yellow-800'}
-                      `}>
-            {client.region}
-          </span>
-        </div>
-
-        <div className="flex items-start gap-4 pr-12 mb-2">
-          <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg shrink-0">
-            {client.companyName.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-bold text-on-surface truncate pr-2" title={client.companyName}>{client.companyName}</h3>
-            <div className="flex flex-wrap items-center gap-2 mt-0.5">
-              <div className="flex items-center gap-1 text-xs text-on-surface-variant">
-                <Tag className="w-3 h-3" />
-                <span className="truncate">{client.category.join(', ')}</span>
-              </div>
-              {client.mainCnae && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-700 border border-purple-100 truncate max-w-[150px]" title={client.mainCnae}>
-                  <Briefcase className="w-2.5 h-2.5 mr-1" />
-                  {client.mainCnae}
-                </span>
-              )}
-            </div>
-
-            {/* PRODUCT STATS */}
-            {client.purchasedProducts && client.purchasedProducts.length > 0 && (
-              <div className="flex items-center gap-3 mt-1.5 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 w-fit">
-                <span className="flex items-center gap-1" title="Total de itens comprados">
-                  📦 <span className="font-bold text-gray-800">{client.purchasedProducts.length}</span> Prod.
-                </span>
-                <div className="h-3 w-px bg-gray-300"></div>
-                <span className="flex items-center gap-1" title="Quantidade de SKUs únicos">
-                  🔖 <span className="font-bold text-gray-800">{new Set(client.purchasedProducts.map(p => p.sku)).size}</span> SKUs
-                </span>
-              </div>
-            )}
-
-            {/* BADGE DE PRODUTOS RECENTES (Opcional - mantendo mas reduzindo destaque se necessário, ou mantendo como está) */}
-            {client.purchasedProducts && client.purchasedProducts.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {client.purchasedProducts.slice(0, 2).map((p, i) => (
-                  <span key={i} className="text-[9px] px-1 rounded bg-green-50 text-green-700 border border-green-200 truncate max-w-[100px]" title={p.name}>
-                    {p.sku}
-                  </span>
-                ))}
-                {client.purchasedProducts.length > 2 && (
-                  <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
-                    +{client.purchasedProducts.length - 2}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2 flex-grow">
-          <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-            <Store className="w-4 h-4 shrink-0" />
-            <span className="truncate">{client.ownerName}</span>
-          </div>
-          <div className="flex items-start gap-2 text-sm text-on-surface-variant group/link">
-            <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-            <span className="line-clamp-2">{client.cleanAddress}</span>
-          </div>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-outline-variant/30 flex items-center justify-between">
-          <div className="flex gap-2">
-            <button
-              onClick={() => openProductAssignmentModal(client)}
-              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="Atribuir Produtos"
-            >
-              <ShoppingBag className="w-4 h-4" />
-            </button>
-            <a
-              title={`Abrir localização de ${client.companyName} no Google Maps`}
-              href={client.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.companyName + " " + client.cleanAddress)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-
-          <button
-            onClick={() => openEditModal(client)}
-            className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg active:bg-surface-container-highest"
-            title={`Editar cliente ${client.companyName}`}
-          >
-            <Edit2 className="w-3 h-3" /> Editar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Mobile Card
-  const MobileClientCard = ({ client }: { client: EnrichedClient }) => (
-    <div className="p-4 border-b border-gray-100 last:border-0 bg-white">
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <h3 className="font-bold text-gray-900">{client.companyName}</h3>
-          <p className="text-xs text-gray-500">{client.category.join(', ')}</p>
-          {client.mainCnae && (
-            <p className="text-[10px] text-purple-600 font-medium flex items-center gap-1 mt-0.5">
-              <Briefcase className="w-3 h-3" /> {client.mainCnae}
-            </p>
-          )}
-
-          {/* BADGE DE PRODUTOS MOBILE */}
-          {client.purchasedProducts && client.purchasedProducts.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {client.purchasedProducts.slice(0, 3).map((p, i) => (
-                <span key={i} className="text-[9px] px-1 rounded bg-green-50 text-green-700 border border-green-200 truncate max-w-[100px]" title={p.name}>
-                  {p.sku}
-                </span>
-              ))}
-              {client.purchasedProducts.length > 3 && (
-                <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-500 border border-gray-200">
-                  +{client.purchasedProducts.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
-              ${client.region === 'Nordeste' ? 'bg-orange-100 text-orange-800' :
-            client.region === 'Sudeste' ? 'bg-blue-100 text-blue-800' :
-              client.region === 'Sul' ? 'bg-purple-100 text-purple-800' :
-                client.region === 'Norte' ? 'bg-green-100 text-green-800' :
-                  'bg-yellow-100 text-yellow-800'}
-           `}>
-          {client.region}
-        </span>
-      </div>
-
-      <div className="space-y-1 mb-3">
-        <p className="flex items-center gap-2 text-sm text-gray-600">
-          <Store className="w-4 h-4 text-gray-400" /> {client.ownerName}
-        </p>
-        <p className="flex items-center gap-2 text-sm text-gray-600">
-          <MapPin className="w-4 h-4 text-gray-400" /> <span className="truncate">{client.cleanAddress}</span>
-        </p>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={() => openEditModal(client)}
-          className="flex-1 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg text-center"
-          title={`Editar cliente ${client.companyName}`}
-        >
-          Editar
-        </button>
-        <button
-          onClick={() => openProductAssignmentModal(client)}
-          className="flex-1 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-lg text-center flex items-center justify-center gap-1"
-          title="Atribuir Produtos"
-        >
-          <ShoppingBag className="w-4 h-4" /> Produtos
-        </button>
-        <a
-          href={client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`}
-          target="_blank"
-          className="flex-none p-2 text-gray-600 bg-gray-100 rounded-lg flex items-center justify-center"
-          title="Ver rota no Google Maps"
-        >
-          <ExternalLink className="w-5 h-5" />
-        </a>
-      </div>
-    </div>
-  );
+  /* REMOVED INLINE CARDS - Using Imported ClientCard Component */
 
   return (
     <div className="flex flex-col h-full bg-white relative">
-      {/* ... Filters Header ... */}
       <div className="px-3 py-2.5 border-b border-gray-200 flex flex-col md:flex-row gap-3 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none">
         {/* Search */}
         <div className="relative w-full md:max-w-xs group">
@@ -332,7 +173,7 @@ const ClientList: React.FC<ClientListProps> = ({
             placeholder="Razão Social ou Proprietário..."
             className="w-full pl-10 pr-4 py-1.5 bg-surface-container-highest border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant/50"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => onSearchChange(e.target.value)}
             title="Buscar por razão social ou proprietário"
           />
         </div>
@@ -341,7 +182,7 @@ const ClientList: React.FC<ClientListProps> = ({
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
           <select
             value={regionFilter}
-            onChange={e => setRegionFilter(e.target.value)}
+            onChange={e => onRegionFilterChange(e.target.value)}
             className="px-2 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
             title="Filtrar por Região"
           >
@@ -351,7 +192,7 @@ const ClientList: React.FC<ClientListProps> = ({
 
           <select
             value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
+            onChange={e => onCategoryFilterChange(e.target.value)}
             className="px-2 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"
             title="Filtrar por Categoria"
           >
@@ -390,53 +231,72 @@ const ClientList: React.FC<ClientListProps> = ({
       </div>
 
       <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
-        Exibindo {filteredClients.length} de {clients.length} clientes
+        Exibindo {clients.length} clientes
       </div>
 
-      {/* Grid Content */}
-      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-gray-50">
-
-        {/* Mobile View - List */}
-        <div className="md:hidden flex flex-col gap-0 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {filteredClients.map(client => (
-            <MobileClientCard key={client.id} client={client} />
-          ))}
-        </div>
-
-        {/* Desktop View - Grid */}
-        <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
-          {filteredClients.map((client) => (
-            <ClientCard
-              key={client.id}
-              client={client}
-              style={{}}
-            />
-          ))}
-        </div>
-
-        {filteredClients.length === 0 && (
+      <div className="flex-1 overflow-hidden bg-gray-50 cursor-default">
+        {filteredClients.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Filter className="w-12 h-12 mb-2 opacity-20" />
             <p className="text-lg font-medium">Nenhum cliente encontrado</p>
             <p className="text-sm">Tente ajustar seus filtros de busca</p>
           </div>
+        ) : isMobile ? (
+          <Virtuoso
+            style={{ height: '100%' }}
+            data={filteredClients}
+            itemContent={(index, client) => (
+              <ClientCard
+                client={client}
+                onEdit={openEditModal}
+                onAssignProducts={openProductAssignmentModal}
+              />
+            )}
+            className="custom-scrollbar"
+          />
+        ) : (
+          <VirtuosoGrid
+            style={{ height: '100%' }}
+            data={filteredClients}
+            components={{
+              List: forwardRef((props, ref) => (
+                <div
+                  {...props}
+                  ref={ref}
+                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
+                />
+              )),
+              Item: (props) => <div {...props} className="h-full" />
+            }}
+            itemContent={(index, client) => (
+              <ClientCard
+                client={client}
+                onEdit={openEditModal}
+                onAssignProducts={openProductAssignmentModal}
+                style={{ height: '100%' }}
+              />
+            )}
+            className="custom-scrollbar"
+          />
         )}
       </div>
 
-      {/* Modals */}
-      {
-        selectedClient && isEditModalOpen && (
-          <EditClientModal
-            isOpen={isEditModalOpen}
-            onClose={() => setIsEditModalOpen(false)}
-            client={selectedClient}
-            onSave={onUpdateClient}
-            users={users}
-            uploadedFiles={uploadedFiles}
-            onCNPJAuthError={onCNPJAuthError}
-          />
-        )
-      }
+      <AnimatePresence>
+        {
+          selectedClient && isEditModalOpen && (
+            <EditClientModal
+              key="edit-modal"
+              isOpen={isEditModalOpen}
+              onClose={() => setIsEditModalOpen(false)}
+              client={selectedClient}
+              onSave={onUpdateClient}
+              users={users}
+              uploadedFiles={uploadedFiles}
+              onCNPJAuthError={onCNPJAuthError}
+            />
+          )
+        }
+      </AnimatePresence>
 
       {isAddModalOpen && currentUserId && (
         <AddClientModal
@@ -450,7 +310,6 @@ const ClientList: React.FC<ClientListProps> = ({
         />
       )}
 
-      {/* Product Assignment Modal */}
       <ClientProductAssignmentModal
         isOpen={isProductModalOpen}
         onClose={() => setIsProductModalOpen(false)}
@@ -459,7 +318,7 @@ const ClientList: React.FC<ClientListProps> = ({
         productCategories={productCategories}
         onSave={handleSaveProductAssignment}
       />
-    </div >
+    </div>
   );
 };
 

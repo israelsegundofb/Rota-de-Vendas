@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter, X } from 'lucide-react';
 import { isSalesTeam } from '../utils/authUtils';
 import { AppUser, UploadedFile } from '../types';
-import { isSalesTeam } from '../utils/authUtils';
+
 
 interface AdminFileManagerProps {
     users: AppUser[];

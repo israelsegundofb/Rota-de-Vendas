@@ -429,9 +429,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <YAxis stroke="#8E9199" fontSize={11} axisLine={false} tickLine={false} tickFormatter={(val) => `R$ ${val / 1000}k`} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                                        formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Venda']}
+                                        formatter={(val: any) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Venda']}
                                     />
-                                    <Area type="monotone" dataKey="value" stroke="#0061A4" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                                    <Area type="monotone" dataKey="value" stroke="#0061A4" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" {...({} as any)} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -458,7 +458,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     </Pie>
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none' }}
-                                        formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Total']}
+                                        formatter={(val: any) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Total']}
                                     />
                                     <Legend
                                         verticalAlign="bottom"
@@ -514,7 +514,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <Tooltip
                                         cursor={{ fill: 'rgba(0,0,0,0.03)' }}
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                        formatter={(val: number) => [val, 'Qtd Vendida']}
+                                        formatter={(val: any) => [val, 'Qtd Vendida']}
                                     />
                                     <Bar
                                         dataKey="count"
@@ -522,6 +522,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         radius={[0, 8, 8, 0]}
                                         barSize={24}
                                         animationDuration={1000}
+                                        {...({} as any)}
                                     />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -549,6 +550,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         radius={[8, 8, 0, 0]}
                                         barSize={40}
                                         animationDuration={1500}
+                                        {...({} as any)}
                                     />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -574,8 +576,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     dataKey="revenue"
                                     fill="#D7E3F7"
                                     radius={[12, 12, 0, 0]}
-                                    activeBar={{ fill: '#0061A4' }}
+                                    activeBar={{ fill: '#0061A4' } as any}
                                     animationDuration={2000}
+                                    {...({} as any)}
                                 />
                             </BarChart>
                         </ResponsiveContainer>

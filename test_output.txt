@@ -1,0 +1,173 @@
+﻿
+> rota-de-vendas-inteligente@0.0.0 test
+> vitest components/ClientList.test.tsx --run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Users/comer/Desktop/ISRAEL/Rota de Vendas/Rota-de-Vendas[39m
+
+[90mstdout[2m | components/ClientList.test.tsx[2m > [22m[2mClientList Component[2m > [22m[2mdeve renderizar a lista de clientes
+[22m[39m[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex flex-col h-full bg-white relative"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"px-3 py-2.5 border-b border-gray-200 flex flex-col md:flex-row gap-3 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"relative w-full md:max-w-xs group"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"m21 21-4.34-4.34"[39m
+            [36m/>[39m
+            [36m<circle[39m
+              [33mcx[39m=[32m"11"[39m
+              [33mcy[39m=[32m"11"[39m
+              [33mr[39m=[32m"8"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [36m<input[39m
+            [33mclass[39m=[32m"w-full pl-10 pr-4 py-1.5 bg-surface-container-highest border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant/50"[39m
+            [33mplaceholder[39m=[32m"Raz├úo Social ou Propriet├írio..."[39m
+            [33mtitle[39m=[32m"Buscar por raz├úo social ou propriet├írio"[39m
+            [33mtype[39m=[32m"text"[39m
+            [33mvalue[39m=[32m""[39m
+          [36m/>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar"[39m
+        [36m>[39m
+          [36m<select[39m
+            [33mclass[39m=[32m"px-2 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"[39m
+            [33mtitle[39m=[32m"Filtrar por Regi├úo"[39m
+          [36m>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Todos"[39m
+            [36m>[39m
+              [0mTodas Regi├Áes[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Norte"[39m
+            [36m>[39m
+              [0mNorte[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Nordeste"[39m
+            [36m>[39m
+              [0mNordeste[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Centro-Oeste"[39m
+            [36m>[39m
+              [0mCentro-Oeste[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Sudeste"[39m
+            [36m>[39m
+              [0mSudeste[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Sul"[39m
+            [36m>[39m
+              [0mSul[0m
+            [36m</option>[39m
+          [36m</select>[39m
+          [36m<select[39m
+            [33mclass[39m=[32m"px-2 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap"[39m
+            [33mtitle[39m=[32m"Filtrar por Categoria"[39m
+          [36m>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Todos"[39m
+            [36m>[39m
+              [0mTodos Segmentos[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Som e V├¡deo"[39m
+            [36m>[39m
+              [0mSom e V├¡deo[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Pneus e Rodas"[39m
+            [36m>[39m
+              [0mPneus e Rodas[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Pe├ºas e Mec├ónica"[39m
+            [36m>[39m
+              [0mPe├ºas e Mec├ónica[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Acess├│rios"[39m
+            [36m>[39m
+              [0mAcess├│rios[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Vidros e Pel├¡culas"[39m
+            [36m>[39m
+              [0mVidros e Pel├¡culas[0m
+            [36m</option>[39m
+            [36m<option[39m
+              [33mvalue[39m=[32m"Outros"[39m
+            [36m>[39m
+              [0mOutros[0m
+            [36m</option>[39m
+          [36m</select>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"md:ml-auto flex items-center gap-2 pl-2 border-l border-gray-200"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"flex items-center gap-2 px-3 py-1.5 bg-white border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest rounded-lg text-xs font-bold transition-colors shadow-sm whitespace-nowrap"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"lucide lucide-download w-4 h-4"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M12 15V3"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"m7 10 5 5 5-5"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0m Exportar[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"px-3 py-1.5 bg-gray-50 border-b border-gr...
+
+ [31mÔØ»[39m components/ClientList.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 61[2mms[22m[39m
+[31m     [31m├ù[31m deve renderizar a lista de clientes[39m[32m 43[2mms[22m[39m
+     [32mÔ£ô[39m deve permitir digita├º├úo no campo de busca (comportamento atual)[32m 17[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 13:08:19
+[2m   Duration [22m 1.06s[2m (transform 124ms, setup 75ms, import 229ms, tests 61ms, environment 571ms)[22m
+

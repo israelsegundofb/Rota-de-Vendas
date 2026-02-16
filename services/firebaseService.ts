@@ -194,7 +194,7 @@ export const saveToCloud = async (
         });
 
         products.forEach(product => {
-            const productId = product.id || `prod_${product.sku.replace(/\s+/g, '_')}`;
+            const productId = (product as any).id || `prod_${product.sku.replace(/\s+/g, '_')}`;
             operations.push({
                 ref: doc(db!, 'rota-vendas-data', 'products', 'list', productId),
                 data: { ...removeUndefined(product), id: productId, lastUpdated }

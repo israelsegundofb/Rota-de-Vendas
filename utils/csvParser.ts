@@ -1,4 +1,4 @@
-import Papa from 'papaparse';
+import * as Papa from 'papaparse';
 import { RawClient, Product } from '../types';
 import { ClientSchema, ProductSchema } from './schemas';
 import { z } from 'zod';
@@ -161,7 +161,7 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
       header: false,
       skipEmptyLines: true,
       encoding: "UTF-8",
-      complete: (results) => {
+      complete: (results: any) => {
         const rows = results.data as any[][];
         if (rows.length === 0) return resolve([]);
 
@@ -226,7 +226,7 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
 
         resolve(products);
       },
-      error: (error) => reject(error)
+      error: (error: any) => reject(error)
     });
   });
 };
@@ -237,7 +237,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
       header: false,
       skipEmptyLines: true,
       encoding: "UTF-8",
-      complete: (results) => {
+      complete: (results: any) => {
         const rows = results.data as any[][];
         if (rows.length === 0) return resolve([]);
 
@@ -328,7 +328,7 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
 
         resolve(normalizedData);
       },
-      error: (error) => {
+      error: (error: any) => {
         reject(error);
       },
     });
@@ -341,7 +341,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
       header: false,
       skipEmptyLines: true,
       encoding: "UTF-8",
-      complete: (results) => {
+      complete: (results: any) => {
         const rows = results.data as any[][];
         if (rows.length === 0) return resolve([]);
 
@@ -399,7 +399,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
 
         resolve(records);
       },
-      error: (error) => reject(error)
+      error: (error: any) => reject(error)
     });
   });
 };

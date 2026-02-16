@@ -19,33 +19,39 @@ import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingServ
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
-import ClientMap from './components/ClientMap';
+// Lazy Load ClientMap to reduce initial bundle size
+const ClientMap = React.lazy(() => import('./components/ClientMap'));
+// Lazy Load Admin & Heavy Components
+// REVERTING ClientList and LoginScreen to static imports for performance.
+
 import ClientList from './components/ClientList';
 import LoginScreen from './components/LoginScreen';
-import AddClientModal from './components/AddClientModal';
-import EditClientModal from './components/EditClientModal';
+
+const AddClientModal = React.lazy(() => import('./components/AddClientModal'));
+const EditClientModal = React.lazy(() => import('./components/EditClientModal'));
+const AdminUserManagement = React.lazy(() => import('./components/AdminUserManagement'));
+const AdminCategoryManagement = React.lazy(() => import('./components/AdminCategoryManagement'));
+const AdminProductManagement = React.lazy(() => import('./components/AdminProductManagement'));
+const CloudConfigModal = React.lazy(() => import('./components/CloudConfigModal'));
+const AdminFileManager = React.lazy(() => import('./components/AdminFileManager'));
+const GoogleMapsKeyModal = React.lazy(() => import('./components/GoogleMapsKeyModal'));
+const CNPJaKeyModal = React.lazy(() => import('./components/CNPJaKeyModal'));
+const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
+const LogPanel = React.lazy(() => import('./components/LogPanel'));
+const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
+const ChatPanel = React.lazy(() => import('./components/ChatPanel'));
+
 import DateRangePicker from './components/DateRangePicker';
-import AdminUserManagement from './components/AdminUserManagement';
-import AdminCategoryManagement from './components/AdminCategoryManagement';
-import AdminProductManagement from './components/AdminProductManagement';
-import CloudConfigModal from './components/CloudConfigModal';
 import CookieConsent from './components/CookieConsent';
-import AdminFileManager from './components/AdminFileManager';
-import GoogleMapsKeyModal from './components/GoogleMapsKeyModal';
-import CNPJaKeyModal from './components/CNPJaKeyModal';
 import LoadingScreen from './components/LoadingScreen';
-import AdminDashboard from './components/AdminDashboard';
-import LogPanel from './components/LogPanel';
 import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import CustomDialog, { DialogType } from './components/CustomDialog';
-import SalesHistoryPanel from './components/SalesHistoryPanel';
-import ChatPanel from './components/ChatPanel';
 import { useChat } from './hooks/useChat';
-import { usePageTracking } from './hooks/useAnalytics'; // Import tracking hook
+import { usePageTracking } from './hooks/useAnalytics';
 
 // Initial Mock Data
 interface ProcessingState {
@@ -98,7 +104,8 @@ const App: React.FC = () => {
     setFilterOnlyWithPurchases,
     startDate, setStartDate,
     endDate, setEndDate,
-    resetFilters
+    resetFilters,
+    isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
 
   const {
@@ -1435,7 +1442,9 @@ const App: React.FC = () => {
           appendTo: 'body'
         }}
       >
-        <LoginScreen users={users} onLogin={handleLogin} />
+        <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Login..." />}>
+          <LoginScreen users={users} onLogin={handleLogin} />
+        </React.Suspense>
       </GoogleReCaptchaProvider>
     );
   }
@@ -1737,29 +1746,55 @@ const App: React.FC = () => {
             </button>
           )}
           {/* MODALS */}
-          <CloudConfigModal
-            isOpen={isCloudConfigOpen}
-            onClose={() => setIsCloudConfigOpen(false)}
-            onSaveToCloud={() => {
-              saveToCloud(masterClientList, products, categories, users);
-              alert('✅ Dados salvos na nuvem com sucesso!');
-            }}
-            onClearDatabase={handleClearAllClients}
-            isFirebaseConnected={isFirebaseConnected}
-          />
+          <React.Suspense fallback={null}> {/* Fallback null for modals is usually fine or a small spinner */}
+            <CloudConfigModal
+              isOpen={isCloudConfigOpen}
+              onClose={() => setIsCloudConfigOpen(false)}
+              onSaveToCloud={() => {
+                saveToCloud(masterClientList, products, categories, users);
+                alert('✅ Dados salvos na nuvem com sucesso!');
+              }}
+              onClearDatabase={handleClearAllClients}
+              isFirebaseConnected={isFirebaseConnected}
+            />
 
-          <GoogleMapsKeyModal
-            isOpen={isGoogleMapsModalOpen}
-            onClose={() => setIsGoogleMapsModalOpen(false)}
-            onConfirm={handleConfirmMapKey}
-            suggestedKey={SUGGESTED_MAP_KEY}
-          />
+            <GoogleMapsKeyModal
+              isOpen={isGoogleMapsModalOpen}
+              onClose={() => setIsGoogleMapsModalOpen(false)}
+              onConfirm={handleConfirmMapKey}
+              suggestedKey={SUGGESTED_MAP_KEY}
+            />
 
-          <CNPJaKeyModal
-            isOpen={isCNPJaModalOpen}
-            onClose={() => setIsCNPJaModalOpen(false)}
-            onConfirm={handleConfirmCNPJaKey}
-          />
+            <CNPJaKeyModal
+              isOpen={isCNPJaModalOpen}
+              onClose={() => setIsCNPJaModalOpen(false)}
+              onConfirm={handleConfirmCNPJaKey}
+            />
+
+            {isAddModalOpen && (
+              <AddClientModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onAdd={handleAddClient}
+                salespersonId={currentUser?.id || ''}
+                ownerName={currentUser?.name || 'Sistema'}
+
+                users={users} // Pass users to auto-assign current user
+
+              />
+            )}
+
+            {isEditModalOpen && selectedClient && (
+              <EditClientModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                onSave={handleUpdateClient}
+                client={selectedClient}
+
+                users={users}
+              />
+            )}
+          </React.Suspense>
 
           <CookieConsent
             onAccept={() => {
@@ -1801,103 +1836,115 @@ const App: React.FC = () => {
 
           {
             activeView === 'admin_users' && isAdminUser ? (
-              <div className="flex-1 overflow-y-auto bg-gray-50">
-                <AdminUserManagement
-                  currentUser={currentUser}
-                  users={users}
-                  onAddUser={handleAddUser}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                  onCleanupDuplicates={handleCleanupDuplicates}
-                  totalClients={masterClientList.length}
-                />
-              </div>
+              <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Admin..." />}>
+                <div className="flex-1 overflow-y-auto bg-gray-50">
+                  <AdminUserManagement
+                    currentUser={currentUser}
+                    users={users}
+                    onAddUser={handleAddUser}
+                    onUpdateUser={handleUpdateUser}
+                    onDeleteUser={handleDeleteUser}
+                    onCleanupDuplicates={handleCleanupDuplicates}
+                    totalClients={masterClientList.length}
+                  />
+                </div>
+              </React.Suspense>
             ) : activeView === 'admin_categories' && isAdminUser ? (
-              <div className="flex-1 overflow-y-auto bg-gray-50">
-                <AdminCategoryManagement
-                  categories={categories}
-                  onAddCategory={handleAddCategory}
-                  onDeleteCategory={handleDeleteCategory}
-                />
-              </div>
+              <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Categorias..." />}>
+                <div className="flex-1 overflow-y-auto bg-gray-50">
+                  <AdminCategoryManagement
+                    categories={categories}
+                    onAddCategory={handleAddCategory}
+                    onDeleteCategory={handleDeleteCategory}
+                  />
+                </div>
+              </React.Suspense>
             ) : activeView === 'admin_products' && isAdminUser ? (
-              <div className="flex-1 overflow-y-auto bg-gray-50">
-                <AdminProductManagement
-                  products={products}
-                  onUploadProducts={handleUploadProducts}
-                  onClearProducts={handleClearProducts}
-                  onSaveProducts={handleSaveProducts}
-                />
-              </div>
+              <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Produtos..." />}>
+                <div className="flex-1 overflow-y-auto bg-gray-50">
+                  <AdminProductManagement
+                    products={products}
+                    onUploadProducts={handleUploadProducts}
+                    onClearProducts={handleClearProducts}
+                    onSaveProducts={handleSaveProducts}
+                  />
+                </div>
+              </React.Suspense>
             ) : activeView === 'admin_files' && isAdminUser ? (
-              <div className="flex-1 overflow-y-auto bg-gray-50">
-                <AdminFileManager
-                  users={users}
-                  uploadedFiles={uploadedFiles}
-                  onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
-                  onUploadProducts={handleProductFileUpload}
-                  onUploadPurchases={handlePurchaseUpdateUpload}
-                  onDeleteFile={handleDeleteFile}
-                  onReassignSalesperson={handleReassignFileSalesperson}
-                  procState={procState}
-                />
-              </div>
+              <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Arquivos..." />}>
+                <div className="flex-1 overflow-y-auto bg-gray-50">
+                  <AdminFileManager
+                    users={users}
+                    uploadedFiles={uploadedFiles}
+                    onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
+                    onUploadProducts={handleProductFileUpload}
+                    onUploadPurchases={handlePurchaseUpdateUpload}
+                    onDeleteFile={handleDeleteFile}
+                    onReassignSalesperson={handleReassignFileSalesperson}
+                    procState={procState}
+                  />
+                </div>
+              </React.Suspense>
             ) : activeView === 'chat' && currentUser ? (
-              <div className="flex-1 p-4 md:p-6 overflow-hidden">
-                <ChatPanel
-                  currentUser={currentUser}
-                  allUsers={users}
-                  conversations={conversations}
-                  messages={messages}
-                  activeUserId={activeConversationId}
-                  onSelectUser={(userId) => {
-                    setActiveConversationId(userId);
-                    if (userId) handleChatMarkAsRead(userId);
-                  }}
-                  onSendMessage={handleChatSendMessage}
-                  onDeleteMessage={handleChatDeleteMessage}
-                  onClearMessages={handleChatClearMessages}
-                />
-              </div>
+              <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Chat..." />}>
+                <div className="flex-1 p-4 md:p-6 overflow-hidden">
+                  <ChatPanel
+                    currentUser={currentUser}
+                    allUsers={users}
+                    conversations={conversations}
+                    messages={messages}
+                    activeUserId={activeConversationId}
+                    onSelectUser={(userId) => {
+                      setActiveConversationId(userId);
+                      if (userId) handleChatMarkAsRead(userId);
+                    }}
+                    onSendMessage={handleChatSendMessage}
+                    onDeleteMessage={handleChatDeleteMessage}
+                    onClearMessages={handleChatClearMessages}
+                  />
+                </div>
+              </React.Suspense>
             ) : activeView === 'dashboard' && isAdminUser ? (
-              <div className="flex-1 overflow-hidden bg-surface">
-                <AdminDashboard
-                  clients={filteredClients}
-                  products={products}
-                  users={users}
-                  onClose={() => setActiveView('map')}
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  filterRegion={filterRegion}
-                  setFilterRegion={setFilterRegion}
-                  filterState={filterState}
-                  setFilterState={setFilterState}
-                  filterCity={filterCity}
-                  setFilterCity={setFilterCity}
-                  filterCategory={filterCategory}
-                  setFilterCategory={setFilterCategory}
-                  filterSalespersonId={filterSalespersonId}
-                  setFilterSalespersonId={setFilterSalespersonId}
-                  filterSalesCategory={filterSalesCategory}
-                  setFilterSalesCategory={setFilterSalesCategory}
-                  filterCnae={filterCnae}
-                  setFilterCnae={setFilterCnae}
-                  filterProductCategory={filterProductCategory}
-                  setFilterProductCategory={setFilterProductCategory}
-                  productCategories={productCategories}
-                  startDate={startDate}
-                  setStartDate={setStartDate}
-                  endDate={endDate}
-                  setEndDate={setEndDate}
-                  availableStates={availableStates}
-                  availableCities={availableCities}
-                  availableCnaes={availableCnaes}
-                  categories={categories}
-                  currentUser={currentUser}
-                  isAdminUser={isAdminUser}
-                  canViewAllData={canViewAllData}
-                />
-              </div>
+              <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Dashboard..." />}>
+                <div className="flex-1 overflow-hidden bg-surface">
+                  <AdminDashboard
+                    clients={filteredClients}
+                    products={products}
+                    users={users}
+                    onClose={() => setActiveView('map')}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    filterRegion={filterRegion}
+                    setFilterRegion={setFilterRegion}
+                    filterState={filterState}
+                    setFilterState={setFilterState}
+                    filterCity={filterCity}
+                    setFilterCity={setFilterCity}
+                    filterCategory={filterCategory}
+                    setFilterCategory={setFilterCategory}
+                    filterSalespersonId={filterSalespersonId}
+                    setFilterSalespersonId={setFilterSalespersonId}
+                    filterSalesCategory={filterSalesCategory}
+                    setFilterSalesCategory={setFilterSalesCategory}
+                    filterCnae={filterCnae}
+                    setFilterCnae={setFilterCnae}
+                    filterProductCategory={filterProductCategory}
+                    setFilterProductCategory={setFilterProductCategory}
+                    productCategories={productCategories}
+                    startDate={startDate}
+                    setStartDate={setStartDate}
+                    endDate={endDate}
+                    setEndDate={setEndDate}
+                    availableStates={availableStates}
+                    availableCities={availableCities}
+                    availableCnaes={availableCnaes}
+                    categories={categories}
+                    currentUser={currentUser}
+                    isAdminUser={isAdminUser}
+                    canViewAllData={canViewAllData}
+                  />
+                </div>
+              </React.Suspense>
             ) : (
               <>
                 <div className="bg-gray-100 px-3 py-2.5 border-b border-gray-200 flex flex-col gap-2">
@@ -2200,224 +2247,232 @@ const App: React.FC = () => {
                   ) : (
                     <div className="h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
                       {activeView === 'map' ? (
-                        <ClientMap
-                          key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
-                          clients={filteredClients}
-                          apiKey={googleMapsApiKey}
-                          onInvalidKey={handleInvalidKey}
-                          productFilterActive={isProductFilterActive}
-                          highlightProductTerm={searchProductQuery}
-                          activeProductCategory={filterProductCategory}
-                          users={users} // Pass users for color coding
-                          filterContent={
-                            <div className="bg-gray-100/95 backdrop-blur-sm px-3 py-2 flex flex-col gap-1.5">
-                              {/* Primary Filters Row */}
-                              <div className="flex flex-wrap gap-2 items-center">
-                                <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                  <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Buscar cliente ou empresa..."
-                                    className="pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 w-48 border outline-none"
-                                    title="Buscar cliente ou empresa"
-                                  />
-                                </div>
-
-                                <div className="h-5 w-px bg-gray-300 mx-0.5 hidden sm:block"></div>
-
-                                {/* Salesperson Filter */}
-                                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors ${canViewAllData ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
-                                  <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}>
-                                    {canViewAllData ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                                    {isAdminUser ? 'Admin' : (canViewAllData ? 'Gestão' : 'Vendedor')}
-                                  </span>
+                        <React.Suspense fallback={
+                          <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-50">
+                            <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+                            <p className="text-lg font-medium text-gray-600">Carregando Mapa...</p>
+                            <p className="text-sm text-gray-400">Otimizando sua experiência</p>
+                          </div>
+                        }>
+                          <ClientMap
+                            key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
+                            clients={filteredClients}
+                            apiKey={googleMapsApiKey}
+                            onInvalidKey={handleInvalidKey}
+                            productFilterActive={isProductFilterActive}
+                            highlightProductTerm={searchProductQuery}
+                            activeProductCategory={filterProductCategory}
+                            users={users} // Pass users for color coding
+                            filterContent={
+                              <div className="bg-gray-100/95 backdrop-blur-sm px-3 py-2 flex flex-col gap-1.5">
+                                {/* Primary Filters Row */}
+                                <div className="flex flex-wrap gap-2 items-center">
                                   <div className="relative">
-                                    <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${canViewAllData ? 'text-purple-400' : 'text-gray-400'}`} />
-                                    <select
-                                      value={canViewAllData ? filterSalespersonId : currentUser?.id || ''}
-                                      onChange={(e) => canViewAllData && setFilterSalespersonId(e.target.value)}
-                                      disabled={!canViewAllData}
-                                      className={`text-xs rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium appearance-none ${canViewAllData ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
-                                      title={!canViewAllData ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
-                                    >
-                                      {canViewAllData && <option value="Todos">Todos Vendedores</option>}
-                                      {canViewAllData
-                                        ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
-                                          <option key={u.id} value={u.id}>{u.name}</option>
-                                        ))
-                                        : <option value={currentUser?.id}>{currentUser?.name}</option>
-                                      }
-                                    </select>
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={searchQuery}
+                                      onChange={(e) => setSearchQuery(e.target.value)}
+                                      placeholder="Buscar cliente ou empresa..."
+                                      className="pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 w-48 border outline-none"
+                                      title="Buscar cliente ou empresa"
+                                    />
                                   </div>
-                                  {canViewAllData && (
-                                    <div className="relative animate-fade-in">
-                                      <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
+
+                                  <div className="h-5 w-px bg-gray-300 mx-0.5 hidden sm:block"></div>
+
+                                  {/* Salesperson Filter */}
+                                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors ${canViewAllData ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}>
+                                      {canViewAllData ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                                      {isAdminUser ? 'Admin' : (canViewAllData ? 'Gestão' : 'Vendedor')}
+                                    </span>
+                                    <div className="relative">
+                                      <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${canViewAllData ? 'text-purple-400' : 'text-gray-400'}`} />
                                       <select
-                                        value={filterSalesCategory}
-                                        onChange={(e) => setFilterSalesCategory(e.target.value)}
-                                        className="text-xs border-purple-300 bg-white text-purple-900 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium"
-                                        title="Filtrar por equipe de vendas"
+                                        value={canViewAllData ? filterSalespersonId : currentUser?.id || ''}
+                                        onChange={(e) => canViewAllData && setFilterSalespersonId(e.target.value)}
+                                        disabled={!canViewAllData}
+                                        className={`text-xs rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium appearance-none ${canViewAllData ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
+                                        title={!canViewAllData ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
                                       >
-                                        <option value="Todos">Todas Equipes</option>
-                                        <option value="Externo">Externo</option>
-                                        <option value="Interno">Interno</option>
-                                        <option value="Mercado Livre">Mercado Livre</option>
+                                        {canViewAllData && <option value="Todos">Todos Vendedores</option>}
+                                        {canViewAllData
+                                          ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                          ))
+                                          : <option value={currentUser?.id}>{currentUser?.name}</option>
+                                        }
                                       </select>
                                     </div>
+                                    {canViewAllData && (
+                                      <div className="relative animate-fade-in">
+                                        <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
+                                        <select
+                                          value={filterSalesCategory}
+                                          onChange={(e) => setFilterSalesCategory(e.target.value)}
+                                          className="text-xs border-purple-300 bg-white text-purple-900 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium"
+                                          title="Filtrar por equipe de vendas"
+                                        >
+                                          <option value="Todos">Todas Equipes</option>
+                                          <option value="Externo">Externo</option>
+                                          <option value="Interno">Interno</option>
+                                          <option value="Mercado Livre">Mercado Livre</option>
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <select
+                                    value={filterRegion}
+                                    onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
+                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
+                                    title="Filtrar por região"
+                                  >
+                                    <option value="Todas">Todas Regiões</option>
+                                    {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                  </select>
+
+                                  <select
+                                    value={filterState}
+                                    onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
+                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
+                                    disabled={availableStates.length === 0}
+                                    title="Filtrar por estado"
+                                  >
+                                    <option value="Todos">Todos Estados</option>
+                                    {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+
+                                  <select
+                                    value={filterCity}
+                                    onChange={(e) => setFilterCity(e.target.value)}
+                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
+                                    disabled={filterState === 'Todos' || availableCities.length === 0}
+                                    title="Filtrar por cidade"
+                                  >
+                                    <option value="Todas">Todas Cidades</option>
+                                    {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+
+                                  <div className="flex items-center gap-1 relative">
+                                    <ShoppingBag className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
+                                    <select
+                                      value={filterCategory}
+                                      onChange={(e) => setFilterCategory(e.target.value)}
+                                      className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5"
+                                      title="Filtrar por categoria de cliente"
+                                    >
+                                      <option value="Todos">Todas Cat. Clientes</option>
+                                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 relative">
+                                    <Briefcase className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
+                                    <select
+                                      value={filterCnae}
+                                      onChange={(e) => setFilterCnae(e.target.value)}
+                                      className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5 max-w-[200px]"
+                                      title="Filtrar por CNAE (Atividade Econômica)"
+                                    >
+                                      <option value="Todos">Todos CNAEs</option>
+                                      {availableCnaes.map(c => (
+                                        <option key={c} value={c}>{c.length > 40 ? c.substring(0, 40) + '...' : c}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {isAdminUser && (
+                                    <button
+                                      onClick={handleMassUpdateClients}
+                                      className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all text-[10px] font-bold uppercase tracking-wider ml-2"
+                                      title="Enriquecer toda a base com dados da Receita Federal via CNPJa Comercial"
+                                    >
+                                      <Database className="w-3.5 h-3.5" /> Atualizar Base (CNPJa)
+                                    </button>
                                   )}
                                 </div>
 
-                                <select
-                                  value={filterRegion}
-                                  onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
-                                  className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
-                                  title="Filtrar por região"
-                                >
-                                  <option value="Todas">Todas Regiões</option>
-                                  {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                                </select>
+                                {/* Secondary Filters Row: Products */}
+                                <div className="flex flex-wrap gap-2 items-center bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm">
+                                  <div className="flex items-center gap-2 px-2 text-sm font-semibold text-green-700">
+                                    <Package className="w-4 h-4" />
+                                    Vendas:
+                                  </div>
 
-                                <select
-                                  value={filterState}
-                                  onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
-                                  className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
-                                  disabled={availableStates.length === 0}
-                                  title="Filtrar por estado"
-                                >
-                                  <option value="Todos">Todos Estados</option>
-                                  {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-
-                                <select
-                                  value={filterCity}
-                                  onChange={(e) => setFilterCity(e.target.value)}
-                                  className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
-                                  disabled={filterState === 'Todos' || availableCities.length === 0}
-                                  title="Filtrar por cidade"
-                                >
-                                  <option value="Todas">Todas Cidades</option>
-                                  {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-
-                                <div className="flex items-center gap-1 relative">
-                                  <ShoppingBag className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
                                   <select
-                                    value={filterCategory}
-                                    onChange={(e) => setFilterCategory(e.target.value)}
-                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5"
-                                    title="Filtrar por categoria de cliente"
+                                    value={filterProductCategory}
+                                    onChange={e => setFilterProductCategory(e.target.value)}
+                                    className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                    title="Filtrar por marca ou categoria de produto"
                                   >
-                                    <option value="Todos">Todas Cat. Clientes</option>
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    <option value="Todos">Todos Deptos / Marcas</option>
+                                    {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                   </select>
-                                </div>
 
-                                <div className="flex items-center gap-1 relative">
-                                  <Briefcase className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
-                                  <select
-                                    value={filterCnae}
-                                    onChange={(e) => setFilterCnae(e.target.value)}
-                                    className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5 max-w-[200px]"
-                                    title="Filtrar por CNAE (Atividade Econômica)"
-                                  >
-                                    <option value="Todos">Todos CNAEs</option>
-                                    {availableCnaes.map(c => (
-                                      <option key={c} value={c}>{c.length > 40 ? c.substring(0, 40) + '...' : c}</option>
-                                    ))}
-                                  </select>
-                                </div>
+                                  <div className="relative animate-fade-in">
+                                    <ShoppingBag className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${filterProductSku !== 'Todos' ? 'text-green-600' : 'text-gray-400'}`} />
+                                    <select
+                                      value={filterProductSku}
+                                      onChange={e => setFilterProductSku(e.target.value)}
+                                      className={`text-xs rounded-lg pl-7 pr-2 py-1.5 border appearance-none transition-colors max-w-[180px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                      title="Filtrar por SKU do produto"
+                                    >
+                                      <option value="Todos">Todos Produtos</option>
+                                      {products
+                                        .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
+                                        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                                        .map(p => (
+                                          <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
+                                        ))
+                                      }
+                                    </select>
+                                  </div>
 
-                                {isAdminUser && (
-                                  <button
-                                    onClick={handleMassUpdateClients}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all text-[10px] font-bold uppercase tracking-wider ml-2"
-                                    title="Enriquecer toda a base com dados da Receita Federal via CNPJa Comercial"
-                                  >
-                                    <Database className="w-3.5 h-3.5" /> Atualizar Base (CNPJa)
-                                  </button>
-                                )}
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={searchProductQuery}
+                                      onChange={e => setSearchProductQuery(e.target.value)}
+                                      placeholder="Depto, Marca, SKU ou Produto..."
+                                      className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-52 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
+                                    />
+                                  </div>
+
+                                  <div className="flex gap-1 ml-1">
+                                    <button
+                                      onClick={() => setFilterOnlyWithPurchases(true)}
+                                      className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1.5 rounded-lg border transition-all ${filterOnlyWithPurchases
+                                        ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                        : 'bg-white border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600'
+                                        }`}
+                                    >
+                                      Com Compras
+                                    </button>
+                                    <button
+                                      onClick={() => setFilterOnlyWithPurchases(false)}
+                                      className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1.5 rounded-lg border transition-all ${!filterOnlyWithPurchases
+                                        ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                        : 'bg-white border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'
+                                        }`}
+                                    >
+                                      Todos
+                                    </button>
+                                  </div>
+
+                                  {isProductFilterActive && (
+                                    <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
+                                      <CheckCircle className="w-3 h-3" />
+                                      Exibindo onde foi vendido
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-
-                              {/* Secondary Filters Row: Products */}
-                              <div className="flex flex-wrap gap-2 items-center bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm">
-                                <div className="flex items-center gap-2 px-2 text-sm font-semibold text-green-700">
-                                  <Package className="w-4 h-4" />
-                                  Vendas:
-                                </div>
-
-                                <select
-                                  value={filterProductCategory}
-                                  onChange={e => setFilterProductCategory(e.target.value)}
-                                  className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                                  title="Filtrar por marca ou categoria de produto"
-                                >
-                                  <option value="Todos">Todos Deptos / Marcas</option>
-                                  {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-
-                                <div className="relative animate-fade-in">
-                                  <ShoppingBag className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${filterProductSku !== 'Todos' ? 'text-green-600' : 'text-gray-400'}`} />
-                                  <select
-                                    value={filterProductSku}
-                                    onChange={e => setFilterProductSku(e.target.value)}
-                                    className={`text-xs rounded-lg pl-7 pr-2 py-1.5 border appearance-none transition-colors max-w-[180px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                                    title="Filtrar por SKU do produto"
-                                  >
-                                    <option value="Todos">Todos Produtos</option>
-                                    {products
-                                      .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                                      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                                      .map(p => (
-                                        <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
-                                      ))
-                                    }
-                                  </select>
-                                </div>
-
-                                <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
-                                  <input
-                                    type="text"
-                                    value={searchProductQuery}
-                                    onChange={e => setSearchProductQuery(e.target.value)}
-                                    placeholder="Depto, Marca, SKU ou Produto..."
-                                    className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-52 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
-                                  />
-                                </div>
-
-                                <div className="flex gap-1 ml-1">
-                                  <button
-                                    onClick={() => setFilterOnlyWithPurchases(true)}
-                                    className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1.5 rounded-lg border transition-all ${filterOnlyWithPurchases
-                                      ? 'bg-green-600 border-green-600 text-white shadow-sm'
-                                      : 'bg-white border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600'
-                                      }`}
-                                  >
-                                    Com Compras
-                                  </button>
-                                  <button
-                                    onClick={() => setFilterOnlyWithPurchases(false)}
-                                    className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1.5 rounded-lg border transition-all ${!filterOnlyWithPurchases
-                                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                                      : 'bg-white border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'
-                                      }`}
-                                  >
-                                    Todos
-                                  </button>
-                                </div>
-
-                                {isProductFilterActive && (
-                                  <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
-                                    <CheckCircle className="w-3 h-3" />
-                                    Exibindo onde foi vendido
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          }
-                        />
+                            }
+                          />
+                        </React.Suspense>
                       ) : activeView === 'table' ? (
                         <ClientList
                           clients={filteredClients}
@@ -2428,6 +2483,7 @@ const App: React.FC = () => {
                           currentUserName={currentUser?.name}
                           products={products}
                           productCategories={productCategories}
+                          isLoading={!isDataLoaded || isFiltering}
                           filterOnlyWithPurchases={filterOnlyWithPurchases}
                           setFilterOnlyWithPurchases={setFilterOnlyWithPurchases}
                           resetFilters={resetFilters}
@@ -2435,6 +2491,13 @@ const App: React.FC = () => {
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
                           onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
+
+                          searchTerm={searchQuery}
+                          onSearchChange={setSearchQuery}
+                          regionFilter={filterRegion}
+                          onRegionFilterChange={setFilterRegion}
+                          categoryFilter={filterCategory}
+                          onCategoryFilterChange={setFilterCategory}
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
