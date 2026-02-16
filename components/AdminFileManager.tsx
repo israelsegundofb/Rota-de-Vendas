@@ -450,34 +450,34 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
 
                                     {/* Actions */}
                                     <div className="flex items-center justify-end gap-2 sm:w-auto w-full border-t sm:border-t-0 border-outline-variant/30 pt-3 sm:pt-0 mt-1 sm:mt-0">
-                                        {file.status === 'processing' ? (
-                                            <span className="text-xs font-medium text-primary bg-primary-container px-3 py-1 rounded-full">
+                                        {file.status === 'processing' && (
+                                            <span className="text-xs font-medium text-primary bg-primary-container px-3 py-1 rounded-full mr-2">
                                                 Processando
                                             </span>
-                                        ) : (
-                                            <div className="flex items-center gap-1">
-                                                {file.status === 'error' && (
-                                                    <button
-                                                        onClick={() => {
-                                                            onDeleteFile(file.id);
-                                                        }}
-                                                        className="flex items-center gap-1.5 text-primary hover:bg-primary-container/30 px-3 py-2 rounded-lg transition-colors text-xs font-medium"
-                                                        title="Remover registro com erro para reenviar"
-                                                    >
-                                                        <RefreshCw className="w-3.5 h-3.5" />
-                                                        <span>Reenviar</span>
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => onDeleteFile(file.id)}
-                                                    className="flex items-center gap-2 text-on-surface-variant hover:text-error hover:bg-error-container/20 px-3 py-2 rounded-lg transition-colors text-xs font-medium"
-                                                    title="Excluir arquivo e dados associados"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                    <span className="sm:hidden">Excluir</span>
-                                                </button>
-                                            </div>
                                         )}
+
+                                        <div className="flex items-center gap-1">
+                                            {file.status === 'error' && (
+                                                <button
+                                                    onClick={() => {
+                                                        onDeleteFile(file.id);
+                                                    }}
+                                                    className="flex items-center gap-1.5 text-primary hover:bg-primary-container/30 px-3 py-2 rounded-lg transition-colors text-xs font-medium"
+                                                    title="Remover registro com erro para reenviar"
+                                                >
+                                                    <RefreshCw className="w-3.5 h-3.5" />
+                                                    <span>Reenviar</span>
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => onDeleteFile(file.id)}
+                                                className="flex items-center gap-2 text-on-surface-variant hover:text-error hover:bg-error-container/20 px-3 py-2 rounded-lg transition-colors text-xs font-medium"
+                                                title={file.status === 'processing' ? "Forçar exclusão (Processamento travado)" : "Excluir arquivo e dados associados"}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                <span className="sm:hidden">Excluir</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
