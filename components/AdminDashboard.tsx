@@ -1,15 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import {
-    LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend, BarChart, Bar
 } from 'recharts';
 import {
     TrendingUp, Users, Package, DollarSign,
     ArrowUpRight, ArrowDownRight, Globe, RefreshCcw, Activity,
-    Search, Filter, Shield, User as UserIcon, Briefcase, ShoppingBag, X, Calendar
+    Search, Filter, User as UserIcon, Briefcase, ShoppingBag, X, Calendar
 } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { REGIONS } from '../utils/constants';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface AdminDashboardProps {
     clients: EnrichedClient[];
@@ -109,35 +110,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         let totalRevenue = 0;
         let totalSalesCount = 0;
 
+        // DEBUG: Log initial clients count
+        console.log('[DASHBOARD] Calculating stats for', clients.length, 'clients');
+
         clients.forEach(client => {
-            // Filtrar as compras pelo range de data atual
+            // Filtrar as compras pelo range de data atual usando helper seguro
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
-                const pDate = p.purchaseDate || '';
-                if (startDate && pDate < startDate) return false;
-                if (endDate && pDate > endDate) return false;
-                return true;
+                return isDateInRange(p.purchaseDate, startDate, endDate);
             });
 
             const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
-            totalRevenue += clientTotal;
-            totalSalesCount += clientPurchases.length;
 
-            // Region
-            const region = client.region || 'Outras';
-            regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
+            if (clientTotal > 0) {
+                totalRevenue += clientTotal;
+                totalSalesCount += clientPurchases.length;
 
-            // Seller
-            const sellerObj = users.find(u => u.id === client.salespersonId);
-            const sellerName = sellerObj?.name || 'Não Atribuído';
-            if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
-            sellerSales[sellerName].revenue += clientTotal;
+                // Region
+                const region = client.region || 'Outras';
+                regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
+
+                // Seller
+                const sellerObj = users.find(u => u.id === client.salespersonId);
+                const sellerName = sellerObj?.name || 'Não Atribuído';
+                if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
+                sellerSales[sellerName].revenue += clientTotal;
+            }
 
             clientPurchases.forEach(p => {
                 const pVal = p.totalValue || (p.price * (p.quantity || 1));
+
                 // Product count and revenue
-                if (!productSales[p.sku]) productSales[p.sku] = { name: p.name, revenue: 0, count: 0 };
-                productSales[p.sku].revenue += pVal;
-                productSales[p.sku].count += (p.quantity || 1);
+                const sku = p.sku || 'UNKNOWN';
+                if (!productSales[sku]) productSales[sku] = { name: p.name || 'Produto Desconhecido', revenue: 0, count: 0 };
+                productSales[sku].revenue += pVal;
+                productSales[sku].count += (p.quantity || 1);
 
                 // Category
                 const cat = p.category || 'Outros';
@@ -145,11 +151,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 // Daily trend
                 if (p.purchaseDate) {
-                    const date = p.purchaseDate.split('T')[0];
-                    dailySales[date] = (dailySales[date] || 0) + pVal;
+                    let dateKey = p.purchaseDate.split('T')[0];
+                    // Handle DD/MM/YYYY for trend key
+                    if (p.purchaseDate.includes('/')) {
+                        const parts = p.purchaseDate.split('/');
+                        if (parts.length === 3) dateKey = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    }
+                    dailySales[dateKey] = (dailySales[dateKey] || 0) + pVal;
                 }
             });
         });
+
+        console.log('[DASHBOARD] Stats calculated:', { totalRevenue, totalSalesCount });
 
         return {
             totalRevenue,

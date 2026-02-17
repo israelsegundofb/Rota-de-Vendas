@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, User, Store, Phone, MapPin, Tag, Globe, Briefcase, FileText, Search, Loader2 } from 'lucide-react';
+import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { consultarCNPJ } from '../services/cnpjService';
 import { EnrichedClient, AppUser, UploadedFile } from '../types';
@@ -100,8 +100,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     state: fullData.uf || prev.state,
                     district: fullData.bairro || prev.district,
                     region: fullData.uf ? getRegionByUF(fullData.uf) : prev.region,
-                    lat: fullData.latitude || prev.lat,
-                    lng: fullData.longitude || prev.lng,
+                    lastname: prev.companyName, // Force update trigger
+                    lat: fullData.latitude || 0, // Reset to 0 if not found to force re-geocoding
+                    lng: fullData.longitude || 0, // Reset to 0 if not found to force re-geocoding
                     contact: fullData.ddd_telefone_1 || prev.contact,
                     mainCnae: fullData.cnae_fiscal || prev.mainCnae,
                     secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
@@ -135,6 +136,11 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             const updates: any = { [name]: value };
             if (name === 'state') {
                 updates.region = getRegionByUF(value);
+            }
+            // If address fields change, reset coordinates to force re-geocoding
+            if (['cleanAddress', 'city', 'state', 'zip', 'district', 'plusCode'].includes(name)) {
+                updates.lat = 0;
+                updates.lng = 0;
             }
             return { ...prev, ...updates };
         });

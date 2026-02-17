@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { RawClient, Product } from '../types';
-import { parseHyperlink, cleanAddress } from './csvParser';
+import { parseHyperlink } from './csvParser';
 
 // Helper to normalize headers (remove accents, lowercase)
 const normalizeHeader = (header: string): string => {
@@ -171,6 +171,7 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
     });
 };
 
+
 export const parseProductExcel = (file: File): Promise<Product[]> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -182,33 +183,121 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
 
+                // Convert to array of arrays to scan for headers
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+
+                if (rows.length === 0) {
+                    resolve([]);
+                    return;
+                }
+
+                // 1. Find Header Row (Scan first 20 rows)
+                let headerRowIndex = -1;
+                const PRODUCT_KEYWORDS = ['sku', 'codigo', 'referencia', 'produto', 'descricao', 'nome', 'preco', 'valor', 'cod.prod'];
+
+                for (let i = 0; i < Math.min(rows.length, 20); i++) {
+                    const rowValues = rows[i].map(val => normalizeHeader(String(val)));
+                    // Check if row has at least 2 consecutive product-related keywords or just "sku" + "name"
+                    const matchCount = rowValues.filter(h => PRODUCT_KEYWORDS.some(k => h.includes(k))).length;
+
+                    if (matchCount >= 2 || rowValues.includes('sku') || rowValues.includes('cod.prod')) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerRowIndex === -1) {
+                    console.warn('[Excel] Could not detect header row. assuming row 0.');
+                    headerRowIndex = 0;
+                }
+
+                const headers = rows[headerRowIndex].map(h => normalizeHeader(String(h)));
+                const dataRows = rows.slice(headerRowIndex + 1);
                 const products: Product[] = [];
-                // For products, sheet_to_json is usually sufficient as we don't heavily rely on hyperlinks
-                // But let's use it for simplicity unless we need specific cell metadata
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                jsonData.forEach((row: any) => {
-                    const normalizedRow: Record<string, any> = {};
-                    Object.keys(row).forEach(k => {
-                        normalizedRow[normalizeHeader(k)] = row[k];
-                    });
+                console.log(`[Excel Produtos] Header detected at row ${headerRowIndex}:`, headers);
 
-                    const category = normalizedRow['departamento'] || normalizedRow['categoria'] || 'Geral';
-                    const sku = String(normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['numero do sku'] || '');
-                    const name = normalizedRow['nome do produto'] || normalizedRow['descricao'] || normalizedRow['nome'] || normalizedRow['produto'] || '';
-                    const brand = normalizedRow['marca'] || normalizedRow['fabricante'] || 'Genérico';
-                    const price = parseMoney(normalizedRow['preco de venda'] || normalizedRow['preco'] || 0);
-                    const factoryCode = String(normalizedRow['cod.fabrica'] || normalizedRow['cod fabrica'] || normalizedRow['codigo fabrica'] || '');
-                    const margin = parsePercentage(normalizedRow['margem'] || 0);
-                    const discount = parsePercentage(normalizedRow['desconto'] || normalizedRow['discount'] || 0);
+                // Detailed finding logic similar to CSV parser
+                const skuKeys = ['cod.prod / sku', 'cod.prod/sku', 'codprod/sku', 'codprod / sku', 'cod.prod', 'codprod', 'cod prod', 'sku', 'codigo sku', 'numero do sku', 'codigo', 'codigo produto', 'cod produto', 'id', 'ref', 'referencia', 'cod', 'codigo do produto', 'item'];
+                const nameKeys = ['nome do produto', 'nome produto', 'descricao', 'descricao do produto', 'desc. produto', 'desc produto', 'nome', 'produto', 'descricao completa', 'desc', 'name', 'product'];
+                const brandKeys = ['marca', 'fabricante', 'brand', 'fornecedor'];
+                const priceKeys = ['preco de venda', 'preco venda', 'precovenda', 'preco', 'valor', 'valor venda', 'valor de venda', 'price', 'preco unitario', 'valor unitario', 'prc venda', 'prc.venda'];
+                const categoryKeys = ['departamento', 'categoria', 'grupo', 'familia', 'dept', 'depto', 'secao', 'class', 'classificacao'];
+                const factoryCodeKeys = ['cod.fabrica', 'cod fabrica', 'codigo fabrica', 'codfabrica', 'factory'];
 
+                dataRows.forEach((row, rowIndex) => {
+                    // Get values by column index
+                    const skuVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return skuKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const nameVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return nameKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const brandVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return brandKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const priceVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return priceKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const categoryVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return categoryKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const factoryCodeVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return factoryCodeKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const category = String(categoryVal || 'Geral');
+                    const sku = String(skuVal || '');
+                    const name = String(nameVal || '');
+                    const brand = String(brandVal || 'Genérico');
+
+                    const priceRaw = priceVal;
+                    const price = parseMoney(priceRaw);
+
+                    const factoryCode = String(factoryCodeVal || '');
+
+                    // Optional margin & discount
+                    const marginVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return (h.includes('margem') || h === 'margin') ? row[idx] : undefined;
+                    }, undefined);
+
+                    const discountVal = headers.reduce((found, h, idx) => {
+                        if (found) return found;
+                        return (h.includes('desconto') || h.includes('discount')) ? row[idx] : undefined;
+                    }, undefined);
+
+                    const margin = parsePercentage(marginVal || 0);
+                    const discount = parsePercentage(discountVal || 0);
+
+                    // Only add if it has at least SKU or Name (and ideally SKU is critical for us now)
                     if (sku || name) {
+                        // Fallback for name if missing but SKU exists
+                        const finalName = name || sku;
+                        // Fallback for SKU if missing (Critical: User should know, but we generate one to avoid overwriting all as "prod_")
+                        const finalSku = sku || `GEN-${Math.floor(Math.random() * 1000000)}`;
+
+                        if (!sku) {
+                            console.warn(`[Excel] Row ${rowIndex + headerRowIndex + 2} missing SKU. Generated: ${finalSku}`);
+                        }
+
                         products.push({
                             category,
-                            sku,
+                            sku: finalSku,
                             brand,
                             factoryCode,
-                            name,
+                            name: finalName,
                             price,
                             margin,
                             discount
@@ -216,6 +305,7 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
                     }
                 });
 
+                console.log(`[Excel Produtos] Parsed ${products.length} products.`);
                 resolve(products);
             } catch (error) {
                 console.error("Product Excel Parsing Error:", error);

@@ -1,7 +1,6 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const envDir = path.resolve(__dirname);
@@ -18,11 +17,28 @@ export default defineConfig(({ mode }) => {
   // Determine base path based on environment variable (set in GitHub Actions)
   const basePath = process.env.VITE_BASE_URL || '/Rota-de-Vendas/';
 
+
   return {
     base: basePath,
     envDir: envDir,
     server: {
       port: 3000,
+      host: true
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'maps-vendor': ['@vis.gl/react-google-maps', '@googlemaps/markerclusterer'],
+            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/database'],
+            'ui-vendor': ['lucide-react', 'framer-motion']
+          }
+        }
+      },
+      chunkSizeWarningLimit: 1000
     },
     plugins: [
       react(),

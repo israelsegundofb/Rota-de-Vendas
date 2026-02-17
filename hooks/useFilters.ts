@@ -129,15 +129,42 @@ export const useFilters = (
                     // Date Range Filter
                     const matchDate = (!startDate || !endDate) || c.purchasedProducts.some(p => {
                         if (!p.purchaseDate) return false;
-                        // Basic string comparison if dates are in ISO/YYYY-MM-DD or parseable
-                        // Assuming the date might be flexible, we'll try to normalize
-                        const pDate = new Date(p.purchaseDate);
-                        const sDate = new Date(startDate);
-                        const eDate = new Date(endDate);
-                        // Reset hours for date-only comparison
-                        sDate.setHours(0, 0, 0, 0);
-                        eDate.setHours(23, 59, 59, 999);
-                        return pDate >= sDate && pDate <= eDate;
+
+                        // Robust Date Parsing
+                        let pDate = new Date(p.purchaseDate);
+
+                        // Fallback for DD/MM/YYYY
+                        if (isNaN(pDate.getTime())) {
+                            const parts = p.purchaseDate.split('/');
+                            if (parts.length === 3) {
+                                pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                            } else {
+                                // Try DD-MM-YYYY
+                                const partsHyphen = p.purchaseDate.split('-');
+                                if (partsHyphen.length === 3) {
+                                    pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                                }
+                            }
+                        }
+
+                        if (isNaN(pDate.getTime())) return false; // Invalid date in data
+
+                        // Create Date objects for start/end, resetting time
+                        pDate.setHours(0, 0, 0, 0);
+
+                        if (startDate) {
+                            const sDate = new Date(startDate);
+                            sDate.setHours(0, 0, 0, 0);
+                            if (pDate < sDate) return false;
+                        }
+
+                        if (endDate) {
+                            const eDate = new Date(endDate);
+                            eDate.setHours(23, 59, 59, 999);
+                            if (pDate > eDate) return false;
+                        }
+
+                        return true;
                     });
 
                     matchProduct = hasCat && hasSku && hasMatch && matchDate;

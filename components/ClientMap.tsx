@@ -10,7 +10,7 @@ import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { EnrichedClient, AppUser } from '../types';
 import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2 } from 'lucide-react';
 
-declare var google: any;
+declare const google: any;
 
 interface ClientMapProps {
   clients: EnrichedClient[];
@@ -25,30 +25,38 @@ interface ClientMapProps {
 
 const MapBoundsUpdater: React.FC<{ clients: EnrichedClient[] }> = ({ clients }) => {
   const map = useMap();
-  const prevClientsLength = useRef(0);
+  // Create a stable hash of coordinates to detect position changes
+  const clientsHash = useMemo(() => {
+    return clients.map(c => `${c.id}:${c.lat},${c.lng}`).join('|');
+  }, [clients]);
 
   useEffect(() => {
     if (!map || !window.google || clients.length === 0) return;
-    const shouldUpdate = Math.abs(clients.length - prevClientsLength.current) > 0;
-    if (shouldUpdate) {
-      const bounds = new google.maps.LatLngBounds();
-      let hasValidCoords = false;
-      clients.forEach(client => {
-        if (client.lat && client.lng) {
-          bounds.extend({ lat: client.lat, lng: client.lng });
-          hasValidCoords = true;
-        }
-      });
-      if (hasValidCoords) {
-        map.fitBounds(bounds);
-        const listener = google.maps.event.addListenerOnce(map, "idle", () => {
-          if (map.getZoom()! > 16) map.setZoom(16);
-        });
-        prevClientsLength.current = clients.length;
-        return () => google.maps.event.removeListener(listener);
+
+    // Always update bounds if hash changes or initial load
+    const bounds = new google.maps.LatLngBounds();
+    let hasValidCoords = false;
+
+    clients.forEach(client => {
+      const lat = Number(client.lat);
+      const lng = Number(client.lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        bounds.extend({ lat, lng });
+        hasValidCoords = true;
       }
+    });
+
+    if (hasValidCoords) {
+      map.fitBounds(bounds);
+
+      // Optional: Prevent too much zoom on single point
+      const listener = google.maps.event.addListenerOnce(map, "idle", () => {
+        if (map.getZoom()! > 16) map.setZoom(16);
+      });
+      return () => google.maps.event.removeListener(listener);
     }
-  }, [map, clients]);
+  }, [map, clientsHash]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return null;
 };
 
@@ -257,7 +265,7 @@ const ClientMapContent: React.FC<{
   return <MapBoundsUpdater clients={clients} />;
 };
 
-const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, activeProductCategory, users, filterContent }) => {
+const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, users, filterContent }) => {
   const defaultCenter = { lat: -14.235, lng: -51.9253 };
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
