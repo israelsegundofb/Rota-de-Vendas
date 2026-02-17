@@ -8,7 +8,7 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare, Activity } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare, Activity, History } from 'lucide-react';
 import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
@@ -1635,6 +1635,7 @@ const App: React.FC = () => {
                   : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
                   }`}
               >
+                <History className={`w-5 h-5 ${activeView === 'history' ? 'fill-current' : ''}`} />
                 Histórico de Vendas
               </button>
 
