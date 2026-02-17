@@ -565,4 +565,4 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   );
 };
 
-export default ClientMap;
+export default React.memo(ClientMap);

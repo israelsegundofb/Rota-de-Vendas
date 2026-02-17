@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef } from 'react';
+import React, { useState, useEffect, forwardRef, useCallback } from 'react';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
@@ -83,6 +83,16 @@ const ClientList: React.FC<ClientListProps> = ({
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [clientForProductAssignment, setClientForProductAssignment] = useState<EnrichedClient | null>(null);
 
+  const openEditModal = useCallback((client: EnrichedClient) => {
+    setSelectedClient(client);
+    setIsEditModalOpen(true);
+  }, []);
+
+  const openProductAssignmentModal = useCallback((client: EnrichedClient) => {
+    setClientForProductAssignment(client);
+    setIsProductModalOpen(true);
+  }, []);
+
   // Proactively check loading state
   if (isLoading) {
     return <ClientListSkeleton />;
@@ -136,15 +146,7 @@ const ClientList: React.FC<ClientListProps> = ({
     document.body.removeChild(link);
   };
 
-  const openEditModal = (client: EnrichedClient) => {
-    setSelectedClient(client);
-    setIsEditModalOpen(true);
-  };
 
-  const openProductAssignmentModal = (client: EnrichedClient) => {
-    setClientForProductAssignment(client);
-    setIsProductModalOpen(true);
-  };
 
   const handleSaveProductAssignment = (clientId: string, products: Product[]) => {
     const clientToUpdate = clients.find(c => c.id === clientId);
@@ -247,7 +249,7 @@ const ClientList: React.FC<ClientListProps> = ({
             data={filteredClients}
             itemContent={(index, client) => (
               <ClientCard
-                client={client}
+                client={client} // Client object changes ref on update, so Card re-renders. This is correct.
                 onEdit={openEditModal}
                 onAssignProducts={openProductAssignmentModal}
               />
@@ -322,4 +324,5 @@ const ClientList: React.FC<ClientListProps> = ({
   );
 };
 
-export default ClientList;
+// Memoize the entire component to prevent re-renders from parent when props are stable
+export default React.memo(ClientList);
