@@ -136,3 +136,13 @@ export interface SystemLog {
     [key: string]: any;
   };
 }
+
+export interface ProcessingState {
+  isActive: boolean;
+  total: number;
+  current: number;
+  fileName: string;
+  ownerName: string;
+  status: 'reading' | 'processing' | 'completed' | 'error';
+  errorMessage?: string;
+}

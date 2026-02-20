@@ -7,18 +7,17 @@
   
   Developed with passion and technical excellence.
 */
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare, Activity, History } from 'lucide-react';
-import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileUp, ChevronRight, Loader2, Users as UsersIcon, Lock } from 'lucide-react';
+import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, ProcessingState } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
-import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
+import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
-import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
 const ClientMap = React.lazy(() => import('./components/ClientMap'));
 // Lazy Load Admin & Heavy Components
@@ -41,7 +40,10 @@ const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
 const ChatPanel = React.lazy(() => import('./components/ChatPanel'));
 
-import DateRangePicker from './components/DateRangePicker';
+import Sidebar from './components/Sidebar';
+import MobileHeader from './components/MobileHeader';
+import ProcessingToast from './components/ProcessingToast';
+import FilterBar from './components/FilterBar';
 import CookieConsent from './components/CookieConsent';
 import LoadingScreen from './components/LoadingScreen';
 import { getStoredFirebaseConfig } from './firebaseConfig';
@@ -55,16 +57,6 @@ import { usePageTracking } from './hooks/useAnalytics';
 import { useToast } from './contexts/ToastContext';
 
 // Initial Mock Data
-interface ProcessingState {
-
-  isActive: boolean;
-  total: number;
-  current: number;
-  fileName: string;
-  ownerName: string;
-  status: 'reading' | 'processing' | 'completed' | 'error';
-  errorMessage?: string;
-}
 
 const App: React.FC = () => {
   // --- Custom Hooks ---
@@ -1509,260 +1501,24 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* SIDEBAR */}
-        <aside
-          className={`
-          w-72 bg-surface-container-low text-on-surface shadow-elevation-2 z-30 
-          fixed md:relative h-full transition-transform duration-300 ease-in-out
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          flex flex-col border-r border-outline-variant/30
-        `}
-        >
-          <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between">
-            <h1 className="text-xl font-bold flex items-center gap-2 text-primary">
-              <LayoutDashboard className="w-6 h-6" />
-              Rota de Vendas
-            </h1>
-            <button
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="md:hidden text-on-surface-variant hover:text-primary"
-              title="Fechar menu lateral"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+        <Sidebar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          currentUser={currentUser}
+          activeView={activeView}
+          setActiveView={setActiveView}
+          handleViewNavigation={handleViewNavigation}
+          handleLogout={handleLogout}
+          users={users}
+          baseUpdateUser={baseUpdateUser}
+          totalUnread={totalUnread}
+          activeConversationId={activeConversationId}
+          handleChatMarkAsRead={handleChatMarkAsRead}
+          setIsCloudConfigOpen={setIsCloudConfigOpen}
+          setIsLogPanelOpen={setIsLogPanelOpen}
+        />
 
-          <div className="px-6 py-2">
-            <p className="text-xs font-medium text-on-surface-variant/80 uppercase tracking-wider">
-              {isAdminUser ? 'Painel Administrativo' : 'Portal do Vendedor'}
-            </p>
-          </div>
-
-          <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-            <div className="bg-surface-container-highest rounded-2xl p-4 mb-6 border border-outline-variant/30 shadow-sm relative overflow-hidden group">
-              <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110`}></div>
-              <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider mb-2 relative z-10">Logado como</p>
-              <div className="flex flex-col gap-3 relative z-10">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md overflow-hidden ${isAdminUser ? 'bg-tertiary' : 'bg-secondary'}`}>
-                      {currentUser.photoURL ? (
-                        <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{currentUser.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    {/* Status Indicator Badge */}
-                    <div className={`
-                      absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-surface-container-highest shadow-sm
-                      ${currentUser.status === 'Online' ? 'bg-green-500' : currentUser.status === 'Ocupado' ? 'bg-amber-500' : 'bg-slate-400'}
-                    `}></div>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm text-on-surface truncate">{currentUser.name}</p>
-                    <p className="text-xs text-on-surface-variant truncate opacity-80">{currentUser.email}</p>
-                  </div>
-                </div>
-
-                {/* Status Selector */}
-                <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/10">
-                  <select
-                    value={currentUser.status || 'Offline'}
-                    onChange={async (e) => {
-                      const newStatus = e.target.value as UserStatus;
-                      // Atualizar localmente primeiro para feedback instantâneo
-                      baseUpdateUser({ ...currentUser, status: newStatus });
-
-                      const { updateUserStatusInCloud } = await import('./services/firebaseService');
-                      await updateUserStatusInCloud(currentUser.id, newStatus, users);
-                    }}
-                    className={`
-                      text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded-full border transition-all cursor-pointer outline-none bg-surface/50
-                      ${currentUser.status === 'Online' ? 'border-green-200 text-green-700 hover:bg-green-50' :
-                        currentUser.status === 'Ocupado' ? 'border-amber-200 text-amber-700 hover:bg-amber-50' :
-                          'border-slate-200 text-slate-500 hover:bg-slate-50'}
-                    `}
-                  >
-                    <option value="Online">🟢 Online</option>
-                    <option value="Ocupado">🟡 Ocupado</option>
-                    <option value="Offline">⚪ Offline</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <nav className="space-y-1 mb-8">
-              <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Visualização</p>
-              <button
-                onClick={() => { setActiveView('map'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'map'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <MapIcon className={`w-5 h-5 ${activeView === 'map' ? 'fill-current' : ''}`} />
-                Mapa da Carteira
-              </button>
-
-              {isAdminUser && (
-                <button
-                  onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
-                  Dashboard Admin
-                </button>
-              )}
-
-              <button
-                onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
-                Listagem de Dados
-              </button>
-
-              <button
-                onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <History className={`w-5 h-5 ${activeView === 'history' ? 'fill-current' : ''}`} />
-                Histórico de Vendas
-              </button>
-
-              <button
-                onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
-                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
-                  Mensagens Internas
-                </div>
-                {totalUnread > 0 && activeView !== 'chat' && (
-                  <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
-                    {totalUnread}
-                  </div>
-                )}
-              </button>
-            </nav>
-
-            {isAdminUser && (
-              <nav className="space-y-1 mb-8">
-                <p className="px-3 text-xs font-bold text-on-surface-variant/60 uppercase mb-3 tracking-wider">Administração</p>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_users'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_users'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <UsersIcon className={`w-5 h-5 ${activeView === 'admin_users' ? 'fill-current' : ''}`} />
-                  Gerenciar Usuários
-                </button>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_categories'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_categories'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <Layers className={`w-5 h-5 ${activeView === 'admin_categories' ? 'fill-current' : ''}`} />
-                  Categorias
-                </button>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_products'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_products'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <Package className={`w-5 h-5 ${activeView === 'admin_products' ? 'fill-current' : ''}`} />
-                  Produtos
-                </button>
-
-                <button
-                  onClick={() => { handleViewNavigation('admin_files'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'admin_files'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <FileUp className={`w-5 h-5 ${activeView === 'admin_files' ? 'fill-current' : ''}`} />
-                  Arquivos
-                </button>
-
-                {currentUser?.role === 'admin_dev' && (
-                  <button
-                    onClick={() => { setIsCloudConfigOpen(true); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 text-on-surface-variant hover:bg-surface-container-highest active:scale-95`}
-                  >
-                    <Cloud className="w-5 h-5" />
-                    Backup & Cloud
-                  </button>
-                )}
-                {currentUser?.role === 'admin_dev' && (
-                  <button
-                    onClick={() => {
-                      setIsLogPanelOpen(true);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all hover:bg-slate-100 group"
-                    title="🖥️ Logs e Auditoria do Sistema"
-                  >
-                    <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      <Activity className="w-5 h-5" />
-                    </div>
-                    <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Logs do Sistema</span>
-                  </button>
-                )}
-              </nav>
-            )}
-          </div>
-
-          <div className="p-4 border-t border-outline-variant/30 bg-surface-container-low">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-error bg-error-container hover:bg-error-container/80 rounded-full transition-colors shadow-sm"
-              title="Encerrar sessão e sair do sistema"
-            >
-              <LogOut className="w-4 h-4 box-content" /> Sair do Sistema
-            </button>
-
-            <div className="text-center mt-4">
-              <p className="text-[10px] text-on-surface-variant opacity-60">Versão 3.5.0 V5.3.4 (Cancel Resilience)</p>
-            </div>
-          </div>
-        </aside>
-
-        {/* TOP BAR FOR MOBILE */}
-        <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-surface-container-low shadow-sm z-10 flex items-center justify-between px-4 border-b border-outline-variant/30">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2 text-on-surface hover:bg-surface-container-highest rounded-full transition-colors"
-            title="Abrir menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <span className="font-bold text-lg text-primary flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5" /> Rota de Vendas
-          </span>
-          <div className="w-10"></div> {/* Spacer for center alignment */}
-        </header>
+        <MobileHeader setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
 
         {/* MAIN CONTENT AREA */}
@@ -1980,280 +1736,57 @@ const App: React.FC = () => {
               </React.Suspense>
             ) : (
               <>
-                <div className="bg-gray-100 px-3 py-2.5 border-b border-gray-200 flex flex-col gap-2">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <div className="flex items-center gap-1.5 text-gray-600">
-                      <Filter className="w-4 h-4" />
-                      <span className="text-xs font-bold hidden md:inline">Filtros:</span>
-                    </div>
+                <FilterBar
+                  currentUser={currentUser}
+                  isAdminUser={isAdminUser}
+                  canViewAllData={canViewAllData}
+                  users={users}
+                  filteredClientsCount={filteredClients.length}
 
-                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors ${canViewAllData ? 'bg-purple-50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${canViewAllData ? 'text-purple-600' : 'text-gray-500'}`}
-                        title={isAdminUser ? "Perfil Administrador" : (canViewAllData ? "Perfil Gestor" : "Perfil Vendedor")}
-                      >
-                        {canViewAllData ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                        {isAdminUser ? 'Admin' : (canViewAllData ? 'Gestão' : 'Vendedor')}
-                      </span>
+                  filterSalespersonId={filterSalespersonId}
+                  setFilterSalespersonId={setFilterSalespersonId}
+                  filterSalesCategory={filterSalesCategory}
+                  setFilterSalesCategory={setFilterSalesCategory}
 
-                      <div className="relative">
-                        <UserIcon className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${canViewAllData ? 'text-purple-400' : 'text-gray-400'}`} />
-                        <select
-                          value={canViewAllData ? filterSalespersonId : currentUser?.id || ''}
-                          onChange={(e) => canViewAllData && setFilterSalespersonId(e.target.value)}
-                          disabled={!canViewAllData}
-                          className={`text-xs rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium appearance-none ${canViewAllData ? 'border-purple-300 bg-white text-purple-900 cursor-pointer' : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'}`}
-                          title={!canViewAllData ? "Visualização restrita aos seus clientes" : "Filtrar por vendedor"}
-                        >
-                          {canViewAllData && <option value="Todos">Todos Vendedores</option>}
-                          {/* Show all salespersons for Admin/Managers to choose. For User, show THEMSELVES even if not in 'users' list yet (fallback) */}
-                          {canViewAllData
-                            ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
-                              <option key={u.id} value={u.id}>{u.name}</option>
-                            ))
-                            : <option value={currentUser?.id}>{currentUser?.name}</option>
-                          }
-                        </select>
-                      </div>
+                  filterRegion={filterRegion}
+                  setFilterRegion={setFilterRegion}
+                  filterState={filterState}
+                  setFilterState={setFilterState}
+                  filterCity={filterCity}
+                  setFilterCity={setFilterCity}
 
-                      {canViewAllData && (
-                        <div className="relative animate-fade-in">
-                          <Briefcase className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-400 pointer-events-none" />
-                          <select
-                            value={filterSalesCategory}
-                            onChange={(e) => setFilterSalesCategory(e.target.value)}
-                            className="text-xs border-purple-300 bg-white text-purple-900 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 pl-7 pr-2 py-1 font-medium"
-                            title="Filtrar por equipe de vendas"
-                          >
-                            <option value="Todos">Todas Equipes</option>
-                            <option value="Externo">Externo</option>
-                            <option value="Interno">Interno</option>
-                            <option value="Mercado Livre">Mercado Livre</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
+                  filterCategory={filterCategory}
+                  setFilterCategory={setFilterCategory}
+                  filterCnae={filterCnae}
+                  setFilterCnae={setFilterCnae}
 
-                    <select
-                      value={filterRegion}
-                      onChange={(e) => { setFilterRegion(e.target.value); setFilterState('Todos'); setFilterCity('Todas'); }}
-                      className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
-                      title="Filtrar por região geográfica"
-                    >
-                      <option value="Todas">Todas Regiões</option>
-                      {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                  startDate={startDate}
+                  setStartDate={setStartDate}
+                  endDate={endDate}
+                  setEndDate={setEndDate}
 
-                    <select
-                      value={filterState}
-                      onChange={(e) => { setFilterState(e.target.value); setFilterCity('Todas'); }}
-                      className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5"
-                      disabled={availableStates.length === 0}
-                      title="Filtrar por estado (UF)"
-                    >
-                      <option value="Todos">Todos Estados {filterRegion !== 'Todas' ? `(${filterRegion})` : ''}</option>
-                      {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                  filterProductCategory={filterProductCategory}
+                  setFilterProductCategory={setFilterProductCategory}
+                  filterProductSku={filterProductSku}
+                  setFilterProductSku={setFilterProductSku}
+                  searchProductQuery={searchProductQuery}
+                  setSearchProductQuery={setSearchProductQuery}
+                  showProductSuggestions={showProductSuggestions}
+                  setShowProductSuggestions={setShowProductSuggestions}
 
-                    <select
-                      value={filterCity}
-                      onChange={(e) => setFilterCity(e.target.value)}
-                      className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1.5 min-w-[100px]"
-                      disabled={filterState === 'Todos' || availableCities.length === 0}
-                      title="Filtrar por cidade"
-                    >
-                      <option value="Todas">Todas Cidades</option>
-                      {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                  filterOnlyWithPurchases={filterOnlyWithPurchases}
+                  setFilterOnlyWithPurchases={setFilterOnlyWithPurchases}
 
-                    <div className="flex items-center gap-1 relative">
-                      <ShoppingBag className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
-                      <select
-                        value={filterCategory}
-                        onChange={(e) => setFilterCategory(e.target.value)}
-                        className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5"
-                        title="Filtrar por categoria de cliente"
-                      >
-                        <option value="Todos">Todas Cat. Clientes</option>
-                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
+                  products={products}
+                  productCategories={productCategories}
+                  categories={categories}
+                  availableStates={availableStates}
+                  availableCities={availableCities}
+                  availableCnaes={availableCnaes}
 
-                    <div className="flex items-center gap-1 relative">
-                      <Briefcase className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
-                      <select
-                        value={filterCnae}
-                        onChange={(e) => setFilterCnae(e.target.value)}
-                        className="text-xs border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 pl-7 pr-2 py-1.5 max-w-[200px]"
-                        title="Filtrar por CNAE (Atividade Econômica)"
-                      >
-                        <option value="Todos">Todos CNAEs</option>
-                        {availableCnaes.map(c => (
-                          <option key={c} value={c}>{c.length > 40 ? c.substring(0, 40) + '...' : c}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <DateRangePicker
-                      startDate={startDate}
-                      endDate={endDate}
-                      onRangeChange={(start, end) => {
-                        setStartDate(start);
-                        setEndDate(end);
-                      }}
-                      label="Período"
-                    />
-                  </div>
-
-                  {/* Secondary Filters Row: Products */}
-                  <div className="flex flex-wrap gap-2 items-center bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm">
-                    <div className="flex items-center gap-2 px-2 text-sm font-semibold text-green-700">
-                      <Package className="w-4 h-4" />
-                      Vendas:
-                    </div>
-
-                    <select
-                      value={filterProductCategory}
-                      onChange={e => setFilterProductCategory(e.target.value)}
-                      className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                      title="Filtrar por marca ou categoria de produto"
-                    >
-                      <option value="Todos">Todas Marcas / Categorias</option>
-                      {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-
-                    <div className="relative animate-fade-in">
-                      <ShoppingBag className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none ${filterProductSku !== 'Todos' ? 'text-green-600' : 'text-gray-400'}`} />
-                      <select
-                        value={filterProductSku}
-                        onChange={e => setFilterProductSku(e.target.value)}
-                        className={`text-xs rounded-lg pl-7 pr-2 py-1.5 border appearance-none transition-colors max-w-[180px] truncate ${filterProductSku !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                        title="Filtrar por produto específico"
-                      >
-                        <option value="Todos">Todos Produtos</option>
-                        {products
-                          .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                          .map(p => (
-                            <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
-                          ))
-                        }
-                      </select>
-                    </div>
-
-                    <div className="relative group/search">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
-                      <input
-                        type="text"
-                        value={searchProductQuery}
-                        onChange={e => {
-                          setSearchProductQuery(e.target.value);
-                          setShowProductSuggestions(true);
-                        }}
-                        onFocus={() => setShowProductSuggestions(true)}
-                        placeholder="SKU, Marca, Código ou Descrição..."
-                        className={`pl-7 pr-3 py-1.5 text-xs border rounded-lg focus:ring-green-500 focus:border-green-500 outline-none w-56 transition-colors ${searchProductQuery ? 'bg-green-50 border-green-300' : 'border-gray-300'}`}
-                        title="Buscar produtos por SKU, Marca, Código ou Descrição"
-                      />
-
-                      {/* Autocomplete Dropdown */}
-                      {showProductSuggestions && searchProductQuery.length >= 2 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
-                          {(() => {
-                            const suggestions = products
-                              .filter(p => {
-                                const term = searchProductQuery.toLowerCase();
-                                return (p.name || '').toLowerCase().includes(term) ||
-                                  (p.sku || '').toLowerCase().includes(term) ||
-                                  (p.brand || '').toLowerCase().includes(term);
-                              })
-                              .slice(0, 8);
-
-                            if (suggestions.length === 0) {
-                              return (
-                                <div className="p-3 text-xs text-gray-500 italic flex items-center gap-2">
-                                  <AlertCircle className="w-3 h-3 text-gray-400" />
-                                  Não Foi Encontrado
-                                </div>
-                              );
-                            }
-
-                            return suggestions.map(p => (
-                              <button
-                                key={p.sku}
-                                onClick={() => {
-                                  setSearchProductQuery(p.sku);
-                                  setShowProductSuggestions(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 flex flex-col border-b border-gray-50 last:border-0"
-                              >
-                                <span className="font-bold text-gray-800">{p.name}</span>
-                                <span className="text-[10px] text-gray-500 uppercase">{p.sku} • {p.brand}</span>
-                              </button>
-                            ));
-                          })()}
-                        </div>
-                      )}
-
-                      {/* Explicit "Not Found" message if list is empty and no suggestions */}
-                      {!showProductSuggestions && searchProductQuery && filteredClients.length === 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 animate-fade-in bg-rose-50 px-2 py-1 rounded border border-rose-100 italic">
-                          <AlertCircle className="w-3 h-3" />
-                          Não Foi Encontrado
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setFilterOnlyWithPurchases(true)}
-                        className={`text-[10px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-lg border transition-all ${filterOnlyWithPurchases
-                          ? 'bg-green-600 border-green-600 text-white shadow-sm'
-                          : 'bg-white border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700'
-                          }`}
-                      >
-                        Somente com Compras
-                      </button>
-                      <button
-                        onClick={() => setFilterOnlyWithPurchases(false)}
-                        className={`text-[10px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-lg border transition-all ${!filterOnlyWithPurchases
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                          : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-700'
-                          }`}
-                      >
-                        Mostrar Todos
-                      </button>
-
-                      {isAdminUser && (
-                        <button
-                          onClick={handleMassUpdateClients}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all text-[10px] font-bold uppercase tracking-wider ml-2"
-                          title="Enriquecer toda a base com dados da Receita Federal via CNPJa Comercial"
-                        >
-                          <Database className="w-3 h-3" /> Atualizar Base (CNPJa)
-                        </button>
-                      )}
-                    </div>
-
-                    {isProductFilterActive && (
-                      <span className="ml-auto text-xs font-medium text-green-600 animate-pulse flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        Exibindo onde foi vendido
-                      </span>
-                    )}
-                    {!isProductFilterActive && (
-                      <span className="ml-auto text-xs text-gray-400">
-                        {products.length === 0 ? "Nenhum produto cadastrado no admin." : `${products.length} produtos no catálogo.`}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex justify-end">
-                    <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">
-                      {filteredClients.length} resultados encontrados
-                    </span>
-                  </div>
-                </div>
+                  isProductFilterActive={isProductFilterActive}
+                  handleMassUpdateClients={handleMassUpdateClients}
+                />
 
                 <div className="flex-1 overflow-hidden p-1.5 bg-gray-100">
 
@@ -2559,70 +2092,11 @@ const App: React.FC = () => {
           )}
 
           {/* --- TOAST NOTIFICATION FOR BACKGROUND PROCESSING --- */}
-          {procState.isActive && (
-            <div className="absolute bottom-6 right-6 z-50 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden animate-slide-up">
-              <div className={`h-1.5 w-full ${procState.status === 'error' ? 'bg-red-200' : 'bg-blue-100'}`}>
-                <div
-                  className={`h-full transition-all duration-300 ${procState.status === 'completed' ? 'bg-green-500 w-full' :
-                    procState.status === 'error' ? 'bg-red-500 w-full' :
-                      'bg-blue-600'
-                    }`}
-                  style={{ width: procState.total > 0 ? `${(procState.current / procState.total) * 100}%` : '0%' }}
-                />
-              </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                      {procState.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-                      {procState.status === 'processing' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                      {procState.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
-
-                      {procState.status === 'reading' ? 'Lendo Arquivo...' :
-                        procState.status === 'processing' ? 'Processando Planilha' :
-                          procState.status === 'completed' ? 'Processamento Concluído' :
-                            'Erro no Processamento'}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {procState.fileName} <span className="mx-1">•</span> {procState.ownerName}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (procState.isActive && procState.status === 'processing') {
-                        if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
-                          isUploadCancelled.current = true;
-                          setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
-                        }
-                      } else {
-                        setProcState(prev => ({ ...prev, isActive: false }));
-                      }
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                    title="Fechar Notificação"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {procState.status === 'processing' && (
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Progresso (IA + Maps)</span>
-                      <span className="font-mono">{procState.current} / {procState.total}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400">Você pode continuar usando o sistema.</p>
-                  </div>
-                )}
-
-                {procState.status === 'error' && (
-                  <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
-                    {procState.errorMessage}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          <ProcessingToast
+            procState={procState}
+            setProcState={setProcState}
+            onCancel={() => { isUploadCancelled.current = true; }}
+          />
         </main>
       </div>
 
