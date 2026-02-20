@@ -72,11 +72,13 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
             }
         });
 
-        setConversations(Array.from(convMap.values()).sort((a, b) => {
-            const timeA = a.lastMessage?.timestamp || '';
-            const timeB = b.lastMessage?.timestamp || '';
-            return timeB.localeCompare(timeA);
-        }));
+        setTimeout(() => {
+            setConversations(Array.from(convMap.values()).sort((a, b) => {
+                const timeA = a.lastMessage?.timestamp || '';
+                const timeB = b.lastMessage?.timestamp || '';
+                return timeB.localeCompare(timeA);
+            }));
+        }, 0);
     }, [messages, currentUser, allUsers]);
 
     const sendMessage = useCallback(async (receiverId: string, text: string) => {

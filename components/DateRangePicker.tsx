@@ -72,7 +72,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
         endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
 
         const days = [];
-        let current = new Date(startDate);
+        const current = new Date(startDate);
 
         while (current <= endDate) {
             days.push(new Date(current));
