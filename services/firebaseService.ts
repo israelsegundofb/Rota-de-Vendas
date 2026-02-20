@@ -51,7 +51,7 @@ export const sendMessageToCloud = async (message: Omit<ChatMessage, 'id'>) => {
 };
 
 export const subscribeToMessages = (callback: (messages: ChatMessage[]) => void) => {
-    if (!db) return () => { };
+    if (!db) return () => { /* no-op */ };
     const chatRef = collection(db, 'chats');
     const q = query(chatRef, orderBy('timestamp', 'asc'));
 
@@ -121,13 +121,13 @@ export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
                 body: JSON.stringify(log)
             }).catch(err => console.warn('[BACKEND LOG] Servidor inacessível, log salvo apenas no Firebase.'));
         } catch (e) {
-            console.error('Logging failed:', e);
+            // Silently fail if backend is unreachable
         }
     }
 };
 
 export const subscribeToSystemLogs = (callback: (logs: SystemLog[]) => void) => {
-    if (!db) return () => { };
+    if (!db) return () => { /* no-op */ };
     const logRef = collection(db, 'system_logs');
     const q = query(logRef, orderBy('timestamp', 'desc'));
 
