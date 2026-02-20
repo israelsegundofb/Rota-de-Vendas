@@ -138,7 +138,7 @@ const normalizeHeader = (header: any): string => {
 export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purchases' => {
   const normalizedHeaders = headers.map(h => normalizeHeader(h));
 
-  const purchaseScore = normalizedHeaders.filter(h => PURCHASE_KEYWORDS.some(k => h.includes(k))).length;
+  let purchaseScore = normalizedHeaders.filter(h => PURCHASE_KEYWORDS.some(k => h.includes(k))).length;
   const clientScore = normalizedHeaders.filter(h => CLIENT_KEYWORDS.some(k => h.includes(k))).length;
   const productScore = normalizedHeaders.filter(h => PRODUCT_KEYWORDS.some(k => h.includes(k))).length;
 
