@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChatMessage, ChatConversation, AppUser } from '../types';
 import { sendMessageToCloud, subscribeToMessages, markMessageAsReadInCloud, deleteMessageFromCloud, clearAllMessagesFromCloud } from '../services/firebaseService';
 import { logActivityToCloud } from '../services/firebaseService';
 
 export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [conversations, setConversations] = useState<ChatConversation[]>([]);
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
     // Load messages from Firebase (Firestore)
@@ -28,8 +27,8 @@ export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
     }, [currentUser]);
 
     // Update conversations list based on messages
-    useEffect(() => {
-        if (!currentUser) return;
+    const conversations = useMemo(() => {
+        if (!currentUser) return [];
 
         const convMap = new Map<string, ChatConversation>();
         const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';

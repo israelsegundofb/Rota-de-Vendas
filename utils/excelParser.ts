@@ -102,7 +102,11 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     const addressInput = rowData['endereco'] || rowData['endereco comercial'] || rowData['logradouro'] || rowData['localizacao'] ||
                         rowData['endereco completo'] || rowData['rua'] || rowData['end'] || '';
 
-                    let { address, link, lat, lng } = parseHyperlink(addressInput);
+                    const parsed = parseHyperlink(addressInput);
+                    const address = parsed.address;
+                    const link = parsed.link;
+                    let lat = parsed.lat;
+                    let lng = parsed.lng;
 
                     // Prioritize the extracted Excel Hyperlink if available (from cell.l.Target)
                     let finalLink = addressLink || link;
