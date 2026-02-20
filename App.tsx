@@ -504,11 +504,11 @@ const App: React.FC = () => {
 
         let updatedCount = 0;
         const newList = [...masterClientList];
+        const limit = pLimit(5);
 
-        for (let i = 0; i < clientsMissingPlusCode.length; i++) {
-          if (isUploadCancelled.current) break;
+        const tasks = clientsMissingPlusCode.map((client) => limit(async () => {
+          if (isUploadCancelled.current) return;
 
-          const client = clientsMissingPlusCode[i];
           try {
             const plusCode = await reverseGeocodePlusCode(client.lat, client.lng, googleMapsApiKey || '');
             if (plusCode) {
@@ -520,10 +520,12 @@ const App: React.FC = () => {
             }
           } catch (e) {
             console.error(`Error generating Plus Code for ${client.companyName}:`, e);
+          } finally {
+            setProcState(prev => ({ ...prev, current: prev.current + 1 }));
           }
+        }));
 
-          setProcState(prev => ({ ...prev, current: i + 1 }));
-        }
+        await Promise.all(tasks);
 
         setMasterClientList(newList);
         setProcState(prev => ({ ...prev, status: 'completed', isActive: true }));
@@ -549,6 +551,7 @@ const App: React.FC = () => {
     // We can use a ref for masterClientList to read current value without re-binding.
 
     setMasterClientList(prevList => {
+      /*
       const original = prevList.find(c => c.id === updatedClient.id);
       const finalClient = { ...updatedClient };
 
@@ -557,6 +560,7 @@ const App: React.FC = () => {
       const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
       const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
       const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+      */
 
       // NOTE: We cannot easily doing ASYNC work inside a synchronous setState reducer.
       // So we must keep the async logic OUTSIDE. 

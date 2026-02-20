@@ -19,7 +19,7 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
     onClearDatabase,
     isFirebaseConnected = false
 }) => {
-    const [formData, setFormData] = useState<FirebaseConfig>({
+    const [formData, setFormData] = useState<FirebaseConfig>(() => getStoredFirebaseConfig() || {
         apiKey: '',
         authDomain: '',
         projectId: '',

@@ -68,8 +68,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
     let currentUsers = users;
 
-    console.warn(`[AUTH] Login Attempt: User="${username}" | List Size: ${currentUsers?.length || 0}`);
-
     if (!currentUsers || currentUsers.length === 0) {
       console.warn('[AUTH] Prop users is empty, loading INITIAL_USERS as fallback');
       const { INITIAL_USERS } = await import('../hooks/useAuth');
@@ -83,19 +81,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
       const storedPass = (user.password || '').trim();
       const inputPass = pass.trim();
 
-      console.warn(`[AUTH] User found: ${user.username}. Checking password...`);
-
       if (storedPass === inputPass) {
         console.warn('[AUTH] Login successful ✅');
         onLogin(user);
       } else {
-        console.error(`[AUTH] Senha INCORRETA. Digitada: "${inputPass}" | Esperada: (oculta)`);
         setError('❌ Credenciais inválidas. Verifique usuário e senha.');
       }
     } else {
-      console.error(`[AUTH] Usuário "${username}" NÃO encontrado.`);
-      console.warn('[AUTH] Lista de usuários disponíveis:', currentUsers.map(u => u.username).join(', '));
-
       // Fallback de emergência para Admin hardcoded se tudo falhar
       if (username.toLowerCase() === 'admin' && pass === '123') {
         const { INITIAL_USERS } = await import('../hooks/useAuth');
