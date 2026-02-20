@@ -19,7 +19,7 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
     onClearDatabase,
     isFirebaseConnected = false
 }) => {
-    const [formData, setFormData] = useState<FirebaseConfig>({
+    const [formData, setFormData] = useState<FirebaseConfig>(() => getStoredFirebaseConfig() || {
         apiKey: '',
         authDomain: '',
         projectId: '',
@@ -27,19 +27,10 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
         messagingSenderId: '',
         appId: ''
     });
-    const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-    const [message, setMessage] = useState('');
+    const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>(() => getStoredFirebaseConfig() ? 'success' : 'idle');
+    const [message, setMessage] = useState(() => getStoredFirebaseConfig() ? 'Configuração salva encontrada.' : '');
 
-    useEffect(() => {
-        if (isOpen) {
-            const stored = getStoredFirebaseConfig();
-            if (stored) {
-                setFormData(stored);
-                setStatus('success'); // Assume if stored, it was valid, or let user re-test
-                setMessage('Configuração salva encontrada.');
-            }
-        }
-    }, [isOpen]);
+    // removed redundant useEffect
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });

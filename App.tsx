@@ -7,11 +7,11 @@
   
   Developed with passion and technical excellence.
 */
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Key, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Download, Briefcase, User as UserIcon, Trash2, Database, Upload, Settings, Menu, Save, Cloud, Calendar, MessageSquare, Activity, History } from 'lucide-react';
-import { RawClient, EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History } from 'lucide-react';
+import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
-import { CATEGORIES, REGIONS, getRegionByUF } from './utils/constants';
+import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
@@ -556,7 +556,7 @@ const App: React.FC = () => {
 
     setMasterClientList(prevList => {
       const original = prevList.find(c => c.id === updatedClient.id);
-      let finalClient = { ...updatedClient };
+      const finalClient = { ...updatedClient };
 
       const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
       const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
@@ -586,7 +586,7 @@ const App: React.FC = () => {
     // It's better than no hook.
 
     const original = masterClientList.find(c => c.id === updatedClient.id);
-    let finalClient = { ...updatedClient };
+    const finalClient = { ...updatedClient };
 
     const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
@@ -647,7 +647,7 @@ const App: React.FC = () => {
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
-    let finalClient: EnrichedClient = {
+    const finalClient: EnrichedClient = {
       ...newClient,
       id: (newClient as any).id || crypto.randomUUID(),
       lat: newClient.lat || 0,
@@ -1276,7 +1276,7 @@ const App: React.FC = () => {
 
           if (firstRec.cnpj) {
             clientIdx = newList.findIndex(c => {
-              const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-\/]/g, "");
+              const cleanSystemCnpj = (c.cnpj || '').replace(new RegExp("[.\\-/]", "g"), "");
               return cleanSystemCnpj === firstRec.cnpj;
             });
           }

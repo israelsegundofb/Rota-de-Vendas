@@ -275,7 +275,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   useEffect(() => {
-    if (apiKey) setAuthError(false);
+    // Note: State resets on mount because parent uses key={apiKey} to force remount on change
     (window as any).gm_authFailure = () => {
       console.error("Google Maps Auth Failure detected via gm_authFailure.");
       setAuthError(true);

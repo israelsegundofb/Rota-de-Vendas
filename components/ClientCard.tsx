@@ -2,8 +2,6 @@ import React from 'react';
 import { MapPin, Store, Briefcase, ShoppingBag, ExternalLink, Edit2, Phone, Calendar } from 'lucide-react';
 import { EnrichedClient } from '../types';
 
-import { motion } from 'framer-motion';
-
 interface ClientCardProps {
     client: EnrichedClient;
     onEdit: (client: EnrichedClient) => void;
@@ -29,17 +27,14 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onEdit, onAssignProduct
     const hasPurchases = client.purchasedProducts && client.purchasedProducts.length > 0;
     const regionClass = getRegionColor(client.region);
 
+    // Optimization: Replaced framer-motion with pure CSS animations to improve list rendering performance
     return (
-        <motion.div
+        <div
             style={style}
-            className="p-2 h-full"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            className="p-2 h-full animate-fade-in-up"
         >
-            <motion.div
-                className="h-full bg-white border border-gray-200 rounded-xl hover:shadow-lg transition-shadow duration-200 group relative flex flex-col overflow-hidden"
-                whileHover={{ scale: 1.01, transition: { duration: 0.2 } }}
+            <div
+                className="h-full bg-white border border-gray-200 rounded-xl hover:shadow-lg transition-shadow duration-200 group relative flex flex-col overflow-hidden transform transition-all hover:scale-[1.01]"
             >
 
                 {/* Header / Banner */}
@@ -132,8 +127,8 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onEdit, onAssignProduct
                         <Edit2 className="w-3.5 h-3.5" /> Editar
                     </button>
                 </div>
-            </motion.div>
-        </motion.div>
+            </div>
+        </div>
     );
 };
 
