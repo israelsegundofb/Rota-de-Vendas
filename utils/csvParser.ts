@@ -424,7 +424,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
           if (companyName && (sku || productName)) {
             records.push({
               companyName: String(companyName).trim(),
-              cnpj: String(cnpj).trim().replace(new RegExp("[.\\-/]", "g"), ""),
+              cnpj: String(cnpj).trim().replace(/[./-]/g, ""),
               sku: String(sku).trim(),
               name: String(productName).trim(), // Match Product interface
               brand: normalizedRow['marca'] || 'N/A',

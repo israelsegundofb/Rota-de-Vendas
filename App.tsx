@@ -16,7 +16,7 @@ import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } fro
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -161,7 +161,7 @@ const App: React.FC = () => {
       };
       setOnline();
     }
-  }, [currentUser?.id]); // Only run when user changes or logs in
+  }, [currentUser, baseUpdateUser, users]); // Added missing dependencies
 
   useEffect(() => {
     const handleUnload = () => {
@@ -174,7 +174,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [currentUser, users]);
   // isFirebaseConnected handled by hook
-  const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
+  const [selectedClient] = useState<EnrichedClient | undefined>(undefined);
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
   const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
@@ -510,11 +510,11 @@ const App: React.FC = () => {
 
         let updatedCount = 0;
         const newList = [...masterClientList];
+        const limit = pLimit(5);
 
-        for (let i = 0; i < clientsMissingPlusCode.length; i++) {
-          if (isUploadCancelled.current) break;
+        const tasks = clientsMissingPlusCode.map((client) => limit(async () => {
+          if (isUploadCancelled.current) return;
 
-          const client = clientsMissingPlusCode[i];
           try {
             const plusCode = await reverseGeocodePlusCode(client.lat, client.lng, googleMapsApiKey || '');
             if (plusCode) {
@@ -526,10 +526,12 @@ const App: React.FC = () => {
             }
           } catch (e) {
             console.error(`Error generating Plus Code for ${client.companyName}:`, e);
+          } finally {
+            setProcState(prev => ({ ...prev, current: prev.current + 1 }));
           }
+        }));
 
-          setProcState(prev => ({ ...prev, current: i + 1 }));
-        }
+        await Promise.all(tasks);
 
         setMasterClientList(newList);
         setProcState(prev => ({ ...prev, status: 'completed', isActive: true }));
@@ -555,6 +557,7 @@ const App: React.FC = () => {
     // We can use a ref for masterClientList to read current value without re-binding.
 
     setMasterClientList(prevList => {
+      /*
       const original = prevList.find(c => c.id === updatedClient.id);
       const finalClient = { ...updatedClient };
 
@@ -563,6 +566,7 @@ const App: React.FC = () => {
       const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
       const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
       const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+      */
 
       // NOTE: We cannot easily doing ASYNC work inside a synchronous setState reducer.
       // So we must keep the async logic OUTSIDE. 
@@ -1276,7 +1280,7 @@ const App: React.FC = () => {
 
           if (firstRec.cnpj) {
             clientIdx = newList.findIndex(c => {
-              const cleanSystemCnpj = (c.cnpj || '').replace(new RegExp("[.\\-/]", "g"), "");
+              const cleanSystemCnpj = (c.cnpj || '').replace(/[./-]/g, "");
               return cleanSystemCnpj === firstRec.cnpj;
             });
           }
