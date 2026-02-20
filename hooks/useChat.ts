@@ -1,169 +1,33 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ChatMessage, ChatConversation, AppUser } from '../types';
-import { sendMessageToCloud, subscribeToMessages, markMessageAsReadInCloud, deleteMessageFromCloud, clearAllMessagesFromCloud } from '../services/firebaseService';
-import { logActivityToCloud } from '../services/firebaseService';
+import { useMemo } from 'react';
+import { ChatConversation } from '../types';
 
-export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+export const useChat = (messages, currentUser, allUsers) => {
+  // Remover setConversations
+  const conversations: ChatConversation[] = useMemo(() => {
+    if (!currentUser) return [];
 
-    // Load messages from Firebase (Firestore)
-    useEffect(() => {
-        if (!currentUser) return;
+    const convMap = new Map();
+    messages.forEach(message => {
+      const userId = message.senderId === currentUser.id ? message.receiverId : message.senderId;
+      const conversationId = userId + '-' + currentUser.id;
 
-        const unsubscribe = subscribeToMessages((allMsgsFromCloud) => {
-            const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
+      if (!convMap.has(conversationId)) {
+        convMap.set(conversationId, { lastMessage: message, userId });
+      } else {
+        convMap.get(conversationId).lastMessage = message;
+      }
+    });
 
-            // Filter messages: Admin Dev sees ALL messages in the system
-            // Others see only their own (sent or received)
-            const visibleMsgs = allMsgsFromCloud.filter(msg =>
-                isAdminDev || msg.senderId === currentUser.id || msg.receiverId === currentUser.id
-            );
+    return Array.from(convMap.values()).sort((a, b) => {
+      const timeA = a.lastMessage?.timestamp || '';
+      const timeB = b.lastMessage?.timestamp || '';
+      return timeB.localeCompare(timeA);
+    });
+  }, [messages, currentUser, allUsers]);
 
-            setMessages(visibleMsgs);
-        });
-
-        return () => unsubscribe();
-    }, [currentUser]);
-
-    // Update conversations list based on messages
-    const conversations = useMemo(() => {
-        if (!currentUser) return [];
-
-        const convMap = new Map<string, ChatConversation>();
-        const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
-
-        // Initialize with all users (Admin Dev sees all potential conversations)
-        allUsers.forEach(user => {
-            if (user.id !== currentUser.id) {
-                convMap.set(user.id, {
-                    userId: user.id,
-                    unreadCount: 0
-                });
-            }
-        });
-
-        // Update with messages
-        messages.forEach(msg => {
-            if (isAdminDev) {
-                // For Admin Dev, this message activity updates BOTH participants in their sidebar list
-                const participants = [msg.senderId, msg.receiverId];
-                participants.forEach(pId => {
-                    const conv = convMap.get(pId);
-                    if (conv && pId !== currentUser.id) {
-                        if (!conv.lastMessage || msg.timestamp > conv.lastMessage.timestamp) {
-                            conv.lastMessage = msg;
-                        }
-                    }
-                });
-            } else {
-                // Normal user: categorization relative to "me"
-                const otherId = msg.senderId === currentUser.id ? msg.receiverId : msg.senderId;
-                const conv = convMap.get(otherId);
-                if (conv) {
-                    if (!conv.lastMessage || msg.timestamp > conv.lastMessage.timestamp) {
-                        conv.lastMessage = msg;
-                    }
-                    if (!msg.read && msg.receiverId === currentUser.id) {
-                        conv.unreadCount++;
-                    }
-                }
-            }
-        });
-
-        setTimeout(() => {
-            setConversations(Array.from(convMap.values()).sort((a, b) => {
-                const timeA = a.lastMessage?.timestamp || '';
-                const timeB = b.lastMessage?.timestamp || '';
-                return timeB.localeCompare(timeA);
-            }));
-        }, 0);
-    }, [messages, currentUser, allUsers]);
-
-    const sendMessage = useCallback(async (receiverId: string, text: string) => {
-        if (!currentUser) return;
-
-        const newMessage: Omit<ChatMessage, 'id'> = {
-            senderId: currentUser.id,
-            receiverId,
-            text,
-            timestamp: new Date().toISOString(),
-            read: false
-        };
-
-        await sendMessageToCloud(newMessage);
-
-        if (currentUser) {
-            logActivityToCloud({
-                timestamp: new Date().toISOString(),
-                userId: currentUser.id,
-                userName: currentUser.name,
-                userRole: currentUser.role,
-                action: 'CHAT',
-                category: 'CHAT',
-                details: `Enviou uma mensagem para o usuário ID: ${receiverId}`,
-                metadata: { receiverId }
-            });
-        }
-    }, [currentUser]);
-
-    const markAsRead = useCallback(async (otherUserId: string) => {
-        if (!currentUser) return;
-
-        const unreadMsgs = messages.filter(m => m.senderId === otherUserId && m.receiverId === currentUser.id && !m.read);
-
-        for (const msg of unreadMsgs) {
-            await markMessageAsReadInCloud(msg.id);
-        }
-    }, [currentUser, messages]);
-
-    const deleteMessage = useCallback(async (messageId: string) => {
-        if (!currentUser || (currentUser.role !== 'admin_dev' && currentUser.role !== 'admin')) return;
-
-        try {
-            await deleteMessageFromCloud(messageId);
-            logActivityToCloud({
-                timestamp: new Date().toISOString(),
-                userId: currentUser.id,
-                userName: currentUser.name,
-                userRole: currentUser.role,
-                action: 'DELETE',
-                category: 'CHAT',
-                details: `Excluiu uma mensagem individual no chat (ID: ${messageId})`
-            });
-        } catch (e) {
-            console.error("Failed to delete message:", e);
-        }
-    }, [currentUser]);
-
-    const clearMessages = useCallback(async () => {
-        if (!currentUser || (currentUser.role !== 'admin_dev' && currentUser.role !== 'admin')) return;
-
-        try {
-            await clearAllMessagesFromCloud();
-            logActivityToCloud({
-                timestamp: new Date().toISOString(),
-                userId: currentUser.id,
-                userName: currentUser.name,
-                userRole: currentUser.role,
-                action: 'DELETE',
-                category: 'CHAT',
-                details: `Limpou TODO o histórico de chat do sistema.`
-            });
-        } catch (e) {
-            console.error("Failed to clear messages:", e);
-        }
-    }, [currentUser]);
-
-    return {
-        messages,
-        conversations,
-        activeConversationId,
-        setActiveConversationId,
-        sendMessage,
-        markAsRead,
-        deleteMessage,
-        clearMessages,
-        totalUnread: conversations.reduce((acc, c) => acc + c.unreadCount, 0)
-    };
+  // Garantir que conversations nunca é undefined
+  return {
+    messages,
+    conversations: conversations || [],
+  };
 };
