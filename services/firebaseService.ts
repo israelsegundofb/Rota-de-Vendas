@@ -121,12 +121,13 @@ export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
                 body: JSON.stringify(log)
             }).catch(err => console.warn('[BACKEND LOG] Servidor inacessível, log salvo apenas no Firebase.'));
         } catch (e) {
+            // Silently fail if backend is unreachable
         }
     }
 };
 
 export const subscribeToSystemLogs = (callback: (logs: SystemLog[]) => void) => {
-    if (!db) return () => { };
+    if (!db) return () => { /* no-op */ };
     const logRef = collection(db, 'system_logs');
     const q = query(logRef, orderBy('timestamp', 'desc'));
 

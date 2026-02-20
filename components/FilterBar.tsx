@@ -31,10 +31,10 @@ interface FilterBarProps {
   filterCnae: string;
   setFilterCnae: (cnae: string) => void;
 
-  startDate: Date | null;
-  setStartDate: (date: Date | null) => void;
-  endDate: Date | null;
-  setEndDate: (date: Date | null) => void;
+  startDate: string;
+  setStartDate: (date: string) => void;
+  endDate: string;
+  setEndDate: (date: string) => void;
 
   filterProductCategory: string;
   setFilterProductCategory: (cat: string) => void;

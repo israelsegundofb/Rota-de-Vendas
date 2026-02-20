@@ -8,7 +8,7 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef } from 'react';
-import { FileUp, ChevronRight, Loader2, Users as UsersIcon, Lock } from 'lucide-react';
+import { FileUp, ChevronRight, Loader2, Users as UsersIcon, Lock, Search, Shield, Briefcase, ShoppingBag, Package, CheckCircle, AlertCircle, Database, User as UserIcon } from 'lucide-react';
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, ProcessingState } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
@@ -18,6 +18,7 @@ import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
+import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
 const ClientMap = React.lazy(() => import('./components/ClientMap'));
 // Lazy Load Admin & Heavy Components
@@ -463,7 +464,7 @@ const App: React.FC = () => {
 
 
   // Helper for sequential geocoding attempts
-  const geocodeWithFallback = async (addresses: (string | undefined)[]) => {
+  const geocodeWithFallback = React.useCallback(async (addresses: (string | undefined)[]) => {
     for (const addr of addresses) {
       const candidate = addr?.trim();
       if (!candidate) continue;
@@ -475,7 +476,7 @@ const App: React.FC = () => {
       }
     }
     return null;
-  };
+  }, [googleMapsApiKey]);
 
   const handleBulkGeneratePlusCodes = async () => {
     const clientsMissingPlusCode = masterClientList.filter(c => !c.plusCode && c.lat && c.lng && c.lat !== 0);
@@ -549,7 +550,7 @@ const App: React.FC = () => {
 
     setMasterClientList(prevList => {
       const original = prevList.find(c => c.id === updatedClient.id);
-      let finalClient = { ...updatedClient };
+      const finalClient = { ...updatedClient };
 
       const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
       const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
@@ -636,7 +637,7 @@ const App: React.FC = () => {
       });
     }
     toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
-  }, [masterClientList, currentUser, googleMapsApiKey, toast, setMasterClientList]);
+  }, [masterClientList, currentUser, googleMapsApiKey, toast, setMasterClientList, geocodeWithFallback]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
@@ -700,7 +701,7 @@ const App: React.FC = () => {
         listContainer.scrollTop = listContainer.scrollHeight;
       }
     }, 100);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, geocodeWithFallback]);
 
   const handleClearClients = () => {
     let targetId: string | undefined;
@@ -1269,7 +1270,7 @@ const App: React.FC = () => {
 
           if (firstRec.cnpj) {
             clientIdx = newList.findIndex(c => {
-              const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-\/]/g, "");
+              const cleanSystemCnpj = (c.cnpj || '').replace(new RegExp("[.\\-/]", "g"), "");
               return cleanSystemCnpj === firstRec.cnpj;
             });
           }
