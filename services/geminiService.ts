@@ -223,7 +223,7 @@ export const processClientsWithAI = async (
         } catch (parseError) {
           const match = text.match(/\{[\s\S]*\}/);
           if (match) {
-            try { aiData = JSON.parse(match[0]); } catch (e) { }
+            try { aiData = JSON.parse(match[0]); } catch (e) { console.warn("Failed to parse AI JSON fallback"); }
           }
         }
 
@@ -440,7 +440,7 @@ export const categorizeProductsWithAI = async (
         console.error("Failed to parse AI response", text);
         const match = text.match(/\[.*\]/s);
         if (match) {
-          try { categories = JSON.parse(match[0]); } catch (err) { }
+          try { categories = JSON.parse(match[0]); } catch (err) { console.warn("Failed to parse AI Array fallback"); }
         }
       }
 

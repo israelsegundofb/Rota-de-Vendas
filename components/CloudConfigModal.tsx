@@ -34,9 +34,11 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
         if (isOpen) {
             const stored = getStoredFirebaseConfig();
             if (stored) {
-                setFormData(stored);
-                setStatus('success'); // Assume if stored, it was valid, or let user re-test
-                setMessage('Configuração salva encontrada.');
+                setTimeout(() => {
+                    setFormData(stored);
+                    setStatus('success'); // Assume if stored, it was valid, or let user re-test
+                    setMessage('Configuração salva encontrada.');
+                }, 0);
             }
         }
     }, [isOpen]);

@@ -120,7 +120,7 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  const [activeApiKey, setActiveApiKey] = useState<string>(() => {
+  const [activeApiKey] = useState<string>(() => {
     const key = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || getStoredFirebaseConfig()?.apiKey || '';
     console.log('[APP] Gemini API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
     return key;
@@ -153,6 +153,7 @@ const App: React.FC = () => {
       };
       setOnline();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]); // Only run when user changes or logs in
 
   useEffect(() => {
@@ -166,7 +167,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [currentUser, users]);
   // isFirebaseConnected handled by hook
-  const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
+  const [selectedClient] = useState<EnrichedClient | undefined>(undefined);
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
   const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
@@ -578,7 +579,7 @@ const App: React.FC = () => {
     // It's better than no hook.
 
     const original = masterClientList.find(c => c.id === updatedClient.id);
-    let finalClient = { ...updatedClient };
+    const finalClient = { ...updatedClient };
 
     const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
@@ -639,7 +640,7 @@ const App: React.FC = () => {
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
-    let finalClient: EnrichedClient = {
+    const finalClient: EnrichedClient = {
       ...newClient,
       id: (newClient as any).id || crypto.randomUUID(),
       lat: newClient.lat || 0,

@@ -51,7 +51,7 @@ export const sendMessageToCloud = async (message: Omit<ChatMessage, 'id'>) => {
 };
 
 export const subscribeToMessages = (callback: (messages: ChatMessage[]) => void) => {
-    if (!db) return () => { };
+    if (!db) return () => { /* no-op */ };
     const chatRef = collection(db, 'chats');
     const q = query(chatRef, orderBy('timestamp', 'asc'));
 
