@@ -510,11 +510,11 @@ const App: React.FC = () => {
 
         let updatedCount = 0;
         const newList = [...masterClientList];
+        const limit = pLimit(5);
 
-        for (let i = 0; i < clientsMissingPlusCode.length; i++) {
-          if (isUploadCancelled.current) break;
+        const tasks = clientsMissingPlusCode.map((client) => limit(async () => {
+          if (isUploadCancelled.current) return;
 
-          const client = clientsMissingPlusCode[i];
           try {
             const plusCode = await reverseGeocodePlusCode(client.lat, client.lng, googleMapsApiKey || '');
             if (plusCode) {
@@ -526,10 +526,12 @@ const App: React.FC = () => {
             }
           } catch (e) {
             console.error(`Error generating Plus Code for ${client.companyName}:`, e);
+          } finally {
+            setProcState(prev => ({ ...prev, current: prev.current + 1 }));
           }
+        }));
 
-          setProcState(prev => ({ ...prev, current: i + 1 }));
-        }
+        await Promise.all(tasks);
 
         setMasterClientList(newList);
         setProcState(prev => ({ ...prev, status: 'completed', isActive: true }));
