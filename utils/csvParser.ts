@@ -138,9 +138,9 @@ const normalizeHeader = (header: any): string => {
 export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purchases' => {
   const normalizedHeaders = headers.map(h => normalizeHeader(h));
 
-  let purchaseScore = normalizedHeaders.filter(h => PURCHASE_KEYWORDS.some(k => h.includes(k))).length;
-  let clientScore = normalizedHeaders.filter(h => CLIENT_KEYWORDS.some(k => h.includes(k))).length;
-  let productScore = normalizedHeaders.filter(h => PRODUCT_KEYWORDS.some(k => h.includes(k))).length;
+  const purchaseScore = normalizedHeaders.filter(h => PURCHASE_KEYWORDS.some(k => h.includes(k))).length;
+  const clientScore = normalizedHeaders.filter(h => CLIENT_KEYWORDS.some(k => h.includes(k))).length;
+  const productScore = normalizedHeaders.filter(h => PRODUCT_KEYWORDS.some(k => h.includes(k))).length;
 
   // Prioritize purchases if date + (sku or value or quantity) are present
   const hasDate = normalizedHeaders.some(h => h.includes('data') || h.includes('emissao'));
@@ -424,7 +424,7 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
           if (companyName && (sku || productName)) {
             records.push({
               companyName: String(companyName).trim(),
-              cnpj: String(cnpj).trim().replace(/[.\-\/]/g, ""),
+              cnpj: String(cnpj).trim().replace(new RegExp("[.\\-/]", "g"), ""),
               sku: String(sku).trim(),
               name: String(productName).trim(), // Match Product interface
               brand: normalizedRow['marca'] || 'N/A',

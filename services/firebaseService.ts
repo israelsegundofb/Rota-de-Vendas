@@ -121,6 +121,7 @@ export const logActivityToCloud = async (log: Omit<SystemLog, 'id'>) => {
                 body: JSON.stringify(log)
             }).catch(err => console.warn('[BACKEND LOG] Servidor inacessível, log salvo apenas no Firebase.'));
         } catch (e) {
+            // Ignore fetch setup errors
         }
     }
 };
