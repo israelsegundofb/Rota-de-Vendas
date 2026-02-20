@@ -11,12 +11,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History } from 'lucide-react';
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
-import { REGIONS, getRegionByUF } from './utils/constants';
+import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized, subscribeToCloudChanges, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -161,7 +161,7 @@ const App: React.FC = () => {
       };
       setOnline();
     }
-  }, [currentUser?.id]); // Only run when user changes or logs in
+  }, [currentUser, baseUpdateUser, users]); // Added missing dependencies
 
   useEffect(() => {
     const handleUnload = () => {
@@ -174,7 +174,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [currentUser, users]);
   // isFirebaseConnected handled by hook
-  const [selectedClient, setSelectedClient] = useState<EnrichedClient | undefined>(undefined);
+  const [selectedClient] = useState<EnrichedClient | undefined>(undefined);
   const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
   const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
@@ -557,6 +557,7 @@ const App: React.FC = () => {
     // We can use a ref for masterClientList to read current value without re-binding.
 
     setMasterClientList(prevList => {
+      /*
       const original = prevList.find(c => c.id === updatedClient.id);
       const finalClient = { ...updatedClient };
 
@@ -565,6 +566,7 @@ const App: React.FC = () => {
       const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
       const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
       const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+      */
 
       // NOTE: We cannot easily doing ASYNC work inside a synchronous setState reducer.
       // So we must keep the async logic OUTSIDE. 
