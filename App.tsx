@@ -1935,9 +1935,9 @@ const App: React.FC = () => {
                       setActiveConversationId(userId);
                       if (userId) handleChatMarkAsRead(userId);
                     }}
-                    onSendMessage={handleChatSendMessage}
+                    onSendMessage={(userId, text) => handleChatSendMessage(text, userId)}
                     onDeleteMessage={handleChatDeleteMessage}
-                    onClearMessages={handleChatClearMessages}
+                    onClearMessages={() => { if (activeConversationId) handleChatClearMessages(activeConversationId); }}
                   />
                 </div>
               </React.Suspense>

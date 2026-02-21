@@ -12,6 +12,8 @@ import ClientListSkeleton from './skeletons/ClientListSkeleton';
 import ClientCard from './ClientCard';
 import { AnimatePresence } from 'framer-motion';
 
+const FULL_HEIGHT_STYLE = { height: '100%' };
+
 interface ClientListProps {
   clients: EnrichedClient[];
   isLoading?: boolean; // New Prop
@@ -245,7 +247,7 @@ const ClientList: React.FC<ClientListProps> = ({
           </div>
         ) : isMobile ? (
           <Virtuoso
-            style={{ height: '100%' }}
+            style={FULL_HEIGHT_STYLE}
             data={filteredClients}
             itemContent={(index, client) => (
               <ClientCard
@@ -258,7 +260,7 @@ const ClientList: React.FC<ClientListProps> = ({
           />
         ) : (
           <VirtuosoGrid
-            style={{ height: '100%' }}
+            style={FULL_HEIGHT_STYLE}
             data={filteredClients}
             components={{
               List: forwardRef((props, ref) => (
@@ -275,7 +277,7 @@ const ClientList: React.FC<ClientListProps> = ({
                 client={client}
                 onEdit={openEditModal}
                 onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
+                style={FULL_HEIGHT_STYLE}
               />
             )}
             className="custom-scrollbar"
