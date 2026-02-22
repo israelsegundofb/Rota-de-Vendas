@@ -2,6 +2,8 @@ import React, { useState, useEffect, forwardRef, useCallback } from 'react';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
+
+const CARD_STYLE = { height: '100%' };
 import { isAdmin, isSalesTeam } from '../utils/authUtils';
 import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag, Briefcase } from 'lucide-react';
 import EditClientModal from './EditClientModal';
@@ -275,7 +277,7 @@ const ClientList: React.FC<ClientListProps> = ({
                 client={client}
                 onEdit={openEditModal}
                 onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
+                style={CARD_STYLE}
               />
             )}
             className="custom-scrollbar"
