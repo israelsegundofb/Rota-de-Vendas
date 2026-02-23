@@ -1,5 +1,5 @@
 import React, { useState, useEffect, forwardRef, useCallback } from 'react';
-import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
+import { Virtuoso, VirtuosoGrid, VirtuosoGridComponents } from 'react-virtuoso';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isAdmin, isSalesTeam } from '../utils/authUtils';
@@ -260,22 +260,13 @@ const ClientList: React.FC<ClientListProps> = ({
           <VirtuosoGrid
             style={{ height: '100%' }}
             data={filteredClients}
-            components={{
-              List: forwardRef((props, ref) => (
-                <div
-                  {...props}
-                  ref={ref}
-                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
-                />
-              )),
-              Item: (props) => <div {...props} className="h-full" />
-            }}
+            components={GRID_COMPONENTS}
             itemContent={(index, client) => (
               <ClientCard
                 client={client}
                 onEdit={openEditModal}
                 onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
+                style={CARD_STYLE}
               />
             )}
             className="custom-scrollbar"
@@ -326,3 +317,23 @@ const ClientList: React.FC<ClientListProps> = ({
 
 // Memoize the entire component to prevent re-renders from parent when props are stable
 export default React.memo(ClientList);
+
+// Optimization: Define components outside of render to prevent remounting on every render
+const GridList = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => (
+  <div
+    {...props}
+    ref={ref}
+    className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
+  />
+));
+
+const GridItem: React.FC<React.HTMLAttributes<HTMLDivElement>> = (props) => (
+  <div {...props} className="h-full" />
+);
+
+const GRID_COMPONENTS: VirtuosoGridComponents<EnrichedClient> = {
+  List: GridList,
+  Item: GridItem
+};
+
+const CARD_STYLE = { height: '100%' };
