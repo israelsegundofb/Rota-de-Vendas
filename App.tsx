@@ -115,7 +115,7 @@ const App: React.FC = () => {
     messages, conversations, activeConversationId, setActiveConversationId,
     sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread,
     deleteMessage: handleChatDeleteMessage, clearMessages: handleChatClearMessages
-  } = useChat(currentUser, users);
+  } = useChat([], currentUser, users);
 
   // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
