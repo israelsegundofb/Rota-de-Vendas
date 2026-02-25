@@ -95,14 +95,6 @@ const ClientList: React.FC<ClientListProps> = ({
     setIsProductModalOpen(true);
   }, []);
 
-  // Proactively check loading state
-  if (isLoading) {
-    return <ClientListSkeleton />;
-  }
-
-  // filteredClientsLogic removed - clients prop is already filtered
-  const filteredClients = clients;
-
   const renderListItem = useCallback((index: number, client: EnrichedClient) => (
     <ClientCard
       client={client} // Client object changes ref on update, so Card re-renders. This is correct.
@@ -119,6 +111,14 @@ const ClientList: React.FC<ClientListProps> = ({
       style={CLIENT_CARD_STYLE}
     />
   ), [openEditModal, openProductAssignmentModal]);
+
+  // Proactively check loading state
+  if (isLoading) {
+    return <ClientListSkeleton />;
+  }
+
+  // filteredClientsLogic removed - clients prop is already filtered
+  const filteredClients = clients;
 
 
   const handleExportCSV = () => {
