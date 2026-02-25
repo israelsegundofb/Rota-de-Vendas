@@ -39,6 +39,8 @@ interface ClientListProps {
   onCategoryFilterChange: (value: string) => void;
 }
 
+const CLIENT_CARD_STYLE = { height: '100%' };
+
 const ClientList: React.FC<ClientListProps> = ({
   clients,
   onUpdateClient,
@@ -100,6 +102,23 @@ const ClientList: React.FC<ClientListProps> = ({
 
   // filteredClientsLogic removed - clients prop is already filtered
   const filteredClients = clients;
+
+  const renderListItem = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client} // Client object changes ref on update, so Card re-renders. This is correct.
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+    />
+  ), [openEditModal, openProductAssignmentModal]);
+
+  const renderGridItem = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client}
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+      style={CLIENT_CARD_STYLE}
+    />
+  ), [openEditModal, openProductAssignmentModal]);
 
 
   const handleExportCSV = () => {
@@ -247,13 +266,7 @@ const ClientList: React.FC<ClientListProps> = ({
           <Virtuoso
             style={{ height: '100%' }}
             data={filteredClients}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client} // Client object changes ref on update, so Card re-renders. This is correct.
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-              />
-            )}
+            itemContent={renderListItem}
             className="custom-scrollbar"
           />
         ) : (
@@ -270,14 +283,7 @@ const ClientList: React.FC<ClientListProps> = ({
               )),
               Item: (props) => <div {...props} className="h-full" />
             }}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client}
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
-              />
-            )}
+            itemContent={renderGridItem}
             className="custom-scrollbar"
           />
         )}
