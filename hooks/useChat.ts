@@ -1,20 +1,36 @@
-import { useMemo } from 'react';
-import { ChatConversation } from '../types';
+import { useState, useMemo, useCallback } from 'react';
+import { ChatMessage, ChatConversation, AppUser } from '../types';
 
-export const useChat = (messages, currentUser, allUsers) => {
-  // Remover setConversations
+export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
+  // Mock messages state if not provided
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+  // Derive conversations
   const conversations: ChatConversation[] = useMemo(() => {
     if (!currentUser) return [];
 
-    const convMap = new Map();
+    const convMap = new Map<string, ChatConversation>();
     messages.forEach(message => {
       const userId = message.senderId === currentUser.id ? message.receiverId : message.senderId;
-      const conversationId = userId + '-' + currentUser.id;
+      // Unique conversation ID for the pair
+      const conversationId = userId;
 
       if (!convMap.has(conversationId)) {
-        convMap.set(conversationId, { lastMessage: message, userId });
+        convMap.set(conversationId, { userId, unreadCount: 0, lastMessage: message });
       } else {
-        convMap.get(conversationId).lastMessage = message;
+        const conv = convMap.get(conversationId);
+        if (conv) {
+            conv.lastMessage = message;
+        }
+      }
+
+      // Update unread count
+      if (message.receiverId === currentUser.id && !message.read) {
+          const conv = convMap.get(conversationId);
+          if (conv) {
+              conv.unreadCount = (conv.unreadCount || 0) + 1;
+          }
       }
     });
 
@@ -23,11 +39,59 @@ export const useChat = (messages, currentUser, allUsers) => {
       const timeB = b.lastMessage?.timestamp || '';
       return timeB.localeCompare(timeA);
     });
-  }, [messages, currentUser, allUsers]);
+  }, [messages, currentUser]);
 
-  // Garantir que conversations nunca é undefined
+  const totalUnread = useMemo(() => {
+      return conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
+  }, [conversations]);
+
+  const sendMessage = useCallback((text: string) => {
+      if (!currentUser || !activeConversationId) return;
+
+      const newMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          senderId: currentUser.id,
+          receiverId: activeConversationId,
+          text,
+          timestamp: new Date().toISOString(),
+          read: false
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+  }, [currentUser, activeConversationId]);
+
+  const markAsRead = useCallback((userId: string) => {
+      if (!currentUser) return;
+      setMessages(prev => prev.map(msg =>
+          (msg.senderId === userId && msg.receiverId === currentUser.id)
+          ? { ...msg, read: true }
+          : msg
+      ));
+  }, [currentUser]);
+
+  const deleteMessage = useCallback((messageId: string) => {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+  }, []);
+
+  const clearMessages = useCallback((conversationId?: string) => {
+      const targetId = conversationId || activeConversationId;
+      if (!currentUser || !targetId) return;
+
+      setMessages(prev => prev.filter(m =>
+          !((m.senderId === currentUser.id && m.receiverId === targetId) ||
+            (m.senderId === targetId && m.receiverId === currentUser.id))
+      ));
+  }, [currentUser, activeConversationId]);
+
   return {
     messages,
-    conversations: conversations || [],
+    conversations,
+    activeConversationId,
+    setActiveConversationId,
+    sendMessage,
+    markAsRead,
+    totalUnread,
+    deleteMessage,
+    clearMessages
   };
 };
