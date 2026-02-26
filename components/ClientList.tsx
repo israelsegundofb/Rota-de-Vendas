@@ -12,6 +12,10 @@ import ClientListSkeleton from './skeletons/ClientListSkeleton';
 import ClientCard from './ClientCard';
 import { AnimatePresence } from 'framer-motion';
 
+// Optimization: Define style object outside of render loop to ensure referential equality.
+// This prevents ClientCard from re-rendering unnecessarily in VirtuosoGrid when ClientList re-renders.
+const GRID_ITEM_STYLE = { height: '100%' };
+
 interface ClientListProps {
   clients: EnrichedClient[];
   isLoading?: boolean; // New Prop
@@ -92,6 +96,24 @@ const ClientList: React.FC<ClientListProps> = ({
     setClientForProductAssignment(client);
     setIsProductModalOpen(true);
   }, []);
+
+  // Memoized render functions to prevent unnecessary re-creations on every render
+  const renderListItem = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client}
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+    />
+  ), [openEditModal, openProductAssignmentModal]);
+
+  const renderGridItem = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client}
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+      style={GRID_ITEM_STYLE}
+    />
+  ), [openEditModal, openProductAssignmentModal]);
 
   // Proactively check loading state
   if (isLoading) {
@@ -247,13 +269,7 @@ const ClientList: React.FC<ClientListProps> = ({
           <Virtuoso
             style={{ height: '100%' }}
             data={filteredClients}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client} // Client object changes ref on update, so Card re-renders. This is correct.
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-              />
-            )}
+            itemContent={renderListItem}
             className="custom-scrollbar"
           />
         ) : (
@@ -270,14 +286,7 @@ const ClientList: React.FC<ClientListProps> = ({
               )),
               Item: (props) => <div {...props} className="h-full" />
             }}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client}
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
-              />
-            )}
+            itemContent={renderGridItem}
             className="custom-scrollbar"
           />
         )}
