@@ -74,6 +74,26 @@ export const useFilters = (
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
+        // Pre-calculation of static filter values
+        const query = (debouncedSearchQuery || '').toLowerCase();
+        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+
+        // Pre-calculate Date Objects for filtering
+        let sDateObj: Date | null = null;
+        let eDateObj: Date | null = null;
+
+        if (startDate) {
+            sDateObj = new Date(startDate);
+            sDateObj.setHours(0, 0, 0, 0);
+        }
+
+        if (endDate) {
+            eDateObj = new Date(endDate);
+            eDateObj.setHours(23, 59, 59, 999);
+        }
+
+        const isProductFilterActive = filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || prodQuery !== '';
+
         return visibleClients.filter(c => {
             // General Filters
             const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
@@ -91,21 +111,19 @@ export const useFilters = (
             }
 
             // Text Search
-            const query = (debouncedSearchQuery || '').toLowerCase();
             const matchSearch = debouncedSearchQuery === '' ||
                 (c.companyName || '').toLowerCase().includes(query) ||
                 (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
-            const prodQuery = (debouncedProductQuery || '').toLowerCase();
 
             // CNAE Filter (Matches Main or Secondary)
             const matchCnae = filterCnae === 'Todos' ||
                 (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
-            if (filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || prodQuery !== '') {
+            if (isProductFilterActive) {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
@@ -127,7 +145,9 @@ export const useFilters = (
                     );
 
                     // Date Range Filter
-                    const matchDate = (!startDate || !endDate) || c.purchasedProducts.some(p => {
+                    // Optimized: Using hoisted Date objects but preserving original logic (!startDate || !endDate)
+                    // The original code used (!startDate || !endDate) to skip filtering if EITHER was missing.
+                    const matchDate = (!sDateObj || !eDateObj) || c.purchasedProducts.some(p => {
                         if (!p.purchaseDate) return false;
 
                         // Robust Date Parsing
@@ -149,19 +169,17 @@ export const useFilters = (
 
                         if (isNaN(pDate.getTime())) return false; // Invalid date in data
 
-                        // Create Date objects for start/end, resetting time
+                        // Optimization: pDate is created for each product, but sDateObj/eDateObj are reused
+                        // We still need to set hours on pDate for correct comparison, but we saved creating the bound dates
+                        // M * N times.
                         pDate.setHours(0, 0, 0, 0);
 
-                        if (startDate) {
-                            const sDate = new Date(startDate);
-                            sDate.setHours(0, 0, 0, 0);
-                            if (pDate < sDate) return false;
-                        }
-
-                        if (endDate) {
-                            const eDate = new Date(endDate);
-                            eDate.setHours(23, 59, 59, 999);
-                            if (pDate > eDate) return false;
+                        if (sDateObj && pDate < sDateObj) return false;
+                        if (eDateObj) {
+                            // Logic check: original was eDate set to 23:59:59. pDate is 00:00:00.
+                            // If pDate > eDateObj (which includes time), it means pDate is strictly after the end day.
+                            // e.g. pDate = Jan 2 00:00. eDateObj = Jan 1 23:59. pDate > eDateObj. Correct.
+                            if (pDate > eDateObj) return false;
                         }
 
                         return true;

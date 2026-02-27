@@ -129,4 +129,42 @@ describe('useFilters Hook', () => {
         expect(result.current.filteredClients).toHaveLength(1);
         expect(result.current.filteredClients[0].id).toBe('2');
     });
+
+    it('deve filtrar por intervalo de datas quando filtro de produto ativo', () => {
+        const { result } = renderHook(() => useFilters(mockClients, mockUsers, mockCurrentUser, mockProducts));
+
+        // Activate product filter to enter the logic block where date filtering happens
+        act(() => {
+            result.current.setFilterProductCategory('Cat1');
+        });
+
+        // Test inclusion: 2023-01-01 is within 2022-12-31 to 2023-01-02
+        act(() => {
+            result.current.setStartDate('2022-12-31');
+            result.current.setEndDate('2023-01-02');
+        });
+        expect(result.current.filteredClients).toHaveLength(1);
+        expect(result.current.filteredClients[0].id).toBe('2');
+
+        // Test exclusion: 2023-01-01 is NOT within 2023-01-02 to 2023-01-05
+        act(() => {
+            result.current.setStartDate('2023-01-02');
+            result.current.setEndDate('2023-01-05');
+        });
+        expect(result.current.filteredClients).toHaveLength(0);
+    });
+
+    it('deve retornar todos os clientes se apenas uma data for fornecida (comportamento legado)', () => {
+        const { result } = renderHook(() => useFilters(mockClients, mockUsers, mockCurrentUser, mockProducts));
+
+        act(() => {
+            result.current.setFilterProductCategory('Cat1');
+            result.current.setStartDate('2050-01-01'); // Future date
+            // End Date missing
+        });
+
+        // Should return client 2 because filter is ignored if not both dates are present
+        expect(result.current.filteredClients).toHaveLength(1);
+        expect(result.current.filteredClients[0].id).toBe('2');
+    });
 });
