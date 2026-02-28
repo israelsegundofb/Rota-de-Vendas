@@ -1,0 +1,3 @@
+## 2024-05-18 - [Hoist Date Parsing from Inner Loops]
+**Learning:** In React components or custom hooks (`useFilters.ts`), performing relatively slow operations like parsing strings into `Date` objects inside highly nested inner loops (e.g., iterating over each product of each client) severely impacts performance, especially when the date strings originate from external state (`startDate`, `endDate`) that doesn't change per item.
+**Action:** Always inspect inner loops (especially `.some`, `.filter`, `.map` over large arrays like lists of items/products) for invariant values or computations. Hoist these calculations outside the loop, typically computing them once inside the `useMemo` block before starting the iteration over the list.

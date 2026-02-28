@@ -74,6 +74,23 @@ export const useFilters = (
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
+        // Pre-compute date strings and objects to avoid parsing in inner loops
+        const query = (debouncedSearchQuery || '').toLowerCase();
+        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+
+        let sDate: Date | null = null;
+        let eDate: Date | null = null;
+
+        if (startDate) {
+            sDate = new Date(startDate);
+            sDate.setHours(0, 0, 0, 0);
+        }
+
+        if (endDate) {
+            eDate = new Date(endDate);
+            eDate.setHours(23, 59, 59, 999);
+        }
+
         return visibleClients.filter(c => {
             // General Filters
             const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
@@ -91,14 +108,12 @@ export const useFilters = (
             }
 
             // Text Search
-            const query = (debouncedSearchQuery || '').toLowerCase();
             const matchSearch = debouncedSearchQuery === '' ||
                 (c.companyName || '').toLowerCase().includes(query) ||
                 (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
-            const prodQuery = (debouncedProductQuery || '').toLowerCase();
 
             // CNAE Filter (Matches Main or Secondary)
             const matchCnae = filterCnae === 'Todos' ||
@@ -152,17 +167,8 @@ export const useFilters = (
                         // Create Date objects for start/end, resetting time
                         pDate.setHours(0, 0, 0, 0);
 
-                        if (startDate) {
-                            const sDate = new Date(startDate);
-                            sDate.setHours(0, 0, 0, 0);
-                            if (pDate < sDate) return false;
-                        }
-
-                        if (endDate) {
-                            const eDate = new Date(endDate);
-                            eDate.setHours(23, 59, 59, 999);
-                            if (pDate > eDate) return false;
-                        }
+                        if (sDate && pDate < sDate) return false;
+                        if (eDate && pDate > eDate) return false;
 
                         return true;
                     });
