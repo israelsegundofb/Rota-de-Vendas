@@ -151,14 +151,17 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 }));
             }
         } catch (err: any) {
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+            console.error(err);
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja'))) {
+                // Since we now have fallbacks, a 401 from CNPJa shouldn't block us entirely if fallbacks work.
+                // However, if we reach this catch block, it means ALL fallbacks might have failed or there was a structural error.
                 if (onCNPJAuthError) {
                     onCNPJAuthError();
                 } else {
-                    setError('Chave de API CNPJa inválida ou expirada. Configure-a nas opções do sistema.');
+                    setError('Não foi possível buscar os dados nas APIs (Comercial ou Gratuitas). Verifique sua conexão ou a Chave CNPJa.');
                 }
             } else {
-                setError(err.message || 'Erro ao consultar CNPJ. Verifique a chave da API.');
+                setError(err.message || 'Erro ao consultar CNPJ. Verifique se o número está correto.');
             }
         } finally {
             setIsSearchingCNPJ(false);

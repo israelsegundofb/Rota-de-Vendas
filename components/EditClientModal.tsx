@@ -116,14 +116,14 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         } catch (err: any) {
             console.error(err);
             setRefreshStatus('error');
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja'))) {
                 if (onCNPJAuthError) {
                     onCNPJAuthError();
                 } else {
-                    alert('Chave de API CNPJa inválida ou expirada. Configure-a nas opções do sistema.');
+                    alert('As APIs de consulta não conseguiram buscar o cliente. Verifique sua chave de API ou conexão.');
                 }
             } else {
-                alert('Erro ao consultar CNPJ. Verifique sua chave de API.');
+                alert('Erro ao consultar CNPJ. Verifique se o número está correto.');
             }
         } finally {
             setIsRefreshingByCNPJ(false);

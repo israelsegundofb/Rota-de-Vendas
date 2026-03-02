@@ -84,8 +84,15 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
         };
     } catch (error) {
         console.error("Erro na consulta CNPJa Comercial:", error);
-        // Fallback para BrasilAPI se a chave falhar ou não estiver configurada
-        return fallbackBrasilAPI(cleanCNPJ);
+        // Fallback progressivo: CNPJa -> Minha Receita -> BrasilAPI
+        const minhaReceitaResult = await fallbackMinhaReceita(cleanCNPJ);
+        if (minhaReceitaResult) {
+            console.log("Fallback: Dados obtidos via Minha Receita com sucesso.");
+            return minhaReceitaResult;
+        }
+
+        console.log("Fallback: Minha Receita falhou, tentando BrasilAPI...");
+        return await fallbackBrasilAPI(cleanCNPJ);
     }
 };
 
@@ -121,6 +128,40 @@ export const pesquisarEmpresaPorEndereco = async (params: {
     } catch (error) {
         console.error("Erro na pesquisa por endereço:", error);
         return [];
+    }
+};
+
+const fallbackMinhaReceita = async (cnpj: string): Promise<CNPJResponse | null> => {
+    try {
+        const response = await fetch(`https://minhareceita.org/${cnpj}`);
+        if (!response.ok) return null;
+
+        const data = await response.json();
+
+        return {
+            cnpj: data.cnpj,
+            razao_social: data.razao_social,
+            nome_fantasia: data.nome_fantasia,
+            logradouro: `${data.descricao_tipo_de_logradouro} ${data.logradouro}`.trim(),
+            numero: data.numero,
+            complemento: data.complemento,
+            bairro: data.bairro,
+            cep: data.cep,
+            municipio: data.municipio,
+            uf: data.uf,
+            // Minha Receita provides `ddd_telefone_1`, we format it slightly
+            ddd_telefone_1: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.substring(0, 2)}) ${data.ddd_telefone_1.substring(2)}`.trim() : undefined,
+            cnae_fiscal: data.cnae_fiscal ? `${data.cnae_fiscal} - ${data.cnae_fiscal_descricao}` : data.cnae_fiscal_descricao,
+            cnae_descricao: data.cnae_fiscal_descricao,
+            cnaes_secundarios: data.cnaes_secundarios?.map((s: any) => ({
+                codigo: s.codigo,
+                texto: s.descricao
+            })),
+            situacao_cadastral: data.descricao_situacao_cadastral
+        };
+    } catch (error) {
+        console.warn("Minha Receita API failed, falling back to BrasilAPI...", error);
+        return null; // Will trigger BrasilAPI fallback
     }
 };
 
