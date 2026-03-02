@@ -134,6 +134,8 @@ const ClientMapContent: React.FC<{
     return el;
   }, []);
 
+  const usersColorKey = (users || []).map(u => `${u.id}:${u.name}:${u.color}`).join('|');
+
   const userColorMap = useMemo(() => {
     const map = new Map<string, { bg: string, border: string, glyph: string }>();
     if (!users) return map;
@@ -148,7 +150,7 @@ const ClientMapContent: React.FC<{
       map.set(u.id, color);
     });
     return map;
-  }, [users]);
+  }, [users, usersColorKey]);
 
   useEffect(() => {
     if (!map || !google.maps.marker || isAuthFailureDetected) {

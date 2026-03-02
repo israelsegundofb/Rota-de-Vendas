@@ -3,7 +3,7 @@ import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
 import { isAdmin, isSalesTeam } from '../utils/authUtils';
-import { Store, MapPin, Tag, ExternalLink, Download, Search, Filter, Edit2, Plus, ShoppingBag, Briefcase } from 'lucide-react';
+import { Search, Filter, Plus, Download, MapPin } from 'lucide-react';
 import EditClientModal from './EditClientModal';
 import AddClientModal from './AddClientModal';
 import ClientProductAssignmentModal from './ClientProductAssignmentModal';
@@ -324,5 +324,20 @@ const ClientList: React.FC<ClientListProps> = ({
   );
 };
 
-// Memoize the entire component to prevent re-renders from parent when props are stable
-export default React.memo(ClientList);
+// Memoize the entire component to prevent re-renders from parent when props are stable. 
+// Custom equality function: Ignore 'users' array changes for memoization, 
+// since users are only used when modals are OPEN, and realtime presence updates break the grid scrolling.
+export default React.memo(ClientList, (prevProps, nextProps) => {
+  return (
+    prevProps.clients === nextProps.clients &&
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.filterOnlyWithPurchases === nextProps.filterOnlyWithPurchases &&
+    prevProps.searchTerm === nextProps.searchTerm &&
+    prevProps.regionFilter === nextProps.regionFilter &&
+    prevProps.categoryFilter === nextProps.categoryFilter &&
+    // Functions are typically stable via useCallback in App, 
+    // but we can let them pass if they don't change.
+    prevProps.onUpdateClient === nextProps.onUpdateClient
+    // Ignoring 'users' to prevent realtime presence updates from tearing down the grid
+  );
+});

@@ -54,7 +54,14 @@ export const useFilters = (
 
     const isFiltering = searchQuery !== debouncedSearchQuery || searchProductQuery !== debouncedProductQuery;
 
-    // --- Derived Data ---
+    // Derived Data
+    // Memoized Map of Seller IDs to their Sales Category to avoid full users array dependency in tight loops
+    const sellerCategoriesKey = users.map(u => `${u.id}:${u.salesCategory}`).join(',');
+    const sellerCategoriesMap = useMemo(() => {
+        const map = new Map<string, string>();
+        users.forEach(u => map.set(u.id, u.salesCategory || 'Desconhecido'));
+        return map;
+    }, [users, sellerCategoriesKey]);
 
     // 1. Visible Clients (Permissions)
     const visibleClients = useMemo(() => {
@@ -84,8 +91,8 @@ export const useFilters = (
             // Sales Category Filter (Admin Only)
             let matchSalesCat = true;
             if (currentUser && hasFullDataVisibility(currentUser.role) && filterSalesCategory !== 'Todos') {
-                const seller = users.find(u => u.id === c.salespersonId);
-                if (!seller || seller.salesCategory !== filterSalesCategory) {
+                const sellerSalesCat = sellerCategoriesMap.get(c.salespersonId) || 'Desconhecido';
+                if (sellerSalesCat !== filterSalesCategory) {
                     matchSalesCat = false;
                 }
             }
@@ -176,7 +183,7 @@ export const useFilters = (
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, users, currentUser, startDate, endDate]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUser, startDate, endDate]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
