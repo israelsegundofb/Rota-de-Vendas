@@ -38,32 +38,34 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onEdit, onAssignProduct
             >
 
                 {/* Header / Banner */}
-                <div className="flex justify-between items-start p-4 pb-2">
-                    <div className="flex items-start gap-3">
+                <div className="flex justify-between items-start p-4 pb-2 gap-2">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
                         {/* Avatar */}
                         <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-lg shrink-0 border border-gray-200">
                             {getInitials(client.companyName)}
                         </div>
 
                         {/* Info */}
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <h3 className="font-bold text-gray-900 truncate leading-tight mb-0.5" title={client.companyName}>
                                 {client.companyName}
                             </h3>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs text-gray-500 font-medium">{client.category.join(', ')}</span>
+                            <div className="flex flex-col items-start gap-1">
+                                <span className="text-xs text-gray-500 font-medium truncate w-full" title={client.category.join(', ')}>
+                                    {client.category.length > 0 ? client.category.join(', ') : 'Outros'}
+                                </span>
                                 {client.mainCnae && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100" title={`CNAE: ${client.mainCnae}`}>
-                                        <Briefcase className="w-2.5 h-2.5 mr-1" />
-                                        {client.mainCnae}
-                                    </span>
+                                    <div className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100 max-w-full" title={`CNAE: ${client.mainCnae}`}>
+                                        <Briefcase className="w-2.5 h-2.5 mr-1 shrink-0" />
+                                        <span className="truncate">{client.mainCnae}</span>
+                                    </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
                     {/* Region Badge */}
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${regionClass}`}>
+                    <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${regionClass}`}>
                         {client.region}
                     </span>
                 </div>
