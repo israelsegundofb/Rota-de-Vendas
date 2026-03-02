@@ -169,6 +169,8 @@ const App: React.FC = () => {
   usePageTracking(isEditModalOpen ? 'modal-edit-client' : 'none'); // Track Edit Modal
   usePageTracking(isCloudConfigOpen ? 'modal-cloud-config' : 'none'); // Track Config Modal
 
+  const presenceInitialized = useRef(false);
+
   // --- Presence Effects ---
   useEffect(() => {
     // Global Google Maps Auth Failure Handler
@@ -180,12 +182,17 @@ const App: React.FC = () => {
       setKeyVersion(v => v + 1);
     };
 
-    if (currentUser && (!currentUser.status || currentUser.status === 'Offline')) {
-      const setOnline = async () => {
-        baseUpdateUser({ ...currentUser, status: 'Online' });
-        await updateUserStatusInCloud(currentUser.id, 'Online', users);
-      };
-      setOnline();
+    if (!currentUser) {
+      presenceInitialized.current = false;
+    } else if (!presenceInitialized.current) {
+      presenceInitialized.current = true;
+      if (!currentUser.status || currentUser.status === 'Offline') {
+        const setOnline = async () => {
+          baseUpdateUser({ ...currentUser, status: 'Online' });
+          await updateUserStatusInCloud(currentUser.id, 'Online', users);
+        };
+        setOnline();
+      }
     }
   }, [currentUser, baseUpdateUser, users]); // Added missing dependencies
 
