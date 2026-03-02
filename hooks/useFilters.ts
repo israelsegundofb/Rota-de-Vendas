@@ -74,6 +74,28 @@ export const useFilters = (
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
+        // Hoist date parsing outside the filter loop to avoid O(N*M) redundant Date object creation
+        let parsedStartDate: Date | null = null;
+        let parsedEndDate: Date | null = null;
+
+        if (startDate) {
+            parsedStartDate = new Date(startDate);
+            if (!isNaN(parsedStartDate.getTime())) {
+                parsedStartDate.setHours(0, 0, 0, 0);
+            } else {
+                parsedStartDate = null;
+            }
+        }
+
+        if (endDate) {
+            parsedEndDate = new Date(endDate);
+            if (!isNaN(parsedEndDate.getTime())) {
+                parsedEndDate.setHours(23, 59, 59, 999);
+            } else {
+                parsedEndDate = null;
+            }
+        }
+
         return visibleClients.filter(c => {
             // General Filters
             const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
@@ -127,7 +149,7 @@ export const useFilters = (
                     );
 
                     // Date Range Filter
-                    const matchDate = (!startDate || !endDate) || c.purchasedProducts.some(p => {
+                    const matchDate = (!startDate && !endDate) || c.purchasedProducts.some(p => {
                         if (!p.purchaseDate) return false;
 
                         // Robust Date Parsing
@@ -149,20 +171,10 @@ export const useFilters = (
 
                         if (isNaN(pDate.getTime())) return false; // Invalid date in data
 
-                        // Create Date objects for start/end, resetting time
                         pDate.setHours(0, 0, 0, 0);
 
-                        if (startDate) {
-                            const sDate = new Date(startDate);
-                            sDate.setHours(0, 0, 0, 0);
-                            if (pDate < sDate) return false;
-                        }
-
-                        if (endDate) {
-                            const eDate = new Date(endDate);
-                            eDate.setHours(23, 59, 59, 999);
-                            if (pDate > eDate) return false;
-                        }
+                        if (parsedStartDate && pDate < parsedStartDate) return false;
+                        if (parsedEndDate && pDate > parsedEndDate) return false;
 
                         return true;
                     });
