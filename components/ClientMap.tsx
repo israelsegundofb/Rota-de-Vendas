@@ -118,8 +118,9 @@ const ClientMapContent: React.FC<{
   onClientSelect: (id: string | null) => void,
   productFilterActive?: boolean,
   users?: AppUser[],
-  isClusteringEnabled: boolean
-}> = ({ clients, onClientSelect, productFilterActive, users, isClusteringEnabled }) => {
+  isClusteringEnabled: boolean,
+  isAuthFailureDetected: boolean
+}> = ({ clients, onClientSelect, productFilterActive, users, isClusteringEnabled, isAuthFailureDetected }) => {
   const map = useMap();
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const markersRef = useRef<any[]>([]);
@@ -150,15 +151,24 @@ const ClientMapContent: React.FC<{
   }, [users]);
 
   useEffect(() => {
-    if (!map || !google.maps.marker || (window as any).gm_authFailure_detected) return;
+    if (!map || !google.maps.marker || isAuthFailureDetected) {
+      if (isAuthFailureDetected) {
+        console.warn("[MapContent] Bailing out due to detected auth failure.");
+      }
+      return;
+    }
 
     if (clustererRef.current) {
       clustererRef.current.clearMarkers();
       (clustererRef.current as any).setMap(null);
     }
-    markersRef.current.forEach(m => {
-      m.map = null;
-      google.maps.event.clearInstanceListeners(m);
+    markersRef.current.forEach((m: any) => {
+      try {
+        m.map = null;
+        google.maps.event.clearInstanceListeners(m);
+      } catch (e) {
+        // Ignore errors during marker clearing
+      }
     });
     markersRef.current = [];
 
@@ -221,19 +231,25 @@ const ClientMapContent: React.FC<{
             pinOptions.glyph = glyphElement;
           }
 
-          const pin = new google.maps.marker.PinElement(pinOptions);
-          const marker = new google.maps.marker.AdvancedMarkerElement({
-            position: { lat: client.lat, lng: client.lng },
-            content: pin.element,
-            map: isClusteringEnabled ? null : map,
-            title: client.companyName
-          });
+          try {
+            const pin = new google.maps.marker.PinElement(pinOptions);
+            const marker = new google.maps.marker.AdvancedMarkerElement({
+              position: { lat: Number(client.lat), lng: Number(client.lng) },
+              content: pin.element,
+              map: isClusteringEnabled ? null : map,
+              title: client.companyName
+            });
 
-          marker.addListener('click', () => {
-            onClientSelect(client.id);
-          });
-          return marker;
-        });
+            marker.addListener('click', () => {
+              onClientSelect(client.id);
+            });
+            return marker;
+          } catch (e) {
+            console.error(`[MapContent] Error creating marker for client ${client.id}:`, e);
+            return null;
+          }
+        })
+        .filter(m => m !== null);
 
       if (isActive) {
         if (isClusteringEnabled && clustererRef.current) {
@@ -251,15 +267,36 @@ const ClientMapContent: React.FC<{
     processBatch();
     return () => {
       isActive = false;
-      if (clustererRef.current) {
-        clustererRef.current.clearMarkers();
-        (clustererRef.current as any).setMap(null);
+      // CRITICAL: If the map API is broken (Auth Failure), 
+      // touching markers or clusterer during unmount WILL cause 'getRootNode' crash.
+      // We must bail out immediately and let the objects be leaked/garbage collected.
+      if (isAuthFailureDetected) {
+        console.warn("[MapContent] Auth failure detected. Bailing out of cleanup to avoid crash.");
+        return;
       }
-      markersRef.current.forEach(m => {
-        m.map = null;
-      });
+
+      try {
+        if (clustererRef.current) {
+          try {
+            clustererRef.current.clearMarkers();
+            (clustererRef.current as any).setMap(null);
+          } catch (e) {
+            console.warn("[MapContent] Clusterer cleanup failed:", e);
+          }
+        }
+        markersRef.current.forEach((m: any) => {
+          try {
+            // AdvancedMarkerElement uses .map = null, not .setMap(null)
+            if (m) m.map = null;
+          } catch (e) {
+            // Silently fail during cleanup
+          }
+        });
+      } catch (e) {
+        console.warn("[MapContent] Silent error during marker cleanup:", e);
+      }
     };
-  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, userColorMap, isClusteringEnabled]);
+  }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, userColorMap, isClusteringEnabled, isAuthFailureDetected]);
 
   return <MapBoundsUpdater clients={clients} />;
 };
@@ -267,7 +304,8 @@ const ClientMapContent: React.FC<{
 const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, users, filterContent }) => {
   const defaultCenter = { lat: -14.235, lng: -51.9253 };
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [authError, setAuthError] = useState(false);
+  const [authError, setAuthError] = useState<boolean>(false);
+  const isAuthFailureDetected = (window as any).gm_authFailure_detected === true || authError === true;
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isClusteringEnabled, setIsClusteringEnabled] = useState(true);
 
@@ -357,6 +395,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             productFilterActive={productFilterActive}
             users={users}
             isClusteringEnabled={isClusteringEnabled}
+            isAuthFailureDetected={isAuthFailureDetected}
           />
 
           <MapZoomControls />
