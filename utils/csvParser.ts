@@ -119,7 +119,7 @@ const parsePercentage = (value: string): number => {
 };
 
 const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario'];
-const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular'];
+const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular', 'nome da cidade', 'estado', 'cep', 'telefone comercial', 'numero', 'whatsapp'];
 const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
 
 // Helper to normalize headers (remove accents, lowercase)

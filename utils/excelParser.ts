@@ -140,22 +140,43 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     // re-run extraction logic to get lat/lng from IT if 'lat'/'lng' are undefined.
 
                     const companyName = rowData['razao social'] || rowData['cliente'] || rowData['nome fantasia'] ||
-                        rowData['empresa'] || rowData['nome'] || rowData['nome cliente'] ||
-                        rowData['parceiro'] || rowData['loja'] || '';
+                        rowData['empresa'] || rowData['nome comercial'] || rowData['nome'] || rowData['nome cliente'] ||
+                        rowData['parceiro'] || rowData['loja'] || rowData['fantasia'] || '';
+
+                    const cnpj = rowData['cnpj'] || rowData['taxid'] || rowData['inscricao'] || '';
 
                     const ownerName = rowData['nome do proprietario'] || rowData['proprietario'] || rowData['dono'] ||
                         rowData['contato principal'] || rowData['responsavel'] || rowData['socio'] || '';
 
-                    const contact = String(rowData['contato'] || rowData['telefone'] || rowData['celular'] ||
-                        rowData['whatsapp'] || rowData['tel'] || rowData['fone'] || '');
+                    const contact = String(rowData['telefone comercial'] || rowData['contato'] || rowData['telefone'] || rowData['celular'] ||
+                        rowData['tel'] || rowData['fone'] || '');
 
-                    // Only add if we have at least a Name or Address
-                    if (companyName || address || addressInput) {
+                    const whatsapp = String(rowData['whatsapp'] || rowData['whats'] || '');
+
+                    const street = rowData['rua'] || rowData['logradouro'] || '';
+                    const number = rowData['numero'] || rowData['num'] || '';
+                    const district = rowData['bairro'] || rowData['distrito'] || '';
+                    const city = rowData['nome da cidade'] || rowData['cidade'] || rowData['municipio'] || '';
+                    const state = rowData['estado'] || rowData['uf'] || '';
+                    const zip = rowData['cep'] || rowData['codigo postal'] || '';
+                    const country = rowData['pais'] || '';
+
+                    // Only add if we have at least a Name, CNPJ, or Address
+                    if (companyName || cnpj || address || addressInput) {
                         normalizedData.push({
                             companyName: companyName,
+                            cnpj: cnpj,
                             ownerName: ownerName,
                             phone: contact,
-                            address: address, // The display address
+                            whatsapp: whatsapp,
+                            address: address || street, // Default to street if mapped granularly
+                            street: street,
+                            number: number,
+                            district: district,
+                            city: city,
+                            state: state,
+                            zip: zip,
+                            country: country,
                             googleMapsLink: finalLink,
                             latitude: lat,
                             longitude: lng

@@ -116,22 +116,30 @@ export const processClientsWithAI = async (
       }
     }
 
-    // Construct address from parts if the main address field is empty
+    // Construct address from parts to ensure maximum granularity is used 
+    // especially for files mapping structured columns (Rua, Número, Bairro, Cidade, Estado, CEP)
+    const granularAddressParts = [
+      client.street || client.address, // If street is empty, "address" might just be the street name from the 'Endereço Comercial' column
+      client.number,
+      client.district,
+      client.city,
+      client.state,
+      client.zip,
+      client.country
+    ].filter(Boolean);
+
+    // Construct the granular address string
+    const granularAddress = granularAddressParts.join(", ");
+
     let rawAddress = client.address || "";
-    if (!rawAddress && (client.street || client.city)) {
-      const parts = [
-        client.street,
-        client.number,
-        client.district,
-        client.city,
-        client.state,
-        client.zip,
-        client.country
-      ].filter(Boolean);
-      rawAddress = parts.join(", ");
+
+    // If we have granular fields (number, district, city) that make the combined string longer/more detailed
+    // than the basic `address` field, prioritize the granular combination for optimal Geocoding.
+    if (!rawAddress || (granularAddress.length > rawAddress.length && (client.number || client.district || client.city))) {
+      rawAddress = granularAddress;
     }
 
-    // Override with CNPJ data if available (usually more accurate)
+    // Override with CNPJ data if available (usually the most highly accurate official data)
     if (cnpjData?.logradouro) {
       rawAddress = `${cnpjData.logradouro}, ${cnpjData.numero}${cnpjData.complemento ? ` - ${cnpjData.complemento}` : ''}, ${cnpjData.bairro}, ${cnpjData.municipio} - ${cnpjData.uf}`;
     }
