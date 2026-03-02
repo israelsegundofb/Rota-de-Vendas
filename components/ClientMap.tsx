@@ -150,8 +150,7 @@ const ClientMapContent: React.FC<{
   }, [users]);
 
   useEffect(() => {
-    if (!map) return;
-    if (!google.maps.marker) return;
+    if (!map || !google.maps.marker || (window as any).gm_authFailure_detected) return;
 
     if (clustererRef.current) {
       clustererRef.current.clearMarkers();
@@ -275,9 +274,13 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   useEffect(() => {
-    if (apiKey) setTimeout(() => setAuthError(false), 0);
+    if (apiKey) {
+      setTimeout(() => setAuthError(false), 0);
+      (window as any).gm_authFailure_detected = false;
+    }
     (window as any).gm_authFailure = () => {
       console.error("Google Maps Auth Failure detected via gm_authFailure.");
+      (window as any).gm_authFailure_detected = true;
       setAuthError(true);
     };
 

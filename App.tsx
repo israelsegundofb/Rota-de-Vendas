@@ -8,7 +8,7 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History } from 'lucide-react';
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
@@ -110,6 +110,20 @@ const App: React.FC = () => {
     resetFilters,
     isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
+
+  const missingCoordinatesCount = React.useMemo(() => {
+    return (visibleClients || []).filter((c: EnrichedClient) => !c.lat || !c.lng || Number(c.lat) === 0 || Number(c.lng) === 0).length;
+  }, [visibleClients]);
+
+  const [filterMissingCoords, setFilterMissingCoords] = useState(false);
+
+  // Apply the local diagnostic filter if active
+  const finalFilteredClients = React.useMemo(() => {
+    if (filterMissingCoords) {
+      return (filteredClients || []).filter((c: EnrichedClient) => !c.lat || !c.lng || Number(c.lat) === 0 || Number(c.lng) === 0);
+    }
+    return filteredClients;
+  }, [filteredClients, filterMissingCoords]);
 
   const {
     messages, conversations, activeConversationId, setActiveConversationId,
@@ -1860,8 +1874,24 @@ const App: React.FC = () => {
                 <p className="text-xs text-gray-400">
                   {isAdminUser ? 'Clientes Visualizados' : 'Meus Clientes'}
                 </p>
-                <p className="text-lg font-bold leading-none">{visibleClients.length}</p>
+                <p className="text-lg font-bold leading-none">{finalFilteredClients.length}</p>
               </div>
+              {missingCoordinatesCount > 0 && (
+                <button
+                  onClick={() => {
+                    setFilterMissingCoords(!filterMissingCoords);
+                    if (activeView !== 'table') setActiveView('table');
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${filterMissingCoords ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-inner' : 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'}`}
+                  title={`${missingCoordinatesCount} clientes sem localização no mapa. Clique para filtrar.`}
+                >
+                  <AlertTriangle className={`w-4 h-4 ${filterMissingCoords ? 'animate-pulse' : ''}`} />
+                  <div className="text-left hidden sm:block">
+                    <p className="text-[10px] font-bold uppercase leading-none">Sem Mapa</p>
+                    <p className="text-xs font-black leading-none">{missingCoordinatesCount}</p>
+                  </div>
+                </button>
+              )}
               {isAdminUser && (
                 <div className="text-right border-l pl-6 border-gray-200">
                   <p className="text-xs text-gray-400">Total Sistema</p>
@@ -1945,7 +1975,7 @@ const App: React.FC = () => {
               <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Dashboard..." />}>
                 <div className="flex-1 overflow-hidden bg-surface">
                   <AdminDashboard
-                    clients={filteredClients}
+                    clients={finalFilteredClients}
                     products={products}
                     users={users}
                     onClose={() => setActiveView('map')}
@@ -2200,7 +2230,7 @@ const App: React.FC = () => {
                       )}
 
                       {/* Explicit "Not Found" message if list is empty and no suggestions */}
-                      {!showProductSuggestions && searchProductQuery && filteredClients.length === 0 && (
+                      {!showProductSuggestions && searchProductQuery && finalFilteredClients.length === 0 && (
                         <div className="absolute top-full left-0 right-0 mt-1 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 animate-fade-in bg-rose-50 px-2 py-1 rounded border border-rose-100 italic">
                           <AlertCircle className="w-3 h-3" />
                           Não Foi Encontrado
@@ -2254,7 +2284,7 @@ const App: React.FC = () => {
 
                   <div className="flex justify-end">
                     <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">
-                      {filteredClients.length} resultados encontrados
+                      {finalFilteredClients.length} resultados encontrados
                     </span>
                   </div>
                 </div>
@@ -2293,7 +2323,7 @@ const App: React.FC = () => {
                         }>
                           <ClientMap
                             key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
-                            clients={filteredClients}
+                            clients={finalFilteredClients}
                             apiKey={googleMapsApiKey}
                             onInvalidKey={handleInvalidKey}
                             productFilterActive={isProductFilterActive}
@@ -2512,7 +2542,7 @@ const App: React.FC = () => {
                         </React.Suspense>
                       ) : activeView === 'table' ? (
                         <ClientList
-                          clients={filteredClients}
+                          clients={finalFilteredClients}
                           onUpdateClient={handleUpdateClient}
                           onAddClient={handleAddClient}
                           currentUserRole={currentUser?.role}
@@ -2538,7 +2568,7 @@ const App: React.FC = () => {
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
-                          clients={filteredClients}
+                          clients={finalFilteredClients}
                           users={users}
                           startDate={startDate}
                           endDate={endDate}
@@ -2640,7 +2670,7 @@ const App: React.FC = () => {
         confirmLabel={dialogConfig.confirmLabel}
         cancelLabel={dialogConfig.cancelLabel}
       />
-    </GoogleReCaptchaProvider>
+    </GoogleReCaptchaProvider >
   );
 };
 
