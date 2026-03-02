@@ -265,6 +265,7 @@ const ClientMapContent: React.FC<{
     };
 
     processBatch();
+
     return () => {
       isActive = false;
       // CRITICAL: If the map API is broken (Auth Failure), 

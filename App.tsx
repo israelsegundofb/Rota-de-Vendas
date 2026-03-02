@@ -582,42 +582,26 @@ const App: React.FC = () => {
     // OPTIMIZATION: We will trust the passed 'updatedClient' mostly, but for address comparison we need source.
     // We can use a ref for masterClientList to read current value without re-binding.
 
-    setMasterClientList(prevList => {
-      /*
+    setMasterClientList((prevList) => {
       const original = prevList.find(c => c.id === updatedClient.id);
-      const finalClient = { ...updatedClient };
 
       const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
       const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
       const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
       const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
-      const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
-      */
 
-      // NOTE: We cannot easily doing ASYNC work inside a synchronous setState reducer.
-      // So we must keep the async logic OUTSIDE. 
-      // This means handleUpdateClient MUST depend on masterClientList or we refactor.
-      return prevList; // Placeholder, see logic below
+      const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+
+      // Handle async geocoding OUTSIDE the synchronous setState where possible.
+      // Since geocode is async, we return the list as-is below, 
+      // but if we successfully geocode outside, we will fire ANOTHER setState.
+      return prevList;
     });
 
-    // REVERTING STRATEGY: 
-    // Since we have async logic (geocoding) that depends on "original" state, 
-    // and we want to avoid re-creating this handler every time the list changes...
-    // The best pattern here without major refactor is to use a Ref for the list.
-
-    // For now, I will implement a standard useCallback but I acknowledge it will update when masterClientList changes.
-    // However, fast typing updates might be filtered if we ensure other props are stable.
-
-    // Actually, we can optimize by making the heavy geocoding independent of the list.
-    // 'original' is just needed to know if we SHOULD geocode. 
-    // If the user passes a flag or if we just compare with what we have...
-
-    // Let's stick to simple useCallback for now, adding masterClientList as dependency.
-    // It's better than no hook.
-
-    const original = masterClientList.find(c => c.id === updatedClient.id);
     const finalClient = { ...updatedClient };
 
+    // Find original directly for comparison
+    const original = masterClientList.find(c => c.id === updatedClient.id);
     const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
     const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
@@ -673,7 +657,7 @@ const App: React.FC = () => {
       });
     }
     toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
-  }, [masterClientList, currentUser, googleMapsApiKey, toast, setMasterClientList]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
@@ -739,7 +723,7 @@ const App: React.FC = () => {
     }, 100);
   }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
 
-  const handleClearClients = () => {
+  const handleClearClients = React.useCallback(() => {
     let targetId: string | undefined;
     let targetName = "TODOS";
 
@@ -786,7 +770,7 @@ const App: React.FC = () => {
         });
       }
     );
-  };
+  }, [currentUser, filterSalespersonId, targetUploadUserId, users, toast, setMasterClientList]);
 
   // Simulate Sales Logic
   const distributeProductsToClients = (clients: EnrichedClient[], allProducts: Product[]) => {
