@@ -25,6 +25,22 @@ const getApiKey = () => {
 
 const BASE_URL = 'https://api.cnpja.com';
 
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs: number = 8000) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        throw error;
+    }
+};
+
 /**
  * Consulta um CNPJ específico usando a API Comercial
  */
@@ -38,9 +54,9 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
     try {
         // Na API Comercial, o endpoint é /office/:taxId
         // Adicionamos geocoding=true para obter lat/lng nativamente
-        const response = await fetch(`${BASE_URL}/office/${cleanCNPJ}?geocoding=true`, {
+        const response = await fetchWithTimeout(`${BASE_URL}/office/${cleanCNPJ}?geocoding=true`, {
             headers: { 'Authorization': getApiKey() }
-        });
+        }, 10000); // 10s timeout maximum
 
         if (!response.ok) {
             if (response.status === 404) throw new Error('CNPJ não encontrado.');
@@ -117,9 +133,9 @@ export const pesquisarEmpresaPorEndereco = async (params: {
             limit: '10'
         });
 
-        const response = await fetch(`${BASE_URL}/office?${query}`, {
+        const response = await fetchWithTimeout(`${BASE_URL}/office?${query}`, {
             headers: { 'Authorization': getApiKey() }
-        });
+        }, 10000); // 10s timeout maximum
 
         if (!response.ok) return [];
 
@@ -133,7 +149,7 @@ export const pesquisarEmpresaPorEndereco = async (params: {
 
 const fallbackMinhaReceita = async (cnpj: string): Promise<CNPJResponse | null> => {
     try {
-        const response = await fetch(`https://minhareceita.org/${cnpj}`);
+        const response = await fetchWithTimeout(`https://minhareceita.org/${cnpj}`, {}, 8000); // 8s timeout
         if (!response.ok) return null;
 
         const data = await response.json();
@@ -167,7 +183,7 @@ const fallbackMinhaReceita = async (cnpj: string): Promise<CNPJResponse | null> 
 
 const fallbackBrasilAPI = async (cnpj: string): Promise<CNPJResponse | null> => {
     try {
-        const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+        const response = await fetchWithTimeout(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {}, 8000); // 8s timeout
         if (!response.ok) return null;
         const data = await response.json();
         return {
