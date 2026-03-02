@@ -47,6 +47,9 @@ const loadInitialFiles = (): UploadedFile[] => {
 
 // Helper to migrate legacy roles removed - imported from authUtils
 
+// Helper to hash data ignoring lastUpdated timestamp to prevent infinite sync loops
+const hashDataList = (list: any[]) => JSON.stringify(list, (key, value) => key === 'lastUpdated' ? undefined : value);
+
 export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]) => void) => {
     const [masterClientList, setMasterClientList] = useState<EnrichedClient[]>([]);
     const [products, setProducts] = useState<Product[]>(loadInitialProducts);
@@ -58,8 +61,10 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
     const [loadingProgress, setLoadingProgress] = useState(0);
     const [loadingMessage, setLoadingMessage] = useState('Iniciando sistema...');
 
-    // Initialize Data
-    const lastUsersString = useRef<string>('');
+    // Initialize Data Sync Refs
+    const lastClientsHash = useRef<string>('');
+    const lastUsersHash = useRef<string>('');
+    const lastProductsHash = useRef<string>('');
 
     useEffect(() => {
         const initData = async () => {
@@ -81,10 +86,17 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
                     if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
                         console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
-                        if (cloudData.clients) setMasterClientList(cloudData.clients);
-                        if (cloudData.products) setProducts(cloudData.products);
+                        if (cloudData.clients) {
+                            lastClientsHash.current = hashDataList(cloudData.clients);
+                            setMasterClientList(cloudData.clients);
+                        }
+                        if (cloudData.products) {
+                            lastProductsHash.current = hashDataList(cloudData.products);
+                            setProducts(cloudData.products);
+                        }
                         if (cloudData.categories) setCategories(cloudData.categories);
                         if (cloudData.users && setUsers) {
+                            lastUsersHash.current = hashDataList(cloudData.users);
                             setUsers(migrateUsers(cloudData.users));
                         }
                         if (cloudData.uploadedFiles) {
@@ -171,14 +183,26 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                 unsubscribe = subscribeToCloudChanges((newData: any) => {
                     if (newData) {
                         console.log('[SYNC] Real-time update received from cloud');
-                        if (newData.clients) setMasterClientList(newData.clients);
-                        if (newData.products) setProducts(newData.products);
+                        if (newData.clients) {
+                            const newHash = hashDataList(newData.clients);
+                            if (newHash !== lastClientsHash.current) {
+                                lastClientsHash.current = newHash;
+                                setMasterClientList(newData.clients);
+                            }
+                        }
+                        if (newData.products) {
+                            const newHash = hashDataList(newData.products);
+                            if (newHash !== lastProductsHash.current) {
+                                lastProductsHash.current = newHash;
+                                setProducts(newData.products);
+                            }
+                        }
                         if (newData.categories) setCategories(newData.categories);
                         if (newData.users && setUsers) {
-                            const newUsersString = JSON.stringify(newData.users);
-                            if (newUsersString !== lastUsersString.current) {
+                            const newHash = hashDataList(newData.users);
+                            if (newHash !== lastUsersHash.current) {
                                 console.log(`[SYNC] Users changed in cloud (${newData.users.length} users). Updating local state.`);
-                                lastUsersString.current = newUsersString;
+                                lastUsersHash.current = newHash;
                                 setUsers(migrateUsers(newData.users));
                             }
                         }
@@ -194,19 +218,29 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
     // Auto-Save to Cloud
     useEffect(() => {
-        // Only save if we are connected, loaded, AND have actual data to save
-        // We also check for users.length > 3 to avoid saving the default list over a populated cloud
-        // Added check to ensure we don't save if clients were loaded but now we have 0 (unless explicit)
-        // Only save if we are connected, loaded, AND have some users (never save if users are 0 as a safety measure)
         const shouldSave = isFirebaseConnected && isDataLoaded && users.length > 0;
 
         if (shouldSave) {
-            const timeout = setTimeout(() => {
-                console.log('[SYNC] Auto-saving to cloud...');
-                saveToCloud(masterClientList, products, categories, users, uploadedFiles)
-                    .catch(err => console.error("Auto-save failed", err));
-            }, 3000); // 3s debounce
-            return () => clearTimeout(timeout);
+            const currentClientsHash = hashDataList(masterClientList);
+            const currentUsersHash = hashDataList(users);
+            const currentProductsHash = hashDataList(products);
+
+            const hasChanges =
+                currentClientsHash !== lastClientsHash.current ||
+                currentUsersHash !== lastUsersHash.current ||
+                currentProductsHash !== lastProductsHash.current;
+
+            if (hasChanges) {
+                const timeout = setTimeout(() => {
+                    console.log('[SYNC] Auto-saving to cloud... local changes detected.');
+                    lastClientsHash.current = currentClientsHash;
+                    lastUsersHash.current = currentUsersHash;
+                    lastProductsHash.current = currentProductsHash;
+                    saveToCloud(masterClientList, products, categories, users, uploadedFiles)
+                        .catch(err => console.error("Auto-save failed", err));
+                }, 3000); // 3s debounce
+                return () => clearTimeout(timeout);
+            }
         }
     }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
 

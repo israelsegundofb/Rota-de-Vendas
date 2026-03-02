@@ -134,12 +134,13 @@ const ClientMapContent: React.FC<{
     return el;
   }, []);
 
-  const usersColorKey = (users || []).map(u => `${u.id}:${u.name}:${u.color}`).join('|');
+  const usersColorKey = useMemo(() => JSON.stringify((users || []).map(u => ({ id: u.id, name: u.name, color: u.color }))), [users]);
 
   const userColorMap = useMemo(() => {
     const map = new Map<string, { bg: string, border: string, glyph: string }>();
-    if (!users) return map;
-    users.forEach(u => {
+    if (!usersColorKey || usersColorKey === '[]') return map;
+    const parsedUsers = JSON.parse(usersColorKey);
+    parsedUsers.forEach((u: any) => {
       let color = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
       if (u.color) {
         color = { bg: u.color, border: 'black', glyph: '#fff' };
@@ -150,7 +151,7 @@ const ClientMapContent: React.FC<{
       map.set(u.id, color);
     });
     return map;
-  }, [users, usersColorKey]);
+  }, [usersColorKey]);
 
   useEffect(() => {
     if (!map || !google.maps.marker || isAuthFailureDetected) {

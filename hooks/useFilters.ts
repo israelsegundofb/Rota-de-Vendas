@@ -59,25 +59,33 @@ export const useFilters = (
     const sellerCategoriesKey = users.map(u => `${u.id}:${u.salesCategory}`).join(',');
     const sellerCategoriesMap = useMemo(() => {
         const map = new Map<string, string>();
-        users.forEach(u => map.set(u.id, u.salesCategory || 'Desconhecido'));
+        sellerCategoriesKey.split(',').forEach(pair => {
+            if (pair) {
+                const [id, cat] = pair.split(':');
+                map.set(id, cat);
+            }
+        });
         return map;
-    }, [users, sellerCategoriesKey]);
+    }, [sellerCategoriesKey]);
+
+    const currentUserId = currentUser?.id;
+    const currentUserRole = currentUser?.role;
 
     // 1. Visible Clients (Permissions)
     const visibleClients = useMemo(() => {
-        if (!currentUser) return [];
+        if (!currentUserId || !currentUserRole) return [];
         let baseList = [];
-        if (hasFullDataVisibility(currentUser.role)) {
+        if (hasFullDataVisibility(currentUserRole)) {
             if (filterSalespersonId !== 'Todos') {
                 baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
             } else {
                 baseList = masterClientList;
             }
         } else {
-            baseList = masterClientList.filter(c => c.salespersonId === currentUser.id);
+            baseList = masterClientList.filter(c => c.salespersonId === currentUserId);
         }
         return baseList;
-    }, [currentUser, masterClientList, filterSalespersonId]);
+    }, [currentUserId, currentUserRole, masterClientList, filterSalespersonId]);
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
@@ -90,7 +98,7 @@ export const useFilters = (
 
             // Sales Category Filter (Admin Only)
             let matchSalesCat = true;
-            if (currentUser && hasFullDataVisibility(currentUser.role) && filterSalesCategory !== 'Todos') {
+            if (currentUserRole && hasFullDataVisibility(currentUserRole) && filterSalesCategory !== 'Todos') {
                 const sellerSalesCat = sellerCategoriesMap.get(c.salespersonId) || 'Desconhecido';
                 if (sellerSalesCat !== filterSalesCategory) {
                     matchSalesCat = false;
@@ -183,7 +191,7 @@ export const useFilters = (
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUser, startDate, endDate]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
