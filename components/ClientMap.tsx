@@ -39,8 +39,7 @@ const MapStyleSelector: React.FC<MapStyleSelectorProps> = ({ mapTypeId, setMapTy
     </button>
     <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-xl border border-gray-100 py-1 hidden group-hover:block z-50">
       <button onClick={() => setMapTypeId('roadmap')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'roadmap' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Map</button>
-      <button onClick={() => setMapTypeId('satellite')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'satellite' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Satélite</button>
-      <button onClick={() => setMapTypeId('hybrid')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'hybrid' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Híbrido</button>
+      <button onClick={() => setMapTypeId('hybrid')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'hybrid' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Satélite</button>
       <button onClick={() => setMapTypeId('terrain')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'terrain' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Relevo</button>
     </div>
   </div>
