@@ -16,7 +16,7 @@ import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } fro
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -480,9 +480,15 @@ const App: React.FC = () => {
         '• Limpeza da listagem de arquivos e reset de contadores.',
         '• Vendedores, produtos e categorias NÃO serão afetados.'
       ],
-      () => {
+      async () => {
         setMasterClientList([]);
         setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+
+        try {
+          await deleteAllClientsFromCloud();
+        } catch (error) {
+          console.error("Erro ao apagar clientes do firebase: ", error);
+        }
 
         if (currentUser) {
           logActivityToCloud({

@@ -241,6 +241,44 @@ export const saveToCloud = async (
     }
 };
 
+export const deleteAllClientsFromCloud = async () => {
+    if (!db) return;
+    try {
+        const clientsRef = collection(db, 'rota-vendas-data', 'clients', 'list');
+        const snapshot = await getDocs(clientsRef);
+        console.warn(`[FIREBASE] Deleting ${snapshot.size} clients from cloud...`);
+
+        let batch = writeBatch(db);
+        let count = 0;
+
+        for (const docSnapshot of snapshot.docs) {
+            batch.delete(docSnapshot.ref);
+            count++;
+
+            // Commit every 450 documents (Firestore limit is 500)
+            if (count % 450 === 0) {
+                await batch.commit();
+                batch = writeBatch(db);
+                await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit pause
+            }
+        }
+
+        // Commit remaining
+        if (count % 450 !== 0) {
+            await batch.commit();
+        }
+
+        // Also update metadata to reflect 0 clients
+        const metaRef = doc(db, 'rota-vendas-data', 'metadata');
+        await updateDoc(metaRef, { totalClients: 0, lastUpdated: new Date().toISOString() });
+
+        console.log('✅ All clients successfully deleted from cloud');
+    } catch (e) {
+        console.error("Error deleting all clients from cloud:", e);
+        throw e;
+    }
+};
+
 export const loadFromCloud = async (): Promise<any | null> => {
     if (!db) return null;
 
