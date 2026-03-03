@@ -234,11 +234,32 @@ const ClientMapContent: React.FC<{
             pinOptions.glyph = glyphElement;
           }
 
+          // Calculate total purchase value for the client
+          const totalPurchaseValue = client.purchasedProducts?.reduce((sum, p) => sum + (p.totalValue || 0), 0) || 0;
+
           try {
             const pin = new google.maps.marker.PinElement(pinOptions);
+
+            let finalContent: HTMLElement = pin.element;
+
+            if (totalPurchaseValue > 0) {
+              const container = document.createElement('div');
+              container.className = 'relative flex flex-col items-center cursor-pointer -mt-6 hover:z-50';
+              // '-mt-6' pulls the marker visually up so the tooltip doesn't push the actual pin tip drastically off-center
+
+              const tooltip = document.createElement('div');
+              tooltip.className = 'bg-green-600 text-white shadow-elevation-1 text-[10px] font-black px-1.5 py-0.5 rounded border border-green-700 mb-0.5 z-10 whitespace-nowrap';
+              tooltip.textContent = totalPurchaseValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+              container.appendChild(tooltip);
+              container.appendChild(pin.element);
+
+              finalContent = container;
+            }
+
             const marker = new google.maps.marker.AdvancedMarkerElement({
               position: { lat: Number(client.lat), lng: Number(client.lng) },
-              content: pin.element,
+              content: finalContent,
               map: isClusteringEnabled ? null : map,
               title: client.companyName
             });

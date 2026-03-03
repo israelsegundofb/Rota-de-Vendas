@@ -1369,13 +1369,9 @@ const App: React.FC = () => {
           if (firstRec.cnpj) {
             clientIdx = newList.findIndex(c => {
               const cleanSystemCnpj = (c.cnpj || '').replace(/[./-]/g, "");
-              return cleanSystemCnpj === firstRec.cnpj;
+              // Strict Matching: Same CNPJ AND belongs to the selected salesperson
+              return cleanSystemCnpj === firstRec.cnpj && c.salespersonId === targetUserId;
             });
-          }
-
-          if (clientIdx === -1) {
-            const normalizedFileName = (firstRec.companyName || '').toLowerCase().trim();
-            clientIdx = newList.findIndex(c => (c.companyName || '').toLowerCase().trim() === normalizedFileName);
           }
 
           if (clientIdx !== -1) {
@@ -1428,7 +1424,6 @@ const App: React.FC = () => {
             if (filteredNewProducts.length > 0) {
               newList[clientIdx] = {
                 ...newList[clientIdx],
-                salespersonId: targetUserId, // Force the client to follow the salesperson of this purchase file
                 purchasedProducts: [
                   ...existingHistory,
                   ...filteredNewProducts
