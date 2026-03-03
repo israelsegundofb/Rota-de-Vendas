@@ -2688,6 +2688,14 @@ const App: React.FC = () => {
                         if (window.confirm("Gostaria de Parar de Enviar o Arquivo?")) {
                           isUploadCancelled.current = true;
                           setProcState(prev => ({ ...prev, isActive: false, status: 'error', errorMessage: 'Cancelado pelo usuário.' }));
+
+                          // Fix: Persist cancellation state to the file list immediately
+                          setUploadedFiles(prev => prev.map(f => {
+                            if (f.status === 'processing') {
+                              return { ...f, status: 'error', errorMessage: 'Cancelado pelo usuário.' };
+                            }
+                            return f;
+                          }));
                         }
                       } else {
                         setProcState(prev => ({ ...prev, isActive: false }));

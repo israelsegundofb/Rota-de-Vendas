@@ -102,14 +102,14 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         }
                         if (cloudData.uploadedFiles) {
                             // Recovery: Mark stale 'processing' files as 'error'
-                            const ONE_HOUR = 60 * 60 * 1000;
+                            const TEN_MINUTES = 10 * 60 * 1000;
                             const now = Date.now();
                             const recoveredFiles = cloudData.uploadedFiles.map((f: UploadedFile) => {
                                 if (f.status === 'processing' && f.uploadDate) {
                                     const uploadTime = new Date(f.uploadDate).getTime();
-                                    if (now - uploadTime > ONE_HOUR) {
+                                    if (now - uploadTime > TEN_MINUTES) {
                                         console.warn(`[RECOVERY] File "${f.fileName}" was stuck in processing. Marking as error.`);
-                                        return { ...f, status: 'error' as const, errorMessage: 'Processamento interrompido. Reenvie o arquivo.' };
+                                        return { ...f, status: 'error' as const, errorMessage: 'Processamento interrompido ou abandonado. Reenvie o arquivo.' };
                                     }
                                 }
                                 return f;
