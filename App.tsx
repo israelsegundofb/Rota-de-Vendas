@@ -1281,6 +1281,9 @@ const App: React.FC = () => {
     const targetUser = users.find(u => u.id === newSalespersonId);
     const newSalespersonName = targetUser?.name || 'None';
 
+    const file = uploadedFiles.find(f => f.id === fileId);
+    if (!file) return;
+
     // Update the file record
     setUploadedFiles(prev => prev.map(f =>
       f.id === fileId
@@ -1288,12 +1291,29 @@ const App: React.FC = () => {
         : f
     ));
 
-    // Update all clients from this file to the new salesperson
-    setMasterClientList(prev => prev.map(c =>
-      c.sourceFileId === fileId
-        ? { ...c, salespersonId: newSalespersonId }
-        : c
-    ));
+    if (file.type === 'clients') {
+      // Update all clients from this file to the new salesperson
+      setMasterClientList(prev => prev.map(c =>
+        c.sourceFileId === fileId
+          ? { ...c, salespersonId: newSalespersonId }
+          : c
+      ));
+    } else if (file.type === 'purchases') {
+      // Update all clients that have purchase records from this file
+      setMasterClientList(prev => prev.map(c => {
+        const hasPurchaseFromFile = c.purchasedProducts?.some(p => p.sourceFileId === fileId);
+        if (hasPurchaseFromFile) {
+          return {
+            ...c,
+            salespersonId: newSalespersonId,
+            purchasedProducts: c.purchasedProducts?.map(p =>
+              p.sourceFileId === fileId ? { ...p, salespersonId: newSalespersonId } : p
+            )
+          };
+        }
+        return c;
+      }));
+    }
 
     // Auto-navigate to map and apply filter
     if (newSalespersonId) {
@@ -1371,7 +1391,14 @@ const App: React.FC = () => {
               );
 
               if (masterProd) {
-                return { ...masterProd, purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue };
+                return {
+                  ...masterProd,
+                  purchaseDate: rec.purchaseDate,
+                  quantity: rec.quantity,
+                  totalValue: rec.totalValue,
+                  sourceFileId: fileId,
+                  salespersonId: targetUserId
+                };
               } else {
                 // Fallback for missing product in catalog
                 return {
@@ -1383,7 +1410,9 @@ const App: React.FC = () => {
                   factoryCode: '',
                   purchaseDate: rec.purchaseDate,
                   quantity: rec.quantity,
-                  totalValue: rec.totalValue
+                  totalValue: rec.totalValue,
+                  sourceFileId: fileId,
+                  salespersonId: targetUserId
                 };
               }
             });
@@ -1399,6 +1428,7 @@ const App: React.FC = () => {
             if (filteredNewProducts.length > 0) {
               newList[clientIdx] = {
                 ...newList[clientIdx],
+                salespersonId: targetUserId, // Force the client to follow the salesperson of this purchase file
                 purchasedProducts: [
                   ...existingHistory,
                   ...filteredNewProducts

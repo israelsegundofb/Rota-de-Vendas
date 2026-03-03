@@ -420,8 +420,8 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Owner Info with Reassignment (Only for clients) */}
-                                    {activeTab === 'clients' && (
+                                    {/* Owner Info with Reassignment (For clients and purchases) */}
+                                    {(activeTab === 'clients' || activeTab === 'purchases') && (
                                         <div className="flex items-center gap-3 sm:border-l sm:border-r border-outline-variant/30 sm:px-4 sm:w-56 shrink-0">
                                             <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary shrink-0">
                                                 {(() => {
