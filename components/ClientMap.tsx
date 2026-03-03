@@ -8,7 +8,7 @@ import {
 } from '@vis.gl/react-google-maps';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { EnrichedClient, AppUser } from '../types';
-import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2 } from 'lucide-react';
+import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2, Layers } from 'lucide-react';
 
 declare const google: any;
 
@@ -22,6 +22,29 @@ interface ClientMapProps {
   users?: AppUser[];
   filterContent?: React.ReactNode;
 }
+
+interface MapStyleSelectorProps {
+  mapTypeId: string;
+  setMapTypeId: (id: string) => void;
+}
+
+const MapStyleSelector: React.FC<MapStyleSelectorProps> = ({ mapTypeId, setMapTypeId }) => (
+  <div className="relative group">
+    <button
+      className="bg-white p-1.5 px-3 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold"
+      title="Alterar Estilo do Mapa"
+    >
+      <Layers className="w-4 h-4" />
+      <span className="hidden sm:inline">Estilo</span>
+    </button>
+    <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-xl border border-gray-100 py-1 hidden group-hover:block z-50">
+      <button onClick={() => setMapTypeId('roadmap')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'roadmap' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Map</button>
+      <button onClick={() => setMapTypeId('satellite')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'satellite' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Satélite</button>
+      <button onClick={() => setMapTypeId('hybrid')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'hybrid' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Híbrido</button>
+      <button onClick={() => setMapTypeId('terrain')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'terrain' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Relevo</button>
+    </div>
+  </div>
+);
 
 const MapBoundsUpdater: React.FC<{ clients: EnrichedClient[] }> = ({ clients }) => {
   const map = useMap();
@@ -137,8 +160,9 @@ const ClientMapContent: React.FC<{
   const usersColorKey = useMemo(() => JSON.stringify((users || []).map(u => ({ id: u.id, name: u.name, color: u.color }))), [users]);
 
   const userColorMap = useMemo(() => {
-    const map = new Map<string, { bg: string, border: string, glyph: string }>();
-    if (!usersColorKey || usersColorKey === '[]') return map;
+    type ColorConfig = { bg: string; border: string; glyph: string };
+    const colorMap = new globalThis.Map<string, ColorConfig>();
+    if (!usersColorKey || usersColorKey === '[]') return colorMap;
     const parsedUsers = JSON.parse(usersColorKey);
     parsedUsers.forEach((u: any) => {
       let color = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
@@ -148,9 +172,9 @@ const ClientMapContent: React.FC<{
         const genColor = stringToColor(u.id + u.name);
         color = { bg: genColor, border: 'black', glyph: '#fff' };
       }
-      map.set(u.id, color);
+      colorMap.set(u.id, color);
     });
-    return map;
+    return colorMap;
   }, [usersColorKey]);
 
   useEffect(() => {
@@ -332,6 +356,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
   const [authError, setAuthError] = useState<boolean>(false);
   const isAuthFailureDetected = (window as any).gm_authFailure_detected === true || authError === true;
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [mapTypeId, setMapTypeId] = useState('roadmap');
   const [isClusteringEnabled, setIsClusteringEnabled] = useState(true);
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
@@ -409,6 +434,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           defaultCenter={defaultCenter}
           defaultZoom={4}
           mapId="DEMO_MAP_ID"
+          mapTypeId={mapTypeId}
           style={{ width: '100%', height: '100%' }}
           gestureHandling={'greedy'}
           disableDefaultUI={true}
@@ -429,6 +455,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             <div className="absolute top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm shadow-md border-b border-gray-200">
               {filterContent}
               <div className="flex justify-end gap-2 px-3 py-1.5 border-t border-gray-100 bg-gray-50/80">
+                <MapStyleSelector mapTypeId={mapTypeId} setMapTypeId={setMapTypeId} />
                 <button
                   onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
                   className={`p-1.5 px-3 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
@@ -463,6 +490,7 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
 
           {!isFullScreen && (
             <div className="absolute top-4 right-4 flex gap-2 z-10">
+              <MapStyleSelector mapTypeId={mapTypeId} setMapTypeId={setMapTypeId} />
               <button
                 onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
                 className={`p-2 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
@@ -493,37 +521,6 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
             </div>
           )}
 
-          {isFullScreen && !filterContent && (
-            <div className="absolute top-4 right-4 flex gap-2 z-10">
-              <button
-                onClick={() => setIsClusteringEnabled(!isClusteringEnabled)}
-                className={`p-2 rounded-lg border text-gray-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold ${isClusteringEnabled ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
-                title={isClusteringEnabled ? "Desativar Agrupamento" : "Ativar Agrupamento"}
-              >
-                {isClusteringEnabled ? (
-                  <>
-                    <div className="flex -space-x-1">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      <div className="w-2 h-2 rounded-full bg-blue-500/50"></div>
-                    </div>
-                    Agrupado
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-3 h-3" />
-                    Solto
-                  </>
-                )}
-              </button>
-              <button
-                onClick={toggleFullScreen}
-                className="bg-white p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none"
-                title="Sair da Tela Cheia"
-              >
-                <Minimize2 className="w-5 h-5" />
-              </button>
-            </div>
-          )}
 
           {selectedClient && (
             <InfoWindow
