@@ -1374,6 +1374,15 @@ const App: React.FC = () => {
             });
           }
 
+          if (clientIdx === -1) {
+            // Fallback Matching: By Company Name (Razão Social) AND belongs to the selected salesperson
+            const normalizedFileName = (firstRec.companyName || '').toLowerCase().trim();
+            clientIdx = newList.findIndex(c =>
+              (c.companyName || '').toLowerCase().trim() === normalizedFileName &&
+              c.salespersonId === targetUserId
+            );
+          }
+
           if (clientIdx !== -1) {
             updatedCount++;
             const clientPurchases = groupedByClient[key];

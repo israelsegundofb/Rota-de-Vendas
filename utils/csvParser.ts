@@ -412,11 +412,11 @@ export const parsePurchaseHistoryCSV = (file: File): Promise<any[]> => {
 
           const companyName = normalizedRow['razao social'] || normalizedRow['cliente'] || normalizedRow['empresa'] || '';
           const cnpj = normalizedRow['cnpj'] || normalizedRow['cpf/cnpj'] || normalizedRow['cpf'] || '';
-          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || '';
+          const sku = normalizedRow['cod.prod / sku'] || normalizedRow['cod.prod'] || normalizedRow['sku'] || normalizedRow['sku do produto'] || '';
           const productName = normalizedRow['nome do produto'] || normalizedRow['produto'] || normalizedRow['descricao'] || '';
           const purchaseDate = normalizedRow['data da compra'] || normalizedRow['data'] || normalizedRow['emissao'] || '';
 
-          const quantity = parseFloat(normalizedRow['quantidade de skus / produtos comprados'] || normalizedRow['quantidade'] || normalizedRow['qtd'] || '1');
+          const quantity = parseFloat(normalizedRow['quantidade de skus / produtos comprados'] || normalizedRow['quantidade vendida'] || normalizedRow['quantidade'] || normalizedRow['qtd'] || '1');
           const safeQuantity = isNaN(quantity) ? 1 : quantity;
           const price = parseMoney(normalizedRow['valor unitario'] || normalizedRow['preco'] || '0');
           const totalValue = parseMoney(normalizedRow['valor total'] || normalizedRow['total'] || (safeQuantity * price).toString());
