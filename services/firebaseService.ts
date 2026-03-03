@@ -241,6 +241,26 @@ export const saveToCloud = async (
     }
 };
 
+/**
+ * Força a sincronização imediata do array de UploadedFiles no Metadata.
+ * Usado primariamente durante deleções manuais para impedir que o debounce
+ * de auto-save atrase a remoção e cause arquivos zumbis no reload.
+ */
+export const syncUploadedFilesMetadata = async (newUploadedFiles: any[]) => {
+    if (!db) return;
+    try {
+        const metaRef = doc(db, 'rota-vendas-data', 'metadata');
+        await updateDoc(metaRef, {
+            uploadedFiles: removeUndefined(newUploadedFiles),
+            lastUpdated: new Date().toISOString()
+        });
+        console.log(`[FIREBASE] Force-synced uploadedFiles metadata (${newUploadedFiles.length} files)`);
+    } catch (e) {
+        console.error("Error force syncing uploadedFiles metadata:", e);
+        throw e;
+    }
+};
+
 export const deleteAllClientsFromCloud = async () => {
     if (!db) return;
     try {

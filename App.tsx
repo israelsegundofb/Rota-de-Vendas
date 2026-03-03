@@ -16,7 +16,7 @@ import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } fro
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud, syncUploadedFilesMetadata } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -1132,7 +1132,7 @@ const App: React.FC = () => {
   };
 
 
-  const handleDeleteFile = (fileId: string) => {
+  const handleDeleteFile = async (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (!file) return;
 
@@ -1146,7 +1146,18 @@ const App: React.FC = () => {
       setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
     }
 
-    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+    setUploadedFiles(newUploadedFiles);
+
+    // Fix: Force sync the deleted file array immediately to bypass the 3s auto-save debounce
+    if (isFirebaseConnected) {
+      try {
+        await syncUploadedFilesMetadata(newUploadedFiles);
+      } catch (e) {
+        console.error("Failed to sync file deletion immediately", e);
+      }
+    }
+
     // alert("Arquivo e dados associados foram removidos.");
   };
 
