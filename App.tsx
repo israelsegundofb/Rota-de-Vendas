@@ -1376,11 +1376,33 @@ const App: React.FC = () => {
 
           if (clientIdx === -1) {
             // Fallback Matching: By Company Name (Razão Social) AND belongs to the selected salesperson
-            const normalizedFileName = (firstRec.companyName || '').toLowerCase().trim();
-            clientIdx = newList.findIndex(c =>
-              (c.companyName || '').toLowerCase().trim() === normalizedFileName &&
-              c.salespersonId === targetUserId
-            );
+            const cleanCSVName = (firstRec.companyName || '')
+              .toLowerCase()
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+              .replace(/[^a-z0-9\s]/g, "")
+              .replace(/\s+/g, " ")
+              .trim();
+
+            if (cleanCSVName) {
+              clientIdx = newList.findIndex(c => {
+                if (c.salespersonId !== targetUserId) return false;
+
+                const cleanSysName = (c.companyName || '')
+                  .toLowerCase()
+                  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                  .replace(/[^a-z0-9\s]/g, "")
+                  .replace(/\s+/g, " ")
+                  .trim();
+
+                if (!cleanSysName) return false;
+
+                const isExact = cleanSysName === cleanCSVName;
+                const isPartial = cleanCSVName.length > 4 && cleanSysName.length > 4 &&
+                  (cleanSysName.includes(cleanCSVName) || cleanCSVName.includes(cleanSysName));
+
+                return isExact || isPartial;
+              });
+            }
           }
 
           if (clientIdx !== -1) {
