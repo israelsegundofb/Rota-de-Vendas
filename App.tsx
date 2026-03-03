@@ -1148,6 +1148,44 @@ const App: React.FC = () => {
     // alert("Arquivo e dados associados foram removidos.");
   };
 
+  const handleReassignFile = (fileId: string, newSalespersonId: string) => {
+    const file = uploadedFiles.find(f => f.id === fileId);
+    const newOwner = users.find(u => u.id === newSalespersonId);
+    if (!file || !newOwner) return;
+
+    // 1. Update the uploaded file's owner
+    setUploadedFiles(prev => prev.map(f =>
+      f.id === fileId
+        ? { ...f, salespersonId: newOwner.id, salespersonName: newOwner.name }
+        : f
+    ));
+
+    // 2. Cascade update to all affiliated clients
+    if (file.type === 'clients') {
+      setMasterClientList(prev => prev.map(c =>
+        c.sourceFileId === fileId
+          ? { ...c, salespersonId: newOwner.id }
+          : c
+      ));
+    }
+
+    // 3. Log the administrative action
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'SYSTEM',
+        details: `Reatribuiu arquivo "${file.fileName}" para ${newOwner.name}`,
+        metadata: { fileId, oldSalespersonId: file.salespersonId }
+      });
+    }
+
+    toast.success(`Arquivo e seus ${file.itemCount} registros reatribuídos para ${newOwner.name}`);
+  };
+
   const handleAddUser = (user: AppUser) => {
     // 1. Local update
     baseAddUser(user);
@@ -1950,7 +1988,7 @@ const App: React.FC = () => {
                     onUploadProducts={handleProductFileUpload}
                     onUploadPurchases={handlePurchaseUpdateUpload}
                     onDeleteFile={handleDeleteFile}
-                    onReassignSalesperson={handleReassignFileSalesperson}
+                    onReassignSalesperson={handleReassignFile}
                     procState={procState}
                   />
                 </div>

@@ -65,6 +65,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
     const lastClientsHash = useRef<string>('');
     const lastUsersHash = useRef<string>('');
     const lastProductsHash = useRef<string>('');
+    const lastFilesHash = useRef<string>('');
 
     useEffect(() => {
         const initData = async () => {
@@ -113,6 +114,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                                 }
                                 return f;
                             });
+                            lastFilesHash.current = hashDataList(recoveredFiles);
                             setUploadedFiles(recoveredFiles);
                         }
 
@@ -206,7 +208,13 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                                 setUsers(migrateUsers(newData.users));
                             }
                         }
-                        if (newData.uploadedFiles) setUploadedFiles(newData.uploadedFiles);
+                        if (newData.uploadedFiles) {
+                            const newHash = hashDataList(newData.uploadedFiles);
+                            if (newHash !== lastFilesHash.current) {
+                                lastFilesHash.current = newHash;
+                                setUploadedFiles(newData.uploadedFiles);
+                            }
+                        }
                     }
                 });
             }
@@ -224,11 +232,13 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
             const currentClientsHash = hashDataList(masterClientList);
             const currentUsersHash = hashDataList(users);
             const currentProductsHash = hashDataList(products);
+            const currentFilesHash = hashDataList(uploadedFiles);
 
             const hasChanges =
                 currentClientsHash !== lastClientsHash.current ||
                 currentUsersHash !== lastUsersHash.current ||
-                currentProductsHash !== lastProductsHash.current;
+                currentProductsHash !== lastProductsHash.current ||
+                currentFilesHash !== lastFilesHash.current;
 
             if (hasChanges) {
                 const timeout = setTimeout(() => {
@@ -236,6 +246,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                     lastClientsHash.current = currentClientsHash;
                     lastUsersHash.current = currentUsersHash;
                     lastProductsHash.current = currentProductsHash;
+                    lastFilesHash.current = currentFilesHash;
                     saveToCloud(masterClientList, products, categories, users, uploadedFiles)
                         .catch(err => console.error("Auto-save failed", err));
                 }, 3000); // 3s debounce
