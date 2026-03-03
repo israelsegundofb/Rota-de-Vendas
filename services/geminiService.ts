@@ -104,7 +104,11 @@ export const processClientsWithAI = async (
       return null;
     }
 
-    const id = `${salespersonId}-${Date.now()}-${index}`;
+    // Create a sanitized ID, falling back to timestamp if CNPJ is invalid or missing
+    const sanitizedCnpj = client.cnpj ? client.cnpj.replace(/\D/g, '') : null;
+    const id = sanitizedCnpj && sanitizedCnpj.length === 14
+      ? `cli_${sanitizedCnpj}`
+      : `cli_${salespersonId}-${Date.now()}-${index}`;
 
     // --- PRE-ENRICHMENT WITH CNPJ ---
     let cnpjData: any = null;
@@ -281,8 +285,8 @@ export const processClientsWithAI = async (
         if (addressToGeocode && addressToGeocode.length > 5) {
           try {
             // We'll need a way to get the mapsApiKey here if it was removed from params.
-            // For now, I'll check if VITE_GOOGLE_MAPS_API_KEY is available in import.meta.env
-            const currentMapsKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string);
+            // For now, I'll check if VITE_GOOGLE_MAPS_API_KEY is available in import.meta.env or from localStorage
+            const currentMapsKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || localStorage.getItem('google_maps_api_key') || localStorage.getItem('gemini_api_key');
             if (currentMapsKey) {
               if ((globalThis as any).isUploadCancelled?.current) throw new Error("CANCELLED_BY_USER");
               const geocodeResult = await geocodeAddress(addressToGeocode, currentMapsKey);
