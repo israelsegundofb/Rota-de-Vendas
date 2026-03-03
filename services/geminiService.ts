@@ -87,7 +87,7 @@ export const processClientsWithAI = async (
   rawClients: RawClient[],
   salespersonId: string,
   categories: string[],
-  onProgress?: (processed: number, total: number) => void
+  onProgress?: (processed: number, total: number, latestClient?: EnrichedClient) => void
 ): Promise<EnrichedClient[]> => {
 
   const total = rawClients.length;
@@ -377,7 +377,11 @@ export const processClientsWithAI = async (
     }
 
     processedCount++;
-    if (onProgress) onProgress(processedCount, total);
+    if (onProgress && result) {
+      onProgress(processedCount, total, result);
+    } else if (onProgress) {
+      onProgress(processedCount, total);
+    }
 
     return result;
   };

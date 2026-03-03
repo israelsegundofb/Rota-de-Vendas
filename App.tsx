@@ -992,60 +992,56 @@ const App: React.FC = () => {
         rawData,
         ownerId,
         categories,
-        (processed, total) => {
+        (processed, total, latestClient?: EnrichedClient) => {
           if (isUploadCancelled.current) throw new Error("CANCELLED_BY_USER");
           setProcState(prev => ({ ...prev, current: processed, total: total }));
+
+          // -------------------------------------------------------------
+          // PROGRESSIVE INSERTION: Update the UI Map/List in real-time
+          // -------------------------------------------------------------
+          if (latestClient) {
+            const taggedNewClient = { ...latestClient, sourceFileId: fileId };
+
+            setMasterClientList(prev => {
+              const list = [...prev];
+              const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+
+              const existingIdx = list.findIndex(c => {
+                const cleanCnpj = c.cnpj?.replace(/\D/g, '');
+                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj.length === 14 && cleanCnpj.length === 14) {
+                  return cleanNewCnpj === cleanCnpj;
+                }
+                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
+                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+              });
+
+              if (existingIdx !== -1) {
+                const existing = list[existingIdx];
+                list[existingIdx] = {
+                  ...existing,
+                  ...taggedNewClient,
+                  ownerName: taggedNewClient.ownerName || existing.ownerName,
+                  contact: taggedNewClient.contact || existing.contact,
+                  whatsapp: taggedNewClient.whatsapp || existing.whatsapp,
+                  cnpj: taggedNewClient.cnpj || existing.cnpj,
+                  mainCnae: taggedNewClient.mainCnae || existing.mainCnae,
+                  secondaryCnaes: (taggedNewClient.secondaryCnaes && taggedNewClient.secondaryCnaes.length > 0) ? taggedNewClient.secondaryCnaes : existing.secondaryCnaes,
+                  lat: (taggedNewClient.lat !== 0) ? taggedNewClient.lat : existing.lat,
+                  lng: (taggedNewClient.lng !== 0) ? taggedNewClient.lng : existing.lng,
+                  googleMapsUri: taggedNewClient.googleMapsUri || existing.googleMapsUri,
+                  plusCode: taggedNewClient.plusCode || existing.plusCode,
+                };
+              } else {
+                list.push(taggedNewClient);
+              }
+              return list;
+            });
+          }
         }
       );
 
-      // Tag clients with Source File ID
-      const taggedData = enrichedData.map(c => ({
-        ...c,
-        sourceFileId: fileId
-      }));
-
-      // Update Master List - UPSERT mode (Merge existing clients)
-      setMasterClientList(prev => {
-        const list = [...prev];
-        taggedData.forEach(newClient => {
-          const cleanNewCnpj = newClient.cnpj?.replace(/\D/g, '');
-
-          const existingIdx = list.findIndex(c => {
-            const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-            if (cleanNewCnpj && cleanCnpj && cleanNewCnpj.length === 14 && cleanCnpj.length === 14) {
-              return cleanNewCnpj === cleanCnpj;
-            }
-            // Fallback to Name + City matching if CNPJ is missing
-            return c.companyName.toLowerCase().trim() === newClient.companyName.toLowerCase().trim() &&
-              c.city.toLowerCase().trim() === newClient.city.toLowerCase().trim();
-          });
-
-          if (existingIdx !== -1) {
-            // MERGE: Keep existing data if new is missing, but prefer new data for updates
-            const existing = list[existingIdx];
-            list[existingIdx] = {
-              ...existing,
-              ...newClient,
-              // Special preservation: don't overwrite with empty values if we have data
-              ownerName: newClient.ownerName || existing.ownerName,
-              contact: newClient.contact || existing.contact,
-              whatsapp: newClient.whatsapp || existing.whatsapp,
-              cnpj: newClient.cnpj || existing.cnpj,
-              mainCnae: newClient.mainCnae || existing.mainCnae,
-              secondaryCnaes: (newClient.secondaryCnaes && newClient.secondaryCnaes.length > 0) ? newClient.secondaryCnaes : existing.secondaryCnaes,
-              lat: (newClient.lat !== 0) ? newClient.lat : existing.lat,
-              lng: (newClient.lng !== 0) ? newClient.lng : existing.lng,
-              googleMapsUri: newClient.googleMapsUri || existing.googleMapsUri,
-              plusCode: newClient.plusCode || existing.plusCode,
-              // Keep original source file ID if the new one doesn't have a valid one? 
-              // Actually newClient always has the new fileId from taggedData.
-            };
-          } else {
-            list.push(newClient);
-          }
-        });
-        return list;
-      });
+      // The individual clients were already inserted progressively via onProgress!
+      // We no longer need to do a bulk batch UPSERT here to prevent duplicate render cycles natively.
 
       // We don't automatically switch filter here.
 
