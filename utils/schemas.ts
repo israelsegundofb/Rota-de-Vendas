@@ -17,6 +17,7 @@ export const ProductSchema = z.object({
     name: z.string().default(''),
     price: z.number().nonnegative().default(0),
     category: z.string().default('Geral'),
+    section: z.string().optional(),
     sku: z.string().optional(),
     brand: z.string().default('Genérico'),
     factoryCode: z.string().optional(),

@@ -12,7 +12,7 @@ interface AdminProductManagementProps {
   onSaveProducts?: (products: Product[]) => void;
 }
 
-type SortKey = 'sku' | 'brand' | 'factoryCode' | 'name' | 'price' | 'category' | 'discount';
+type SortKey = 'sku' | 'brand' | 'factoryCode' | 'name' | 'price' | 'category' | 'section' | 'discount';
 
 interface SortConfig {
   key: SortKey;
@@ -150,6 +150,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
     (p.sku || '').toLowerCase().includes(filter.toLowerCase()) ||
     (p.brand || '').toLowerCase().includes(filter.toLowerCase()) ||
     (p.category || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (p.section || '').toLowerCase().includes(filter.toLowerCase()) ||
     (p.factoryCode || '').toLowerCase().includes(filter.toLowerCase())
   );
 
@@ -240,7 +241,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                 type="text"
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
-                placeholder="Filtrar por SKU, Marca, Departamento, Nome..."
+                placeholder="Filtrar por SKU, Marca, Departamento, Seção, Nome..."
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-highest border-b border-outline-variant rounded-t-lg text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors text-sm"
               />
             </div>
@@ -274,6 +275,12 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                       Departamento <SortIcon column="category" />
                     </th>
                     <th
+                      className="px-4 py-3 cursor-pointer hover:bg-surface-container-highest group select-none w-40"
+                      onClick={() => requestSort('section')}
+                    >
+                      Seção <SortIcon column="section" />
+                    </th>
+                    <th
                       className="px-4 py-3 text-right cursor-pointer hover:bg-surface-container-highest group select-none w-32"
                       onClick={() => requestSort('price')}
                     >
@@ -303,8 +310,20 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           className="w-full text-xs text-on-surface border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.category}
                           onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
-                          title="Editar Categoria"
-                          placeholder="Categoria"
+                          title="Editar Departamento"
+                          placeholder="Departamento"
+                        />
+                      </td>
+
+                      {/* Editable Section */}
+                      <td className="px-2 py-2">
+                        <input
+                          type="text"
+                          className="w-full text-xs text-on-surface border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
+                          value={p.section || ''}
+                          onChange={(e) => handleProductChange((p as any).originalIndex, 'section', e.target.value)}
+                          title="Editar Seção"
+                          placeholder="Seção"
                         />
                       </td>
 
@@ -371,6 +390,20 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                         placeholder="Departamento"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-on-surface-variant font-bold">Seção</label>
+                      <input
+                        type="text"
+                        className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-primary outline-none"
+                        value={p.section || ''}
+                        onChange={(e) => handleProductChange((p as any).originalIndex, 'section', e.target.value)}
+                        title="Editar Seção"
+                        placeholder="Seção"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-outline-variant/20">
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase text-on-surface-variant font-bold">Desconto (%)</label>
                       <input

@@ -96,6 +96,7 @@ const App: React.FC = () => {
     filterSalesCategory, setFilterSalesCategory,
     filterCnae, setFilterCnae,
     filterProductCategory, setFilterProductCategory,
+    filterProductSection, setFilterProductSection,
     filterProductSku, setFilterProductSku,
     searchProductQuery, setSearchProductQuery,
     showProductSuggestions, setShowProductSuggestions,
@@ -105,6 +106,7 @@ const App: React.FC = () => {
     availableCities,
     availableCnaes,
     productCategories,
+    productSections,
     filterOnlyWithPurchases,
     setFilterOnlyWithPurchases,
     startDate, setStartDate,
@@ -2258,12 +2260,26 @@ const App: React.FC = () => {
 
                     <select
                       value={filterProductCategory}
-                      onChange={e => setFilterProductCategory(e.target.value)}
+                      onChange={e => {
+                        setFilterProductCategory(e.target.value);
+                        setFilterProductSection('Todas'); // Reset section when department changes
+                      }}
                       className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                      title="Filtrar por marca ou categoria de produto"
+                      title="Filtrar por Departamento"
                     >
-                      <option value="Todos">Todas Marcas / Categorias</option>
+                      <option value="Todos">Todos Departamentos</option>
                       {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+
+                    <select
+                      value={filterProductSection}
+                      onChange={e => setFilterProductSection(e.target.value)}
+                      className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductSection !== 'Todas' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                      title="Filtrar por Seção"
+                      disabled={productSections.length === 0}
+                    >
+                      <option value="Todas">Todas Seções</option>
+                      {productSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
                     </select>
 
                     <div className="relative animate-fade-in">
@@ -2277,6 +2293,7 @@ const App: React.FC = () => {
                         <option value="Todos">Todos Produtos</option>
                         {products
                           .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
+                          .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
                           .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                           .map(p => (
                             <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
@@ -2597,12 +2614,26 @@ const App: React.FC = () => {
 
                                     <select
                                       value={filterProductCategory}
-                                      onChange={e => setFilterProductCategory(e.target.value)}
+                                      onChange={e => {
+                                        setFilterProductCategory(e.target.value);
+                                        setFilterProductSection('Todas');
+                                      }}
                                       className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductCategory !== 'Todos' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
-                                      title="Filtrar por marca ou categoria de produto"
+                                      title="Filtrar por Departamento"
                                     >
-                                      <option value="Todos">Todos Deptos / Marcas</option>
+                                      <option value="Todos">Todos Departamentos</option>
                                       {productCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+
+                                    <select
+                                      value={filterProductSection}
+                                      onChange={e => setFilterProductSection(e.target.value)}
+                                      className={`text-xs rounded-lg px-2 py-1.5 border transition-colors ${filterProductSection !== 'Todas' ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'border-gray-300 text-gray-600'}`}
+                                      title="Filtrar por Seção"
+                                      disabled={productSections.length === 0}
+                                    >
+                                      <option value="Todas">Todas Seções</option>
+                                      {productSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
                                     </select>
 
                                     <div className="relative animate-fade-in">
@@ -2616,6 +2647,7 @@ const App: React.FC = () => {
                                         <option value="Todos">Todos Produtos</option>
                                         {products
                                           .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
+                                          .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
                                           .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                           .map(p => (
                                             <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>

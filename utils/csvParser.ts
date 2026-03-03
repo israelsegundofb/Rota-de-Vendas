@@ -120,7 +120,7 @@ const parsePercentage = (value: string): number => {
 
 const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario'];
 const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular', 'nome da cidade', 'estado', 'cep', 'telefone comercial', 'numero', 'whatsapp'];
-const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
+const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'secao', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
 
 // Helper to normalize headers (remove accents, lowercase)
 const normalizeHeader = (header: any): string => {
@@ -220,10 +220,12 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
           const nameKeys = ['nome do produto', 'nome produto', 'descricao', 'descricao do produto', 'desc. produto', 'desc produto', 'nome', 'produto', 'descricao completa', 'desc', 'name', 'product'];
           const brandKeys = ['marca', 'fabricante', 'brand', 'fornecedor'];
           const priceKeys = ['preco de venda', 'preco venda', 'precovenda', 'preco', 'valor', 'valor venda', 'valor de venda', 'price', 'preco unitario', 'valor unitario', 'prc venda', 'prc.venda', 'preco unit'];
-          const categoryKeys = ['departamento', 'categoria', 'grupo', 'familia', 'dept', 'depto', 'secao', 'class', 'classificacao', 'tipo', 'category'];
+          const categoryKeys = ['descrição do departamento', 'descricao do departamento', 'departamento', 'categoria', 'grupo', 'familia', 'dept', 'depto', 'class', 'classificacao', 'tipo', 'category'];
+          const sectionKeys = ['descrição da seção', 'descricao da secao', 'secao', 'seção', 'subcategoria', 'subgrupo', 'section'];
           const factoryCodeKeys = ['cod.fabrica', 'cod fabrica', 'codigo fabrica', 'codfabrica', 'factory'];
 
           const category = findValue(normalizedRow, categoryKeys) || 'Geral';
+          const section = findValue(normalizedRow, sectionKeys) || '';
           const sku = findValue(normalizedRow, skuKeys) || '';
           const rawName = findValue(normalizedRow, nameKeys) || '';
           const name = rawName || sku || `Produto ${rowIndex + 1}`;
@@ -237,6 +239,7 @@ export const parseProductCSV = (file: File): Promise<Product[]> => {
 
           const rawProduct = {
             category: category || 'Geral',
+            section: String(section),
             sku: String(sku),
             brand: brand || 'Genérico',
             factoryCode,

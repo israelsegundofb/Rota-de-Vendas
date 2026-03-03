@@ -28,6 +28,7 @@ export const useFilters = (
 
     // Product Filters
     const [filterProductCategory, setFilterProductCategoryState] = useState<string>(() => getParam('prod_cat') || 'Todos');
+    const [filterProductSection, setFilterProductSectionState] = useState<string>(() => getParam('prod_sec') || 'Todas');
     const [filterProductSku, setFilterProductSkuState] = useState<string>(() => getParam('sku') || 'Todos');
     const [searchProductQuery, setSearchProductQueryState] = useState<string>(() => getParam('prod_q') || '');
     const [showProductSuggestions, setShowProductSuggestions] = useState<boolean>(false);
@@ -45,6 +46,7 @@ export const useFilters = (
     const setStartDate = (val: string) => { setStartDateState(val); setParam('startDict', val); };
     const setEndDate = (val: string) => { setEndDateState(val); setParam('endDate', val); };
     const setFilterProductCategory = (val: string) => { setFilterProductCategoryState(val); setParam('prod_cat', val === 'Todos' ? '' : val); };
+    const setFilterProductSection = (val: string) => { setFilterProductSectionState(val); setParam('prod_sec', val === 'Todas' ? '' : val); };
     const setFilterProductSku = (val: string) => { setFilterProductSkuState(val); setParam('sku', val === 'Todos' ? '' : val); };
     const setSearchProductQuery = (val: string) => { setSearchProductQueryState(val); setParam('prod_q', val); };
 
@@ -120,13 +122,16 @@ export const useFilters = (
                 (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
-            if (filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || prodQuery !== '') {
+            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // Check Category (Brand often used as category in this context)
+                    // Check Category (Brand often used as category in this context) -> Now acts as Department
                     const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => (p.category || '') === filterProductCategory);
+
+                    // Check Section
+                    const hasSection = filterProductSection === 'Todas' || c.purchasedProducts.some(p => (p.section || '') === filterProductSection);
 
                     // Check Specific SKU
                     const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => (p.sku || '') === filterProductSku);
@@ -137,6 +142,7 @@ export const useFilters = (
                         (p.sku || '').toLowerCase().includes(prodQuery) ||
                         (p.brand || '').toLowerCase().includes(prodQuery) ||
                         (p.category || '').toLowerCase().includes(prodQuery) ||
+                        (p.section || '').toLowerCase().includes(prodQuery) ||
                         (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
                         (p.price || 0).toString().includes(prodQuery)
                     );
@@ -182,7 +188,7 @@ export const useFilters = (
                         return true;
                     });
 
-                    matchProduct = hasCat && hasSku && hasMatch && matchDate;
+                    matchProduct = hasCat && hasSection && hasSku && hasMatch && matchDate;
                 }
             }
 
@@ -191,7 +197,7 @@ export const useFilters = (
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSection, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
@@ -218,9 +224,18 @@ export const useFilters = (
     }, [visibleClients, filterRegion, filterState]);
 
     const productCategories = useMemo(() => {
-        const cats = new Set(products.map(p => p.category));
+        const cats = new Set(products.map(p => p.category).filter(Boolean));
         return Array.from(cats).sort();
     }, [products]);
+
+    const productSections = useMemo(() => {
+        let base = products;
+        if (filterProductCategory !== 'Todos') {
+            base = base.filter(p => p.category === filterProductCategory);
+        }
+        const secs = new Set(base.map(p => p.section).filter(Boolean));
+        return Array.from(secs).sort();
+    }, [products, filterProductCategory]);
 
     const availableCnaes = useMemo(() => {
         const cnaes = new Set<string>();
@@ -243,6 +258,7 @@ export const useFilters = (
         setFilterSalesCategoryState('Todos');
         setFilterCnaeState('Todos');
         setFilterProductCategoryState('Todos');
+        setFilterProductSectionState('Todas');
         setFilterProductSkuState('Todos');
         setSearchProductQueryState('');
         setFilterOnlyWithPurchasesState(false);
@@ -261,6 +277,7 @@ export const useFilters = (
         filterSalesCategory, setFilterSalesCategory,
         filterCnae, setFilterCnae,
         filterProductCategory, setFilterProductCategory,
+        filterProductSection, setFilterProductSection,
         filterProductSku, setFilterProductSku,
         searchProductQuery, setSearchProductQuery,
         showProductSuggestions, setShowProductSuggestions,
@@ -276,6 +293,7 @@ export const useFilters = (
         availableCities,
         availableCnaes,
         productCategories,
+        productSections,
 
         // Actions
         resetFilters

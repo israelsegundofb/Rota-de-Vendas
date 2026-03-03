@@ -18,7 +18,8 @@ export interface RawClient {
 }
 
 export interface Product {
-  category: string; // Used for grouping/filtering logic (can default to Brand or General)
+  category: string; // Used for grouping/filtering logic (can default to Brand or General) -> Treated as Department
+  section?: string; // Descrição da Seção
   sku: string;      // Número do SKU
   brand: string;    // Marca
   factoryCode: string; // Cód.Fábrica
