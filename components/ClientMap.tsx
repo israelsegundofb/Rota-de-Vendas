@@ -435,7 +435,11 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
           mapId="DEMO_MAP_ID"
           mapTypeId={mapTypeId}
           style={{ width: '100%', height: '100%' }}
-          styles={mapTypeId === 'hybrid' ? [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] : []}
+          styles={mapTypeId === 'hybrid' ? [
+            { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+            { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+            { featureType: 'landscape', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+          ] : []}
           gestureHandling={'greedy'}
           disableDefaultUI={true}
           reuseMaps={true}
