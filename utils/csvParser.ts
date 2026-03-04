@@ -118,7 +118,7 @@ const parsePercentage = (value: string): number => {
   return parseFloat(clean) || 0;
 };
 
-const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario'];
+const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario', 'qtd vendida', 'descricao'];
 const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'cnpj - cpf', 'cpf', 'nome do cliente', 'descricao do pais', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular', 'nome da cidade', 'estado', 'cep', 'telefone comercial', 'numero', 'whatsapp', 'pais', 'endereco comercial numero', 'pais telefone comercial'];
 const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'secao', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
 
