@@ -99,7 +99,7 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     if (Object.keys(rowData).length === 0) continue;
 
                     // 3. Map to RawClient
-                    const addressInput = rowData['endereco'] || rowData['endereco comercial'] || rowData['logradouro'] || rowData['localizacao'] ||
+                    const addressInput = rowData['endereco'] || rowData['endereco comercial numero'] || rowData['endereco comercial'] || rowData['logradouro'] || rowData['localizacao'] ||
                         rowData['endereco completo'] || rowData['rua'] || rowData['end'] || '';
 
                     const parsed = parseHyperlink(addressInput);
@@ -139,16 +139,22 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     // Note: If addressLink provides a direct Google Maps URL, we might want to 
                     // re-run extraction logic to get lat/lng from IT if 'lat'/'lng' are undefined.
 
-                    const companyName = rowData['razao social'] || rowData['cliente'] || rowData['nome fantasia'] ||
-                        rowData['empresa'] || rowData['nome comercial'] || rowData['nome'] || rowData['nome cliente'] ||
-                        rowData['parceiro'] || rowData['loja'] || rowData['fantasia'] || '';
+                    let companyName = rowData['razao social'] || rowData['cliente'] || rowData['empresa'] || rowData['nome comercial'] || rowData['nome'] || rowData['nome cliente'] ||
+                        rowData['parceiro'] || rowData['loja'] || '';
 
-                    const cnpj = rowData['cnpj'] || rowData['taxid'] || rowData['inscricao'] || '';
+                    const nomeFantasia = rowData['nome fantasia'] || rowData['fantasia'] || '';
+                    if (companyName && nomeFantasia && companyName !== nomeFantasia) {
+                        companyName = `${companyName} (${nomeFantasia})`;
+                    } else if (!companyName) {
+                        companyName = nomeFantasia;
+                    }
 
-                    const ownerName = rowData['nome do proprietario'] || rowData['proprietario'] || rowData['dono'] ||
+                    const cnpj = rowData['cnpj - cpf'] || rowData['cnpj'] || rowData['cpf/cnpj'] || rowData['cpf'] || rowData['taxid'] || rowData['inscricao'] || '';
+
+                    const ownerName = rowData['nome do cliente'] || rowData['nome do proprietario'] || rowData['proprietario'] || rowData['dono'] ||
                         rowData['contato principal'] || rowData['responsavel'] || rowData['socio'] || '';
 
-                    const contact = String(rowData['telefone comercial'] || rowData['contato'] || rowData['telefone'] || rowData['celular'] ||
+                    const contact = String(rowData['telefone comercial'] || rowData['pais telefone comercial'] || rowData['contato'] || rowData['telefone'] || rowData['celular'] ||
                         rowData['tel'] || rowData['fone'] || '');
 
                     const whatsapp = String(rowData['whatsapp'] || rowData['whats'] || '');
@@ -159,7 +165,7 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     const city = rowData['nome da cidade'] || rowData['cidade'] || rowData['municipio'] || '';
                     const state = rowData['estado'] || rowData['uf'] || '';
                     const zip = rowData['cep'] || rowData['codigo postal'] || '';
-                    const country = rowData['pais'] || '';
+                    const country = rowData['descricao do pais'] || rowData['pais'] || '';
 
                     // Only add if we have at least a Name, CNPJ, or Address
                     if (companyName || cnpj || address || addressInput) {

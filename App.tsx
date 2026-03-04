@@ -16,7 +16,7 @@ import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } fro
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud, syncUploadedFilesMetadata } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -1259,6 +1259,10 @@ const App: React.FC = () => {
 
     // 2. Immediate Cloud Save
     const updatedUsers = users.filter(u => u.id !== userId);
+
+    // Explicitly delete user document from Firestore First
+    deleteUserFromCloud(userId).catch(e => console.error("Falha ao excluir o documento do usuário:", e));
+
     saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
       .then(() => console.warn('[AUTH] Exclusão de usuário na nuvem concluída ✅'))
       .catch(e => console.error('[AUTH] Falha no salvamento imediato da exclusão:', e));

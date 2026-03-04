@@ -261,6 +261,23 @@ export const syncUploadedFilesMetadata = async (newUploadedFiles: any[]) => {
     }
 };
 
+export const deleteUserFromCloud = async (userId: string) => {
+    if (!db) return;
+    try {
+        const userRef = doc(db, 'rota-vendas-data', 'users', 'list', userId);
+        await deleteDoc(userRef);
+        console.log(`✅ User ${userId} deleted from cloud`);
+
+        // Also update metadata slightly to reflect total users
+        // This is safe to run in background
+        const metaRef = doc(db, 'rota-vendas-data', 'metadata');
+        await updateDoc(metaRef, { lastUpdated: new Date().toISOString() });
+    } catch (e) {
+        console.error("Error deleting user from cloud:", e);
+        throw e;
+    }
+};
+
 export const deleteAllClientsFromCloud = async () => {
     if (!db) return;
     try {
