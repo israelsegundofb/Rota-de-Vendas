@@ -185,7 +185,8 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                             country: country,
                             googleMapsLink: finalLink,
                             latitude: lat,
-                            longitude: lng
+                            longitude: lng,
+                            salespersonName: rowData['vendedor responsavel'] || rowData['vendedor'] || ''
                         });
                     }
                 }

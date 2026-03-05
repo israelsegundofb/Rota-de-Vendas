@@ -119,7 +119,7 @@ const parsePercentage = (value: string): number => {
 };
 
 const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario', 'qtd vendida', 'descricao'];
-const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'cnpj - cpf', 'cpf', 'nome do cliente', 'descricao do pais', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular', 'nome da cidade', 'estado', 'cep', 'telefone comercial', 'numero', 'whatsapp', 'pais', 'endereco comercial numero', 'pais telefone comercial'];
+const CLIENT_KEYWORDS = ['razao social', 'cnpj', 'cnpj - cpf', 'cpf', 'nome do cliente', 'descricao do pais', 'endereco', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular', 'nome da cidade', 'estado', 'cep', 'telefone comercial', 'numero', 'whatsapp', 'pais', 'endereco comercial numero', 'pais telefone comercial', 'vendedor responsavel', 'vendedor'];
 const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'secao', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
 
 // Helper to normalize headers (remove accents, lowercase)
@@ -357,7 +357,8 @@ export const parseCSV = (file: File): Promise<RawClient[]> => {
             country: map['descricao do pais'] || map['pais'] || '',
             googleMapsLink: link,
             latitude: lat,
-            longitude: lng
+            longitude: lng,
+            salespersonName: map['vendedor responsavel'] || map['vendedor'] || ''
           };
 
           // Validation using Zod is implicit here via manual mapping but we can enforce stricter schema matching if we map to ClientSchema

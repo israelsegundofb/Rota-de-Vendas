@@ -962,6 +962,23 @@ const App: React.FC = () => {
 
       if (rawData.length === 0) throw new Error("Arquivo vazio.");
 
+      // -----------------------------------------------------------------
+      // DYNAMIC SALESPERSON ASSIGNMENT FROM CSV 'Vendedor Responsável'
+      // -----------------------------------------------------------------
+      rawData.forEach(raw => {
+        if (raw.salespersonName) {
+          // Find exactly the user with that name (case insensitive)
+          const match = users.find(u =>
+            u.name.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
+            u.username.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
+            raw.salespersonName?.trim().toLowerCase().includes(u.name.trim().toLowerCase()) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
+          );
+          if (match) {
+            raw.salespersonId = match.id;
+          }
+        }
+      });
+
       // Create and Save File Record
       const newFileRecord: UploadedFile = {
         id: fileId,

@@ -106,9 +106,11 @@ export const processClientsWithAI = async (
 
     // Create a sanitized ID, falling back to timestamp if CNPJ is invalid or missing
     const sanitizedCnpj = client.cnpj ? client.cnpj.replace(/\D/g, '') : null;
+    const resolvedSalespersonId = client.salespersonId || salespersonId;
+
     const id = sanitizedCnpj && sanitizedCnpj.length === 14
       ? `cli_${sanitizedCnpj}`
-      : `cli_${salespersonId}-${Date.now()}-${index}`;
+      : `cli_${resolvedSalespersonId}-${Date.now()}-${index}`;
 
     // --- PRE-ENRICHMENT WITH CNPJ ---
     let cnpjData: any = null;
@@ -335,7 +337,7 @@ export const processClientsWithAI = async (
 
       result = {
         id: id,
-        salespersonId: salespersonId,
+        salespersonId: resolvedSalespersonId,
         companyName: company,
         ownerName: owner,
         contact: finalContact,
@@ -359,7 +361,7 @@ export const processClientsWithAI = async (
       // Absolute fallback if even the sync logic creates an exception
       result = {
         id: id,
-        salespersonId: salespersonId,
+        salespersonId: resolvedSalespersonId,
         companyName: company,
         ownerName: owner,
         contact: contact,

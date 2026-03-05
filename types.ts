@@ -15,6 +15,8 @@ export interface RawClient {
   googleMapsLink?: string;
   latitude?: number;
   longitude?: number;
+  salespersonName?: string; // Optional: Extracted from CSV/Excel
+  salespersonId?: string;   // Optional: Matched with system users
 }
 
 export interface Product {
