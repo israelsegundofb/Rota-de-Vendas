@@ -2737,7 +2737,6 @@ const App: React.FC = () => {
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
                           clients={finalFilteredClients}
-                          users={users}
                           startDate={startDate}
                           endDate={endDate}
                           onRangeChange={(start, end) => {

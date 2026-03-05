@@ -2,10 +2,8 @@ import React, { useMemo } from 'react';
 import { EnrichedClient, PurchaseRecord, AppUser } from '../types';
 import { ShoppingBag, Calendar, User, TrendingUp, DollarSign } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
-
 interface SalesHistoryPanelProps {
     clients: EnrichedClient[];
-    users: AppUser[];
     startDate: string;
     endDate: string;
     onRangeChange: (start: string, end: string) => void;
@@ -13,7 +11,6 @@ interface SalesHistoryPanelProps {
 
 const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
     clients,
-    users,
     startDate,
     endDate,
     onRangeChange
@@ -63,7 +60,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 p-4 overflow-hidden">
+        <div className="flex flex-col h-full bg-gray-50 p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
