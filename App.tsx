@@ -1751,7 +1751,7 @@ const App: React.FC = () => {
                 </button>
               )}
 
-              {!isAdminUser && currentUser.role !== 'general_viewer' && (
+              {currentUser.role !== 'general_viewer' && (
                 <>
                   <button
                     onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
