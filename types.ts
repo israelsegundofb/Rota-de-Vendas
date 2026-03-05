@@ -72,8 +72,9 @@ export type UserRole =
   | 'general_manager'  // Nível 3: Gerente Geral
   | 'sales_manager'    // Nível 4: Gerente de Vendas
   | 'sales_supervisor' // Nível 5: Supervisor
-  | 'sales_internal'   // Nível 6: Vendedor Interno
-  | 'sales_external'   // Nível 7: Vendedor Externo
+  | 'general_viewer'   // Nível 6: Visualizador Geral
+  | 'sales_internal'   // Nível 7: Vendedor Interno
+  | 'sales_external'   // Nível 8: Vendedor Externo
   | 'admin'            // Legacy (será tratado como admin_dev)
   | 'salesperson';     // Legacy (será tratado como sales_external)
 

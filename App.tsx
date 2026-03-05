@@ -1751,45 +1751,49 @@ const App: React.FC = () => {
                 </button>
               )}
 
-              <button
-                onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
-                Listagem de Dados
-              </button>
+              {!isAdminUser && currentUser.role !== 'general_viewer' && (
+                <>
+                  <button
+                    onClick={() => { setActiveView('table'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'table'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <TableIcon className={`w-5 h-5 ${activeView === 'table' ? 'fill-current' : ''}`} />
+                    Listagem de Dados
+                  </button>
 
-              <button
-                onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <History className={`w-5 h-5 ${activeView === 'history' ? 'fill-current' : ''}`} />
-                Histórico de Vendas
-              </button>
+                  <button
+                    onClick={() => { setActiveView('history'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'history'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <History className={`w-5 h-5 ${activeView === 'history' ? 'fill-current' : ''}`} />
+                    Histórico de Vendas
+                  </button>
 
-              <button
-                onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
-                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
-                  ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
-                  Mensagens Internas
-                </div>
-                {totalUnread > 0 && activeView !== 'chat' && (
-                  <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
-                    {totalUnread}
-                  </div>
-                )}
-              </button>
+                  <button
+                    onClick={() => { setActiveView('chat'); setIsMobileMenuOpen(false); if (activeConversationId) handleChatMarkAsRead(activeConversationId); }}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'chat'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'fill-current' : ''}`} />
+                      Mensagens Internas
+                    </div>
+                    {totalUnread > 0 && activeView !== 'chat' && (
+                      <div className="bg-error text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                        {totalUnread}
+                      </div>
+                    )}
+                  </button>
+                </>
+              )}
             </nav>
 
             {isAdminUser && (

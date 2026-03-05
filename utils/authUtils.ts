@@ -6,6 +6,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
     general_manager: '👔 Gerente Geral',
     sales_manager: '📈 Gerente de Vendas',
     sales_supervisor: '📋 Supervisor de Vendas',
+    general_viewer: '👁️ Visualizador Geral',
     sales_internal: '🏢 Vendedor Interno',
     sales_external: '🚗 Vendedor Externo',
     admin: '👑 Admin (Legado)',
@@ -20,9 +21,10 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
     general_manager: 3,
     sales_manager: 4,
     sales_supervisor: 5,
-    sales_internal: 6,
-    sales_external: 7,
-    salesperson: 7 // Legacy treats as lowest level
+    general_viewer: 6,
+    sales_internal: 7,
+    sales_external: 8,
+    salesperson: 8 // Legacy treats as lowest level
 };
 
 export const getRoleLabel = (role: UserRole) => ROLE_LABELS[role] || role;
@@ -51,6 +53,7 @@ export const getAvailableRoles = (currentUserRole: UserRole): UserRole[] => {
         'general_manager',
         'sales_manager',
         'sales_supervisor',
+        'general_viewer',
         'sales_internal',
         'sales_external'
     ];
@@ -83,18 +86,19 @@ export const isAdmin = (role: UserRole): boolean => {
 
 /**
  * Verifica se é da área de Vendas (Managers pra baixo -> Nível 3+)
+ * Exclui Visualizadores (são apenas observadores)
  */
 export const isSalesTeam = (role: UserRole): boolean => {
-    return ROLE_HIERARCHY[role] >= 3;
+    return ROLE_HIERARCHY[role] >= 3 && role !== 'general_viewer';
 };
 
 /**
  * Verifica se tem visibilidade total dos dados (Todos os pinos/clientes).
- * Inclui: Admin DEV, Admin Geral, Gerente Geral, Gerente de Vendas, Supervisor de Vendas.
- * (Níveis 1 a 5)
+ * Inclui: Admin DEV, Admin Geral, Gerente Geral, Gerente de Vendas, Supervisor de Vendas e Visualizador Geral.
+ * (Níveis 1 a 6)
  */
 export const hasFullDataVisibility = (role: UserRole): boolean => {
-    return ROLE_HIERARCHY[role] <= 5;
+    return ROLE_HIERARCHY[role] <= 6;
 };
 /**
  * Migra roles legados e garante propriedades específicas para o Administrador principal.
