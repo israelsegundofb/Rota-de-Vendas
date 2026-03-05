@@ -99,8 +99,8 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     if (Object.keys(rowData).length === 0) continue;
 
                     // 3. Map to RawClient
-                    const addressInput = rowData['endereco'] || rowData['endereco comercial numero'] || rowData['endereco comercial'] || rowData['logradouro'] || rowData['localizacao'] ||
-                        rowData['endereco completo'] || rowData['rua'] || rowData['end'] || '';
+                    const addressInput = rowData['endereco completo'] || rowData['endereco'] || rowData['endereco comercial numero'] || rowData['endereco comercial'] || rowData['logradouro'] || rowData['localizacao'] ||
+                        rowData['rua'] || rowData['end'] || '';
 
                     const parsed = parseHyperlink(addressInput);
                     const address = parsed.address;
@@ -139,7 +139,7 @@ export const parseExcel = (file: File): Promise<RawClient[]> => {
                     // Note: If addressLink provides a direct Google Maps URL, we might want to 
                     // re-run extraction logic to get lat/lng from IT if 'lat'/'lng' are undefined.
 
-                    let companyName = rowData['razao social'] || rowData['cliente'] || rowData['empresa'] || rowData['nome comercial'] || rowData['nome'] || rowData['nome cliente'] ||
+                    let companyName = rowData['razao social / nome'] || rowData['razao social'] || rowData['cliente'] || rowData['empresa'] || rowData['nome comercial'] || rowData['nome'] || rowData['nome cliente'] ||
                         rowData['parceiro'] || rowData['loja'] || '';
 
                     const nomeFantasia = rowData['nome fantasia'] || rowData['fantasia'] || '';
