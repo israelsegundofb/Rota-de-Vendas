@@ -184,6 +184,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                             onChange={(e) => setTargetUploadUserId(e.target.value)}
                                         >
                                             <option value="" disabled>Selecione um vendedor...</option>
+                                            <option value="smart">🌟 Automático (Via Planilha)</option>
                                             {users.filter(u => isSalesTeam(u.role)).map(u => (
                                                 <option key={u.id} value={u.id}>{u.name}</option>
                                             ))}
@@ -220,6 +221,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                         className={`bg-transparent border rounded px-1 py-0.5 outline-none w-24 ${!pf.targetUserId ? 'border-error text-error' : 'border-outline-variant text-on-surface'}`}
                                                     >
                                                         <option value="" disabled>Vendedor...</option>
+                                                        <option value="smart">Automático</option>
                                                         {users.filter(u => isSalesTeam(u.role)).map(u => (
                                                             <option key={u.id} value={u.id}>{u.name}</option>
                                                         ))}

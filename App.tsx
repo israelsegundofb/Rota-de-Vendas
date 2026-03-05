@@ -909,11 +909,14 @@ const App: React.FC = () => {
   };
 
   const handleClientFileDirect = async (file: File, ownerId: string, skipConfirmation = false) => {
-    // Determine owner name (if not passed, though we change signature to not require it as param)
-    // Actually, ownerName was a param but ownerId allows us to lookup.
-    // We will derive ownerName inside.
-    const owner = users.find(u => u.id === ownerId);
-    const ownerName = owner ? owner.name : 'Desconhecido';
+    let ownerName = 'Desconhecido';
+    if (ownerId === 'smart') {
+      ownerName = 'Múltiplos (Via Planilha)';
+      ownerId = 'multi'; // Special grouping ID for generic unassigned clients
+    } else {
+      const owner = users.find(u => u.id === ownerId);
+      ownerName = owner ? owner.name : 'Desconhecido';
+    }
 
     if (masterClientList.length > 0 && !skipConfirmation) {
       const confirmUpdate = window.confirm(
@@ -1040,6 +1043,8 @@ const App: React.FC = () => {
                 list[existingIdx] = {
                   ...existing,
                   ...taggedNewClient,
+                  // PRESERVE original creator so deleting the new spreadsheet doesn't wipe older clients
+                  sourceFileId: existing.sourceFileId || taggedNewClient.sourceFileId,
                   ownerName: taggedNewClient.ownerName || existing.ownerName,
                   contact: taggedNewClient.contact || existing.contact,
                   whatsapp: taggedNewClient.whatsapp || existing.whatsapp,
