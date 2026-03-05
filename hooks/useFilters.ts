@@ -91,6 +91,24 @@ export const useFilters = (
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
+        // Optimize: Pre-parse filter dates outside the loop to avoid recreating Date objects for every product
+        let parsedStartDate: Date | null = null;
+        if (startDate) {
+            parsedStartDate = new Date(startDate);
+            parsedStartDate.setHours(0, 0, 0, 0);
+        }
+
+        let parsedEndDate: Date | null = null;
+        if (endDate) {
+            parsedEndDate = new Date(endDate);
+            parsedEndDate.setHours(23, 59, 59, 999);
+        }
+        const hasDateFilter = !!(parsedStartDate || parsedEndDate);
+
+        // Optimize: Pre-calculate lowercased queries
+        const query = (debouncedSearchQuery || '').toLowerCase();
+        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+
         return visibleClients.filter(c => {
             // General Filters
             const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
@@ -108,14 +126,12 @@ export const useFilters = (
             }
 
             // Text Search
-            const query = (debouncedSearchQuery || '').toLowerCase();
             const matchSearch = debouncedSearchQuery === '' ||
                 (c.companyName || '').toLowerCase().includes(query) ||
                 (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
-            const prodQuery = (debouncedProductQuery || '').toLowerCase();
 
             // CNAE Filter (Matches Main or Secondary)
             const matchCnae = filterCnae === 'Todos' ||
@@ -148,7 +164,7 @@ export const useFilters = (
                     );
 
                     // Date Range Filter
-                    const matchDate = (!startDate || !endDate) || c.purchasedProducts.some(p => {
+                    const matchDate = (!hasDateFilter) || c.purchasedProducts.some(p => {
                         if (!p.purchaseDate) return false;
 
                         // Robust Date Parsing
@@ -170,20 +186,11 @@ export const useFilters = (
 
                         if (isNaN(pDate.getTime())) return false; // Invalid date in data
 
-                        // Create Date objects for start/end, resetting time
+                        // Reset time for comparison
                         pDate.setHours(0, 0, 0, 0);
 
-                        if (startDate) {
-                            const sDate = new Date(startDate);
-                            sDate.setHours(0, 0, 0, 0);
-                            if (pDate < sDate) return false;
-                        }
-
-                        if (endDate) {
-                            const eDate = new Date(endDate);
-                            eDate.setHours(23, 59, 59, 999);
-                            if (pDate > eDate) return false;
-                        }
+                        if (parsedStartDate && pDate < parsedStartDate) return false;
+                        if (parsedEndDate && pDate > parsedEndDate) return false;
 
                         return true;
                     });
