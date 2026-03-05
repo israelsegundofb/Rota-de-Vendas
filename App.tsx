@@ -8,11 +8,12 @@
   Developed with passion and technical excellence.
 */
 import React, { useState, useEffect, useRef } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History, Download } from 'lucide-react';
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
+import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
@@ -2400,6 +2401,16 @@ const App: React.FC = () => {
                           title="Enriquecer toda a base com dados da Receita Federal via CNPJa Comercial"
                         >
                           <Database className="w-3 h-3" /> Atualizar Base (CNPJa)
+                        </button>
+                      )}
+
+                      {currentUser?.role === 'admin_dev' && (
+                        <button
+                          onClick={() => exportClientsToCSV(finalFilteredClients, users)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:shadow-lg transition-all text-[10px] font-bold uppercase tracking-wider ml-2"
+                          title="Exportar base consolidada de clientes em CSV"
+                        >
+                          <Download className="w-3 h-3" /> Exportar Base (CSV)
                         </button>
                       )}
                     </div>
