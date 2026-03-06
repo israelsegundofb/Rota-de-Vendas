@@ -1400,6 +1400,7 @@ const App: React.FC = () => {
 
       let updatedCount = 0;
       let capturedNewList: typeof masterClientList = [];
+      const unmatchedGroups: { companyName: string; cnpj: string; purchases: typeof records }[] = [];
       setMasterClientList(prevList => {
         const newList = [...prevList];
         clientKeysInFile.forEach((key, index) => {
@@ -1543,8 +1544,70 @@ const App: React.FC = () => {
                 ]
               };
             }
+          } else {
+            // Track unmatched for auto-creation
+            unmatchedGroups.push({
+              companyName: firstRec.companyName || 'Desconhecido',
+              cnpj: firstRec.cnpj || '',
+              purchases: clientPurchases
+            });
           }
         });
+
+        // --- AUTO-CREATE new clients from unmatched CNPJs/names ---
+        let createdCount = 0;
+        unmatchedGroups.forEach(group => {
+          if (!group.companyName && !group.cnpj) return;
+
+          const newClientId = `purchase-import-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          const rawCnpj = group.cnpj;
+          const formattedCnpj = rawCnpj.length === 14
+            ? `${rawCnpj.slice(0, 2)}.${rawCnpj.slice(2, 5)}.${rawCnpj.slice(5, 8)}/${rawCnpj.slice(8, 12)}-${rawCnpj.slice(12, 14)}`
+            : rawCnpj;
+
+          const newPurchasedProducts: PurchaseRecord[] = group.purchases.map((rec: any) => {
+            const masterProd = products.find(p =>
+              (rec.sku && p.sku === rec.sku) ||
+              (p.name && rec.name && (p.name || '').toLowerCase().trim() === (rec.name || '').toLowerCase().trim())
+            );
+            if (masterProd) {
+              return { ...masterProd, purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue, sourceFileId: fileId, salespersonId: targetUserId };
+            }
+            return {
+              sku: rec.sku || 'N/A', name: rec.name || 'Produto Desconhecido', brand: 'Desconhecido',
+              category: 'Manual', price: rec.price || 0, factoryCode: '',
+              purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue,
+              sourceFileId: fileId, salespersonId: targetUserId
+            };
+          });
+
+          const newClient: EnrichedClient = {
+            id: newClientId,
+            salespersonId: targetUserId,
+            companyName: group.companyName,
+            ownerName: '',
+            contact: '',
+            originalAddress: 'Endereço não cadastrado',
+            cleanAddress: 'Endereço não cadastrado',
+            cnpj: formattedCnpj || undefined,
+            category: ['Novo - Importação Compras'],
+            region: 'Indefinido',
+            state: '',
+            city: '',
+            lat: 0,
+            lng: 0,
+            purchasedProducts: newPurchasedProducts,
+            sourceFileId: fileId,
+          };
+
+          newList.push(newClient);
+          createdCount++;
+        });
+
+        if (createdCount > 0) {
+          console.log(`[APP] ✅ Auto-created ${createdCount} new clients from unmatched purchase records.`);
+        }
+
         capturedNewList = newList;
         return newList;
       });
@@ -1586,7 +1649,11 @@ const App: React.FC = () => {
       setUploadedFiles(prev => [newFileRecord, ...prev]);
       setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
 
-      alert(`✅ Atualização de Compras concluída!\n\n${updatedCount} clientes identificados e com histórico renovado.`);
+      const createdMsg = unmatchedGroups.length > 0
+        ? `\n\n📋 ${unmatchedGroups.length} clientes NOVOS foram cadastrados automaticamente (não encontrados na base):\n${unmatchedGroups.slice(0, 15).map(g => `  • ${g.companyName}${g.cnpj ? ` (CNPJ: ${g.cnpj.length === 14 ? g.cnpj.slice(0, 2) + '.' + g.cnpj.slice(2, 5) + '.' + g.cnpj.slice(5, 8) + '/' + g.cnpj.slice(8, 12) + '-' + g.cnpj.slice(12, 14) : g.cnpj})` : ''}`).join('\n')}${unmatchedGroups.length > 15 ? `\n  ... e mais ${unmatchedGroups.length - 15} clientes` : ''}`
+        : '';
+
+      alert(`✅ Atualização de Compras concluída!\n\n🔗 ${updatedCount} clientes existentes atualizados.${createdMsg}\n\n📊 Total: ${updatedCount + unmatchedGroups.length} de ${clientKeysInFile.length} clientes da planilha processados.`);
 
     } catch (e: any) {
       console.error(e);
