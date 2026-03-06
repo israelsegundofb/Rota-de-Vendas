@@ -171,7 +171,14 @@ export const saveToCloud = async (
     if (!db) return;
 
     if (users.length === 0) {
-        console.warn('[FIREBASE] Blocked save attempt with 0 users.');
+        console.warn('[FIREBASE] Blocked save attempt with 0 users. This prevents accidental data wipes.');
+        return;
+    }
+
+    // Protection: Do not save if we are in the middle of a systemic cleanup (handled via syncLock externally)
+    // or if the data looks suspiciously empty while we know we should have users.
+    if (!users.some(u => u.role === 'admin_dev' || u.role === 'admin')) {
+        console.warn('[FIREBASE] Blocked save attempt: No admin users found in list. Safety first.');
         return;
     }
 
@@ -305,6 +312,21 @@ export const deleteAllClientsFromCloud = async () => {
             await batch.commit();
         }
 
+        // --- DEEP CLEAN: Purge legacy V4 paths to prevent "ghost" data on reload ---
+        try {
+            const legacyClientsRef = doc(db, 'rota-vendas', 'clients-data');
+            const legacyMasterRef = doc(db, 'rota-vendas', 'master-data');
+            const batchLegacy = writeBatch(db);
+            batchLegacy.delete(legacyClientsRef);
+            // We keep master-data because it might contain app-wide config, 
+            // but we reset the clients count there if it exists
+            batchLegacy.set(legacyMasterRef, { totalClients: 0, lastUpdated: new Date().toISOString() }, { merge: true });
+            await batchLegacy.commit();
+            console.log('[FIREBASE] Legacy V4 paths purged/reset.');
+        } catch (legacyErr) {
+            console.warn('[FIREBASE] Non-critical: Failed to purge legacy V4 paths (may not exist).', legacyErr);
+        }
+
         // Also update metadata to reflect 0 clients
         const metaRef = doc(db, 'rota-vendas-data', 'metadata');
         await updateDoc(metaRef, { totalClients: 0, lastUpdated: new Date().toISOString() });
@@ -423,21 +445,23 @@ export const uploadFileToCloud = async (file: File | Blob, path: string): Promis
 export const updateUserStatusInCloud = async (userId: string, status: UserStatus, allUsers: AppUser[]) => {
     if (!db) return;
     try {
-        const updatedUsers = allUsers.map(u => u.id === userId ? { ...u, status } : u);
-        const docRef = doc(db, 'rota-vendas', 'master-data');
-        const snap = await getDoc(docRef);
+        // ALWAYS use V5 Path for updates to prevent split-brain data
+        const userRef = doc(db, 'rota-vendas-data', 'users', 'list', userId);
+        const userToUpdate = allUsers.find(u => u.id === userId);
 
-        if (snap.exists()) {
-            const currentData = snap.data();
-            await setDoc(docRef, {
-                ...currentData,
-                users: removeUndefined(updatedUsers),
-                lastUpdated: new Date().toISOString(),
-                updatedBy: `Status Update: ${userId}`
+        if (userToUpdate) {
+            await updateDoc(userRef, {
+                status,
+                lastUpdated: new Date().toISOString()
             });
-            console.log(`✅ Status for ${userId} updated to ${status}`);
+            console.log(`✅ [V5] Status for ${userId} updated to ${status}`);
+        } else {
+            // Fallback if user not in local list yet, try to just update the status field if doc exists
+            await updateDoc(userRef, { status, lastUpdated: new Date().toISOString() });
         }
+
+        // DEPRECATED: V4 path update removed to ensure consistency
     } catch (e) {
-        console.error("Error updating user status:", e);
+        console.error("Error updating user status in cloud:", e);
     }
 };

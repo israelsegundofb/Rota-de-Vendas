@@ -490,13 +490,23 @@ const App: React.FC = () => {
         '• Vendedores, produtos e categorias NÃO serão afetados.'
       ],
       async () => {
+        if (syncLockRef.current !== undefined) syncLockRef.current = true;
         setMasterClientList([]);
         setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+        if (lastClientsHash.current !== undefined) lastClientsHash.current = '';
+
+        // Clear LocalStorage to prevent auto-migration back to cloud
+        localStorage.removeItem('vendas_ai_clients');
+        localStorage.removeItem('vendas_ai_files');
 
         try {
+          // 4. Perform deep clean in cloud
           await deleteAllClientsFromCloud();
         } catch (error) {
           console.error("Erro ao apagar clientes do firebase: ", error);
+          toast.error('Erro na limpeza da nuvem, mas dados locais foram limpos.');
+        } finally {
+          if (syncLockRef.current !== undefined) syncLockRef.current = false;
         }
 
         if (currentUser) {

@@ -45,8 +45,6 @@ const loadInitialFiles = (): UploadedFile[] => {
     } catch (e) { return []; }
 };
 
-// Helper to migrate legacy roles removed - imported from authUtils
-
 // Helper to hash data ignoring lastUpdated timestamp to prevent infinite sync loops
 const hashDataList = (list: any[]) => JSON.stringify(list, (key, value) => key === 'lastUpdated' ? undefined : value);
 
@@ -70,7 +68,6 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
     useEffect(() => {
         const initData = async () => {
-            // ... (rest of the code)
             // 1. Try to init Firebase
             setLoadingMessage('Conectando ao Firebase...');
             setLoadingProgress(10);
@@ -82,35 +79,51 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
             if (connected) {
                 setLoadingMessage('Buscando dados na nuvem...');
                 setLoadingProgress(40);
+
                 try {
-                    const cloudData = await loadFromCloud();
-                    setLoadingProgress(60);
+                    // Optimized: parallel loading with a safety timeout to prevent permanent hang at 40%
+                    const cloudLoadPromise = loadFromCloud();
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Cloud sync timeout')), 15000)
+                    );
+
+                    const cloudData = await Promise.race([cloudLoadPromise, timeoutPromise]) as any;
 
                     if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
                         console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
-                        if (cloudData.clients) {
-                            lastClientsHash.current = hashDataList(cloudData.clients);
-                            setMasterClientList(cloudData.clients);
+
+                        setLoadingMessage('Processando usuários...');
+                        setLoadingProgress(45);
+                        if (cloudData.users && setUsers) {
+                            lastUsersHash.current = hashDataList(cloudData.users);
+                            setUsers(migrateUsers(cloudData.users));
                         }
+
+                        setLoadingMessage('Processando catálogo...');
+                        setLoadingProgress(50);
                         if (cloudData.products) {
                             lastProductsHash.current = hashDataList(cloudData.products);
                             setProducts(cloudData.products);
                         }
                         if (cloudData.categories) setCategories(cloudData.categories);
-                        if (cloudData.users && setUsers) {
-                            lastUsersHash.current = hashDataList(cloudData.users);
-                            setUsers(migrateUsers(cloudData.users));
+
+                        setLoadingMessage('Processando clientes...');
+                        setLoadingProgress(55);
+                        if (cloudData.clients) {
+                            lastClientsHash.current = hashDataList(cloudData.clients);
+                            setMasterClientList(cloudData.clients);
                         }
+
                         if (cloudData.uploadedFiles) {
-                            // Recovery: Mark stale 'processing' files as 'error'
+                            setLoadingMessage('Processando arquivos...');
+                            setLoadingProgress(60);
                             const TEN_MINUTES = 10 * 60 * 1000;
                             const now = Date.now();
                             const recoveredFiles = cloudData.uploadedFiles.map((f: UploadedFile) => {
                                 if (f.status === 'processing' && f.uploadDate) {
                                     const uploadTime = new Date(f.uploadDate).getTime();
                                     if (now - uploadTime > TEN_MINUTES) {
-                                        console.warn(`[RECOVERY] File "${f.fileName}" was stuck in processing. Marking as error.`);
-                                        return { ...f, status: 'error' as const, errorMessage: 'Processamento interrompido ou abandonado. Reenvie o arquivo.' };
+                                        return { ...f, status: 'error' as const, errorMessage: 'Processamento interrompido.' };
                                     }
                                 }
                                 return f;
@@ -137,14 +150,13 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (setUsers) setUsers(usersToSave);
                         setMasterClientList(loadInitialClients());
 
-                        console.log("Saving initial data to cloud (background attempt)...");
                         saveToCloud(
                             loadInitialClients(),
                             loadInitialProducts(),
                             loadInitialCategories(),
                             usersToSave,
                             loadInitialFiles()
-                        ).catch(cloudErr => console.warn("Initial cloud save failed (expected in some offline cases), will retry later", cloudErr));
+                        ).catch(() => { });
 
                         setLoadingMessage('Configuração concluída!');
                         setLoadingProgress(100);
@@ -153,11 +165,10 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                     }
                 } catch (e) {
                     console.error("Cloud load error, falling back to local:", e);
-                    // Continue to fallback below
                 }
             }
 
-            // 3. Fallback to LocalStorage (Firebase not connected)
+            // 3. Fallback to LocalStorage (Firebase not connected or error)
             console.log("Loading data from LocalStorage...");
             setMasterClientList(loadInitialClients());
 
@@ -165,7 +176,6 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
             if (savedUsers && setUsers) {
                 setUsers(migrateUsers(JSON.parse(savedUsers)));
             } else if (setUsers) {
-                // If no users exist, use INITIAL_USERS
                 const { INITIAL_USERS } = await import('./useAuth');
                 setUsers(migrateUsers(INITIAL_USERS));
             }
@@ -177,7 +187,6 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
         initData();
 
-        // 4. Real-time Subscription
         let unsubscribe: () => void = () => { };
 
         const setupSubscription = async () => {
@@ -185,10 +194,9 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                 const { subscribeToCloudChanges } = await import('../services/firebaseService');
                 unsubscribe = subscribeToCloudChanges((newData: any) => {
                     if (newData) {
-                        console.log('[SYNC] Real-time update received from cloud');
                         if (newData.clients) {
                             if (syncLockRef.current) {
-                                console.log('[SYNC] ⏸️ Skipping client sync — upload in progress (syncLock active)');
+                                console.log('[SYNC] Skipping client sync — syncLock active');
                             } else {
                                 const newHash = hashDataList(newData.clients);
                                 if (newHash !== lastClientsHash.current) {
@@ -208,7 +216,6 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         if (newData.users && setUsers) {
                             const newHash = hashDataList(newData.users);
                             if (newHash !== lastUsersHash.current) {
-                                console.log(`[SYNC] Users changed in cloud (${newData.users.length} users). Updating local state.`);
                                 lastUsersHash.current = newHash;
                                 setUsers(migrateUsers(newData.users));
                             }
@@ -227,9 +234,9 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
         setupSubscription();
         return () => { if (unsubscribe) unsubscribe(); };
-    }, [isFirebaseConnected]); // Re-run if connection status changes
+    }, [isFirebaseConnected]);
 
-    // Auto-Save to Cloud
+    // Auto-Save Effect
     useEffect(() => {
         const shouldSave = isFirebaseConnected && isDataLoaded && users.length > 0;
 
@@ -247,22 +254,21 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
             if (hasChanges) {
                 const timeout = setTimeout(() => {
-                    console.log('[SYNC] Auto-saving to cloud... local changes detected.');
                     lastClientsHash.current = currentClientsHash;
                     lastUsersHash.current = currentUsersHash;
                     lastProductsHash.current = currentProductsHash;
                     lastFilesHash.current = currentFilesHash;
                     saveToCloud(masterClientList, products, categories, users, uploadedFiles)
                         .catch(err => console.error("Auto-save failed", err));
-                }, 3000); // 3s debounce
+                }, 3000);
                 return () => clearTimeout(timeout);
             }
         }
     }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
 
-    // Local Persistence Effects (Immediate Logic)
+    // Local Persistence
     useEffect(() => {
-        if (masterClientList.length > 0) localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
+        localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
     }, [masterClientList]);
 
     useEffect(() => {
@@ -279,7 +285,6 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
     useEffect(() => {
         if (users.length > 0) {
-            console.log(`[PERSISTENCE] Saving ${users.length} users to localStorage...`);
             localStorage.setItem('vendas_ai_users', JSON.stringify(users));
         }
     }, [users]);
