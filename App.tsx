@@ -41,6 +41,8 @@ const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
 const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
 const ChatPanel = React.lazy(() => import('./components/ChatPanel'));
+import { AssistantRV } from './components/AssistantRV';
+import { AssistantContext } from './services/geminiService';
 
 import DateRangePicker from './components/DateRangePicker';
 import CookieConsent from './components/CookieConsent';
@@ -159,6 +161,9 @@ const App: React.FC = () => {
   });
   const [keyVersion, setKeyVersion] = useState(0);
   const [isMapApiBroken, setIsMapApiBroken] = useState(false);
+
+  // Assistant State
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   // View State
   const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat'>('map');
@@ -2878,6 +2883,50 @@ const App: React.FC = () => {
         confirmLabel={dialogConfig.confirmLabel}
         cancelLabel={dialogConfig.cancelLabel}
       />
+
+      {currentUser && (
+        <AssistantRV
+          isOpen={isAssistantOpen}
+          setIsOpen={setIsAssistantOpen}
+          context={{
+            userName: currentUser.name || 'Usuário',
+            userRole: currentUser.role || 'Geral',
+            stats: {
+              totalClients: masterClientList.length,
+              totalProducts: products.length,
+              activeClients: finalFilteredClients.length
+            },
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 100).map((c: any) => ({
+              nome: c.companyName,
+              bairro: c.district,
+              cidade: c.city,
+              vendedor: c.salespersonName || c.ownerName
+            })))
+          }}
+        />
+      )}
+
+      {currentUser && (
+        <AssistantRV
+          isOpen={isAssistantOpen}
+          setIsOpen={setIsAssistantOpen}
+          context={{
+            userName: currentUser.name || 'Usuário',
+            userRole: currentUser.role || 'Geral',
+            stats: {
+              totalClients: masterClientList.length,
+              totalProducts: products.length,
+              activeClients: finalFilteredClients.length
+            },
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 100).map(c => ({
+              nome: c.companyName,
+              bairro: c.district,
+              cidade: c.city,
+              vendedorID: c.salespersonId
+            })))
+          }}
+        />
+      )}
     </GoogleReCaptchaProvider >
   );
 };

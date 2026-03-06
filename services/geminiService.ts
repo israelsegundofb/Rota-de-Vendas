@@ -2,6 +2,16 @@ import { EnrichedClient, RawClient, Product } from "../types";
 import { cleanAddress } from "../utils/csvParser";
 import { geocodeAddress } from "./geocodingService";
 import { consultarCNPJ } from "./cnpjService";
+export interface AssistantContext {
+  userName: string;
+  userRole: string;
+  stats: {
+    totalClients: number;
+    totalProducts: number;
+    activeClients: number; // e.g. clients with purchases
+  };
+  filteredData?: string; // Serialized short version of current view
+}
 
 // Use batch size 1 to ensure accurate association of Maps Grounding metadata (URIs) to specific clients.
 const BATCH_SIZE = 1;
@@ -486,4 +496,60 @@ export const categorizeProductsWithAI = async (
   }
 
   return updatedProducts;
+};
+
+/**
+ * Sends a conversational query to the AI Assistant with system context.
+ */
+export const askAssistantRV = async (
+  prompt: string,
+  context: AssistantContext
+): Promise<string> => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+  // Build the super-prompt with context
+  const fullPrompt = `
+    Você é o "Assistente RV", um assistente de inteligência artificial corporativo focado em análise de vendas do sistema "Rota de Vendas".
+    Sua função é fornecer análises claras, responder perguntas sobre a carteira de clientes, e ajudar o usuário a tomar decisões.
+    
+    [CONTEXTO ATUAL DO USUÁRIO LIGADO À SUA SESSÃO]
+    - Nome do Usuário: ${context.userName}
+    - Nível de Acesso: ${context.userRole}
+    - Total de Clientes Visíveis no Sistema: ${context.stats.totalClients}
+    - Total de Produtos no Catálogo: ${context.stats.totalProducts}
+    - Clientes Ativos (Positivados): ${context.stats.activeClients}
+
+    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual)]
+    ${context.filteredData ? context.filteredData : 'Nenhum filtro específico aplicado no momento ou dados muito extensos para leitura individual.'}
+
+    [INSTRUÇÕES GERAIS]
+    1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
+    2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
+    3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
+    4. Se a reposta demandar algo que não está no contexto, informe polidamente que como "Assistente Lite" você visualiza no momento o recorte primário da tela.
+    
+    Pergunta do Usuário:
+    "${prompt}"
+  `;
+
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-1.5-flash',
+        prompt: fullPrompt
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI Request failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response;
+  } catch (error) {
+    console.error("AssistantRV Error:", error);
+    throw new Error("Não foi possível conectar ao motor de IA no momento. Tente novamente em instantes.");
+  }
 };
