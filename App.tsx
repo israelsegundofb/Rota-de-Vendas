@@ -1399,6 +1399,7 @@ const App: React.FC = () => {
       setProcState(prev => ({ ...prev, total: clientKeysInFile.length, status: 'processing' }));
 
       let updatedCount = 0;
+      let capturedNewList: typeof masterClientList = [];
       setMasterClientList(prevList => {
         const newList = [...prevList];
         clientKeysInFile.forEach((key, index) => {
@@ -1544,8 +1545,20 @@ const App: React.FC = () => {
             }
           }
         });
+        capturedNewList = newList;
         return newList;
       });
+
+      // Force-save to Firebase immediately to prevent real-time sync from overwriting
+      if (isFirebaseConnected && capturedNewList.length > 0) {
+        try {
+          const { saveToCloud } = await import('./services/firebaseService');
+          await saveToCloud(capturedNewList, products, categories, users, uploadedFiles);
+          console.log('[APP] ✅ Purchase upload force-saved to Firebase.');
+        } catch (saveErr) {
+          console.error('[APP] Failed to force-save purchase data:', saveErr);
+        }
+      }
 
       // Create File Record
       const newFileRecord: UploadedFile = {
