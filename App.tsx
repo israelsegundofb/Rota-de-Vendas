@@ -1176,15 +1176,43 @@ const App: React.FC = () => {
     } else if (file.type === 'products') {
       setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
     } else if (file.type === 'purchases') {
-      setMasterClientList(prev => prev.map(c => {
-        if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
-        const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
-        if (filteredPurchases.length === c.purchasedProducts.length) return c; // No change
-        return {
-          ...c,
-          purchasedProducts: filteredPurchases
-        };
-      }));
+      // Activate sync lock to prevent real-time sync from overwriting during cleanup
+      syncLockRef.current = true;
+
+      let updatedClientList: typeof masterClientList = [];
+      setMasterClientList(prev => {
+        // 1. Remove auto-created clients from this purchase file
+        let newList = prev.filter(c => {
+          const isAutoCreated = c.sourceFileId === fileId &&
+            c.category?.includes('Novo - Importação Compras');
+          return !isAutoCreated;
+        });
+
+        // 2. Remove purchase records from existing clients
+        newList = newList.map(c => {
+          if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
+          const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
+          if (filteredPurchases.length === c.purchasedProducts.length) return c;
+          return { ...c, purchasedProducts: filteredPurchases };
+        });
+
+        updatedClientList = newList;
+        return newList;
+      });
+
+      // Force-save the cleaned client list to Firebase
+      if (isFirebaseConnected && updatedClientList.length > 0) {
+        try {
+          const newUploadedFilesForSave = uploadedFiles.filter(f => f.id !== fileId);
+          await saveToCloud(updatedClientList, products, categories, users, newUploadedFilesForSave);
+          lastClientsHash.current = JSON.stringify(updatedClientList, (key, value) => key === 'lastUpdated' ? undefined : value);
+          console.log('[APP] ✅ Purchase deletion force-saved to Firebase.');
+        } catch (e) {
+          console.error('[APP] Failed to force-save purchase deletion:', e);
+        }
+      }
+
+      syncLockRef.current = false;
     }
 
     const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
