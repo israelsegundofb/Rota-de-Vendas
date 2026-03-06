@@ -1632,18 +1632,29 @@ const App: React.FC = () => {
   console.warn(`[APP] Build Version: 2026.02.13.1613 (V5.3.3 - Turbo Processing)`);
 
   // --- Auto-Cleanup for Orphaned Purchases (files deleted BEFORE cascade fix) ---
+  const orphanCleanupRan = React.useRef(false);
   React.useEffect(() => {
     if (!isDataLoaded || masterClientList.length === 0) return;
 
-    // We only clean up if we have explicitly loaded files from the cloud to prevent wiping everything.
-    const validFileIds = new Set(uploadedFiles.map(f => f.id));
+    const purchaseFiles = uploadedFiles.filter(f => f.type === 'purchases');
+    const validPurchaseFileIds = new Set(purchaseFiles.map(f => f.id));
+    const hasNoPurchaseFiles = purchaseFiles.length === 0;
     let hasOrphans = false;
 
     const cleanedClients = masterClientList.map(c => {
       if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
 
-      // Keep products manually added (no sourceFileId) OR products that have a valid sourceFileId
-      const filtered = c.purchasedProducts.filter(p => !p.sourceFileId || validFileIds.has(p.sourceFileId));
+      let filtered: typeof c.purchasedProducts;
+
+      if (hasNoPurchaseFiles) {
+        // If there are ZERO purchase files in the system, ALL purchase data is orphaned
+        filtered = [];
+      } else {
+        // Keep only purchases whose sourceFileId still exists OR that have no sourceFileId (legacy/manual)
+        filtered = c.purchasedProducts.filter(p =>
+          p.sourceFileId ? validPurchaseFileIds.has(p.sourceFileId) : true
+        );
+      }
 
       if (filtered.length !== c.purchasedProducts.length) {
         hasOrphans = true;
@@ -1652,9 +1663,19 @@ const App: React.FC = () => {
       return c;
     });
 
-    if (hasOrphans) {
-      console.warn("[APP] Removed orphaned purchase records from deleted files.");
+    if (hasOrphans && !orphanCleanupRan.current) {
+      orphanCleanupRan.current = true;
+      console.warn("[APP] Removed orphaned purchase records. Force-saving to cloud...");
       setMasterClientList(cleanedClients);
+
+      // Force-save cleaned clients to Firebase immediately (bypass the 3s debounce)
+      if (isFirebaseConnected) {
+        import('./services/firebaseService').then(({ saveToCloud }) => {
+          saveToCloud(cleanedClients, products, categories, users, uploadedFiles)
+            .then(() => console.log("[APP] ✅ Orphan cleanup saved to cloud successfully."))
+            .catch(err => console.error("[APP] Failed to save orphan cleanup:", err));
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDataLoaded, uploadedFiles]); // Watch `uploadedFiles` to catch any further deletions.
