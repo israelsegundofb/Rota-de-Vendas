@@ -86,7 +86,8 @@ const App: React.FC = () => {
     categories, setCategories,
     uploadedFiles, setUploadedFiles,
     isFirebaseConnected, isDataLoaded,
-    loadingProgress, loadingMessage
+    loadingProgress, loadingMessage,
+    syncLockRef, lastClientsHash
   } = useDataPersistence(users, setUsers);
 
   const {
@@ -1382,6 +1383,10 @@ const App: React.FC = () => {
     });
 
     try {
+      // Activate sync lock to prevent real-time Firebase subscription from overwriting
+      syncLockRef.current = true;
+      console.log('[APP] 🔒 Sync lock ACTIVATED for purchase upload');
+
       const records = await parsePurchaseHistoryCSV(file);
       if (records.length === 0) throw new Error("Arquivo vazio ou sem registros válidos.");
 
@@ -1618,10 +1623,16 @@ const App: React.FC = () => {
           const { saveToCloud } = await import('./services/firebaseService');
           await saveToCloud(capturedNewList, products, categories, users, uploadedFiles);
           console.log('[APP] ✅ Purchase upload force-saved to Firebase.');
+          // Update hash ref so real-time subscription won't overwrite after unlock
+          lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) => key === 'lastUpdated' ? undefined : value);
         } catch (saveErr) {
           console.error('[APP] Failed to force-save purchase data:', saveErr);
         }
       }
+
+      // Release sync lock after force-save is complete
+      syncLockRef.current = false;
+      console.log('[APP] 🔓 Sync lock RELEASED after purchase upload');
 
       // Create File Record
       const newFileRecord: UploadedFile = {
@@ -1656,6 +1667,8 @@ const App: React.FC = () => {
       alert(`✅ Atualização de Compras concluída!\n\n🔗 ${updatedCount} clientes existentes atualizados.${createdMsg}\n\n📊 Total: ${updatedCount + unmatchedGroups.length} de ${clientKeysInFile.length} clientes da planilha processados.`);
 
     } catch (e: any) {
+      // Always release sync lock on error
+      syncLockRef.current = false;
       console.error(e);
       setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
       setUploadedFiles(prev => [...prev, {

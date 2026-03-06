@@ -66,6 +66,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
     const lastUsersHash = useRef<string>('');
     const lastProductsHash = useRef<string>('');
     const lastFilesHash = useRef<string>('');
+    const syncLockRef = useRef<boolean>(false); // Prevents real-time sync from overwriting during uploads
 
     useEffect(() => {
         const initData = async () => {
@@ -186,10 +187,14 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                     if (newData) {
                         console.log('[SYNC] Real-time update received from cloud');
                         if (newData.clients) {
-                            const newHash = hashDataList(newData.clients);
-                            if (newHash !== lastClientsHash.current) {
-                                lastClientsHash.current = newHash;
-                                setMasterClientList(newData.clients);
+                            if (syncLockRef.current) {
+                                console.log('[SYNC] ⏸️ Skipping client sync — upload in progress (syncLock active)');
+                            } else {
+                                const newHash = hashDataList(newData.clients);
+                                if (newHash !== lastClientsHash.current) {
+                                    lastClientsHash.current = newHash;
+                                    setMasterClientList(newData.clients);
+                                }
                             }
                         }
                         if (newData.products) {
@@ -291,6 +296,8 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         isFirebaseConnected,
         isDataLoaded,
         loadingProgress,
-        loadingMessage
+        loadingMessage,
+        syncLockRef,
+        lastClientsHash
     };
 };
