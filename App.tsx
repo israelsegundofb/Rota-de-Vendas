@@ -1181,15 +1181,9 @@ const App: React.FC = () => {
 
       let updatedClientList: typeof masterClientList = [];
       setMasterClientList(prev => {
-        // 1. Remove auto-created clients from this purchase file
-        let newList = prev.filter(c => {
-          const isAutoCreated = c.sourceFileId === fileId &&
-            c.category?.includes('Novo - Importação Compras');
-          return !isAutoCreated;
-        });
-
-        // 2. Remove purchase records from existing clients
-        newList = newList.map(c => {
+        // 1. Keep all clients (even those auto-created from this file)
+        // 2. Remove purchase records from clients
+        const newList = prev.map(c => {
           if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
           const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
           if (filteredPurchases.length === c.purchasedProducts.length) return c;
