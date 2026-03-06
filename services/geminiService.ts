@@ -533,23 +533,32 @@ export const askAssistantRV = async (
   `;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         prompt: fullPrompt
       }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`AI Request failed with status: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.response;
-  } catch (error) {
+    return data.text || data.response || "Desculpe, não consegui gerar uma resposta. Tente novamente.";
+  } catch (error: any) {
     console.error("AssistantRV Error:", error);
+    if (error.name === 'AbortError') {
+      throw new Error("A requisição ao motor de IA expirou (timeout). Tente novamente.");
+    }
     throw new Error("Não foi possível conectar ao motor de IA no momento. Tente novamente em instantes.");
   }
 };
