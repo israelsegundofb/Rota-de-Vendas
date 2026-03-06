@@ -1174,6 +1174,16 @@ const App: React.FC = () => {
       setMasterClientList(prev => prev.filter(c => c.sourceFileId !== fileId));
     } else if (file.type === 'products') {
       setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
+    } else if (file.type === 'purchases') {
+      setMasterClientList(prev => prev.map(c => {
+        if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
+        const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
+        if (filteredPurchases.length === c.purchasedProducts.length) return c; // No change
+        return {
+          ...c,
+          purchasedProducts: filteredPurchases
+        };
+      }));
     }
 
     const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
