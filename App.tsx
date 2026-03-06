@@ -1631,6 +1631,34 @@ const App: React.FC = () => {
   console.log('[APP] Environment:', import.meta.env.MODE);
   console.warn(`[APP] Build Version: 2026.02.13.1613 (V5.3.3 - Turbo Processing)`);
 
+  // --- Auto-Cleanup for Orphaned Purchases (files deleted BEFORE cascade fix) ---
+  React.useEffect(() => {
+    if (!isDataLoaded || masterClientList.length === 0) return;
+
+    // We only clean up if we have explicitly loaded files from the cloud to prevent wiping everything.
+    const validFileIds = new Set(uploadedFiles.map(f => f.id));
+    let hasOrphans = false;
+
+    const cleanedClients = masterClientList.map(c => {
+      if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
+
+      // Keep products manually added (no sourceFileId) OR products that have a valid sourceFileId
+      const filtered = c.purchasedProducts.filter(p => !p.sourceFileId || validFileIds.has(p.sourceFileId));
+
+      if (filtered.length !== c.purchasedProducts.length) {
+        hasOrphans = true;
+        return { ...c, purchasedProducts: filtered };
+      }
+      return c;
+    });
+
+    if (hasOrphans) {
+      console.warn("[APP] Removed orphaned purchase records from deleted files.");
+      setMasterClientList(cleanedClients);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDataLoaded, uploadedFiles]); // Watch `uploadedFiles` to catch any further deletions.
+
   if (!isDataLoaded) {
     return <LoadingScreen progress={loadingProgress} message={loadingMessage} />;
   }
