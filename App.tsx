@@ -1411,11 +1411,19 @@ const App: React.FC = () => {
           let clientIdx = -1;
 
           if (firstRec.cnpj) {
+            // First: try within the target salesperson
             clientIdx = newList.findIndex(c => {
-              const cleanSystemCnpj = (c.cnpj || '').replace(/[./-]/g, "");
-              // Strict Matching: Same CNPJ AND belongs to the selected salesperson
+              const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-/\s]/g, "");
               return cleanSystemCnpj === firstRec.cnpj && c.salespersonId === targetUserId;
             });
+
+            // Second: if no match found, try across ALL clients in the system
+            if (clientIdx === -1) {
+              clientIdx = newList.findIndex(c => {
+                const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-/\s]/g, "");
+                return cleanSystemCnpj === firstRec.cnpj;
+              });
+            }
           }
 
           if (clientIdx === -1) {

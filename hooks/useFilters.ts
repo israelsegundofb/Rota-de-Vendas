@@ -79,7 +79,20 @@ export const useFilters = (
         let baseList = [];
         if (hasFullDataVisibility(currentUserRole)) {
             if (filterSalespersonId !== 'Todos') {
+                // Include clients assigned to this salesperson
                 baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
+
+                // When filtering purchases: ALSO include clients from other salespersons
+                // that have purchases sold by the selected salesperson
+                if (filterOnlyWithPurchases) {
+                    const assignedIds = new Set(baseList.map(c => c.id));
+                    const crossSalespersonClients = masterClientList.filter(c =>
+                        !assignedIds.has(c.id) && // Not already included
+                        c.purchasedProducts && c.purchasedProducts.length > 0 &&
+                        c.purchasedProducts.some(p => p.salespersonId === filterSalespersonId)
+                    );
+                    baseList = [...baseList, ...crossSalespersonClients];
+                }
             } else {
                 baseList = masterClientList;
             }
@@ -87,7 +100,7 @@ export const useFilters = (
             baseList = masterClientList.filter(c => c.salespersonId === currentUserId);
         }
         return baseList;
-    }, [currentUserId, currentUserRole, masterClientList, filterSalespersonId]);
+    }, [currentUserId, currentUserRole, masterClientList, filterSalespersonId, filterOnlyWithPurchases]);
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
