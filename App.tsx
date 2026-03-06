@@ -1419,33 +1419,62 @@ const App: React.FC = () => {
           }
 
           if (clientIdx === -1) {
-            // Fallback Matching: By Company Name (Razão Social) AND belongs to the selected salesperson
-            const cleanCSVName = (firstRec.companyName || '')
-              .toLowerCase()
-              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-              .replace(/[^a-z0-9\s]/g, "")
-              .replace(/\s+/g, " ")
-              .trim();
+            // Fallback Matching: By Company Name (Razão Social)
+            const LEGAL_SUFFIXES = /\b(ltda|me|epp|eireli|s\/?a|sa|ss|eirelis?|micro empresa|empresa individual|sociedade limitada|comercio|com[eé]rcio|servi[cç]os?|distribuidora|ind[uú]stria|loja|filial|matriz|de|do|da|dos|das|e)\b/gi;
+
+            const normalizeName = (name: string) => {
+              return name
+                .toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(LEGAL_SUFFIXES, "")
+                .replace(/[^a-z0-9\s]/g, "")
+                .replace(/\s+/g, " ")
+                .trim();
+            };
+
+            const cleanCSVName = normalizeName(firstRec.companyName || '');
 
             if (cleanCSVName) {
-              clientIdx = newList.findIndex(c => {
-                if (c.salespersonId !== targetUserId) return false;
+              // Word-based fuzzy matching function
+              const getMatchScore = (sysName: string): number => {
+                const cleanSys = normalizeName(sysName);
+                if (!cleanSys) return 0;
+                if (cleanSys === cleanCSVName) return 1.0; // Exact match
 
-                const cleanSysName = (c.companyName || '')
-                  .toLowerCase()
-                  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                  .replace(/[^a-z0-9\s]/g, "")
-                  .replace(/\s+/g, " ")
-                  .trim();
+                const csvWords = cleanCSVName.split(" ").filter(w => w.length > 1);
+                const sysWords = cleanSys.split(" ").filter(w => w.length > 1);
+                if (csvWords.length === 0 || sysWords.length === 0) return 0;
 
-                if (!cleanSysName) return false;
+                // Count matching words (bidirectional)
+                const matchingWords = csvWords.filter(cw => sysWords.some(sw => sw === cw || sw.includes(cw) || cw.includes(sw)));
+                const maxWords = Math.max(csvWords.length, sysWords.length);
+                return matchingWords.length / maxWords;
+              };
 
-                const isExact = cleanSysName === cleanCSVName;
-                const isPartial = cleanCSVName.length > 4 && cleanSysName.length > 4 &&
-                  (cleanSysName.includes(cleanCSVName) || cleanCSVName.includes(cleanSysName));
-
-                return isExact || isPartial;
+              // First: try within the target salesperson
+              let bestScore = 0;
+              let bestIdx = -1;
+              newList.forEach((c, idx) => {
+                if (c.salespersonId !== targetUserId) return;
+                const score = getMatchScore(c.companyName || '');
+                if (score > bestScore && score >= 0.6) { // 60% word overlap threshold
+                  bestScore = score;
+                  bestIdx = idx;
+                }
               });
+
+              // Second: if no match found, try across ALL clients in the system
+              if (bestIdx === -1) {
+                newList.forEach((c, idx) => {
+                  const score = getMatchScore(c.companyName || '');
+                  if (score > bestScore && score >= 0.6) {
+                    bestScore = score;
+                    bestIdx = idx;
+                  }
+                });
+              }
+
+              clientIdx = bestIdx;
             }
           }
 
