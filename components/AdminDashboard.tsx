@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { REGIONS } from '../utils/constants';
-import { isDateInRange } from '../utils/dateUtils';
+import { isDateWithinBounds } from '../utils/dateUtils';
 
 interface AdminDashboardProps {
     clients: EnrichedClient[];
@@ -113,10 +113,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         // DEBUG: Log initial clients count
         console.log('[DASHBOARD] Calculating stats for', clients.length, 'clients');
 
+        // ⚡ Bolt Optimization: Pre-parse date boundaries outside of the loop to prevent O(N^2) overhead
+        // Instead of parsing strings to Dates on every inner loop iteration.
+        let parsedStartDate: Date | null = null;
+        if (startDate) {
+            parsedStartDate = new Date(startDate);
+            parsedStartDate.setHours(0, 0, 0, 0);
+        }
+
+        let parsedEndDate: Date | null = null;
+        if (endDate) {
+            parsedEndDate = new Date(endDate);
+            parsedEndDate.setHours(23, 59, 59, 999);
+        }
+
+        // ⚡ Bolt Optimization: Pre-calculate O(1) maps for user lookups instead of .find() in loops
+        const sellerMap = new Map(users.map(u => [u.id, u.name]));
+
         clients.forEach(client => {
             // Filtrar as compras pelo range de data atual usando helper seguro
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
-                return isDateInRange(p.purchaseDate, startDate, endDate);
+                // ⚡ Bolt Optimization: Use pre-parsed dates to avoid O(N) string-to-Date parsing overhead
+                return isDateWithinBounds(p.purchaseDate, parsedStartDate, parsedEndDate);
             });
 
             const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
@@ -130,8 +148,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
 
                 // Seller
-                const sellerObj = users.find(u => u.id === client.salespersonId);
-                const sellerName = sellerObj?.name || 'Não Atribuído';
+                // ⚡ Bolt Optimization: O(1) lookup using pre-computed Map instead of O(N) Array.find
+                const sellerName = sellerMap.get(client.salespersonId) || 'Não Atribuído';
                 if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
                 sellerSales[sellerName].revenue += clientTotal;
             }

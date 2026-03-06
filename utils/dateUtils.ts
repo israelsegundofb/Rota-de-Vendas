@@ -57,3 +57,22 @@ export const isDateInRange = (
 
     return true;
 };
+
+export const isDateWithinBounds = (
+    dateString: string | undefined | null,
+    parsedStartDate: Date | null,
+    parsedEndDate: Date | null
+): boolean => {
+    if (!dateString) return false;
+    if (!parsedStartDate && !parsedEndDate) return true;
+
+    const pDate = parseDateSafe(dateString);
+    if (!pDate) return false;
+
+    pDate.setHours(0, 0, 0, 0);
+
+    if (parsedStartDate && pDate < parsedStartDate) return false;
+    if (parsedEndDate && pDate > parsedEndDate) return false;
+
+    return true;
+};
