@@ -328,7 +328,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                 </label>
                                 <div className="flex items-center justify-center gap-2 text-xs text-on-surface-variant italic">
                                     <FileText className="w-3 h-3" />
-                                    <span>Colunas Esperadas: CNPJ, Razão Social, SKU, Descrição, Qtd Vendida</span>
+                                    <span>Colunas Esperadas: CNPJ, Razão Social, SKU, Descrição, Qtd Vendida — ou — Razão Social, SKU, Descrição, Quantidade</span>
                                 </div>
                             </div>
                         ) : (

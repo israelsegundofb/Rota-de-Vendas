@@ -118,7 +118,7 @@ const parsePercentage = (value: string): number => {
   return parseFloat(clean) || 0;
 };
 
-const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario', 'qtd vendida', 'descricao'];
+const PURCHASE_KEYWORDS = ['data da compra', 'valor total', 'quantidade', 'item', 'sku', 'emissao', 'venda', 'nfs', 'quantidade de skus', 'produtos comprados', 'valor unitario', 'qtd vendida', 'descricao', 'quantidade de skus / produtos comprados'];
 const CLIENT_KEYWORDS = ['razao social', 'razao social / nome', 'cnpj', 'cnpj - cpf', 'cpf', 'nome do cliente', 'descricao do pais', 'endereco', 'endereco completo', 'contato', 'fantasia', 'proprietario', 'rua', 'bairro', 'endereco comercial', 'responsavel', 'nome fantasia', 'telefone', 'celular', 'nome da cidade', 'estado', 'cep', 'telefone comercial', 'numero', 'whatsapp', 'pais', 'endereco comercial numero', 'pais telefone comercial', 'vendedor responsavel', 'vendedor'];
 const PRODUCT_KEYWORDS = ['preco de venda', 'custo', 'ncm', 'departamento', 'secao', 'cod.fabrica', 'marca', 'unidade', 'descricao', 'produto'];
 
@@ -147,6 +147,13 @@ export const detectCSVType = (headers: string[]): 'clients' | 'products' | 'purc
   const hasVitals = normalizedHeaders.some(h => h.includes('valor') || h.includes('sku') || h.includes('quantidade'));
 
   if (hasDate && hasVitals) {
+    purchaseScore += 5;
+  }
+
+  // Also detect the simplified format: Razão Social + SKU + Quantidade (no date column)
+  const hasCompanyName = normalizedHeaders.some(h => h.includes('razao social') || h.includes('cliente') || h.includes('empresa'));
+  const hasSkuOrQty = normalizedHeaders.some(h => h.includes('sku') || h.includes('quantidade'));
+  if (hasCompanyName && hasSkuOrQty && !hasDate) {
     purchaseScore += 5;
   }
 
