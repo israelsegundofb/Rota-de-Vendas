@@ -72,6 +72,7 @@ export interface EnrichedClient {
   purchasedProducts?: PurchaseRecord[]; // History of products bought by this client
   sourceFileId?: string; // ID of the file this client was imported from
   plusCode?: string; // Google Plus Code for precise location
+  lastUpdated?: string; // ISO String for last modification
 }
 
 // Roles com hierarquia (1 = maior poder)

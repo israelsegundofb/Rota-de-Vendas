@@ -206,7 +206,13 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             }
 
             // Build enriched data from result
-            const enrichedData: Partial<EnrichedClient> = {};
+            const enrichedData: Partial<EnrichedClient> = {
+                ownerName: formData.ownerName || client.ownerName,
+                category: formData.category || client.category,
+                purchasedProducts: client.purchasedProducts || [],
+                whatsapp: formData.whatsapp || client.whatsapp,
+            };
+
             if (enriched.fullData) {
                 const fd = enriched.fullData;
                 const hasAddr = fd.logradouro && fd.numero;
@@ -223,7 +229,11 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 if (fd.cep) enrichedData.zip = fd.cep;
                 if (fd.cnae_fiscal) enrichedData.mainCnae = fd.cnae_fiscal;
                 if (fd.cnaes_secundarios) enrichedData.secondaryCnaes = fd.cnaes_secundarios.map((s: any) => `${s.codigo} - ${s.texto}`);
-                if (fd.latitude) { enrichedData.lat = fd.latitude; enrichedData.lng = fd.longitude || 0; }
+                if (fd.latitude) {
+                    enrichedData.lat = fd.latitude;
+                    enrichedData.lng = fd.longitude || 0;
+                    enrichedData.googleMapsUri = `https://www.google.com/maps?q=${fd.latitude},${fd.longitude || 0}`;
+                }
             } else {
                 if (enriched.cnpj) enrichedData.cnpj = enriched.cnpj;
                 if (enriched.companyName) enrichedData.companyName = enriched.companyName;
@@ -233,7 +243,11 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 if (enriched.state) { enrichedData.state = enriched.state; enrichedData.region = getRegionByUF(enriched.state); }
                 if (enriched.district) enrichedData.district = enriched.district;
                 if (enriched.mainCnae) enrichedData.mainCnae = enriched.mainCnae;
-                if (enriched.lat && enriched.lng) { enrichedData.lat = enriched.lat; enrichedData.lng = enriched.lng; }
+                if (enriched.lat && enriched.lng) {
+                    enrichedData.lat = enriched.lat;
+                    enrichedData.lng = enriched.lng;
+                    enrichedData.googleMapsUri = enriched.googleMapsUri || `https://www.google.com/maps?q=${enriched.lat},${enriched.lng}`;
+                }
             }
 
             // AUTO-MERGE: if there are duplicate clients, ask user before merging

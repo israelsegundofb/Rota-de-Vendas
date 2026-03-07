@@ -800,11 +800,17 @@ const App: React.FC = () => {
       if (!existingClient) return prev;
 
       // Merge: enriched data overwrites empty/default fields in existing client
+      // IMPORTANT: We MUST preserve all fields not in enrichedData (like products, ownerName, etc.)
       const merged: EnrichedClient = {
         ...existingClient,
+        // Identification
         companyName: enrichedData.companyName || existingClient.companyName,
         cnpj: enrichedData.cnpj || existingClient.cnpj,
+        ownerName: enrichedData.ownerName || existingClient.ownerName,
         contact: enrichedData.contact || existingClient.contact,
+        whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
+
+        // Address
         cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
           ? enrichedData.cleanAddress : existingClient.cleanAddress,
         originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
@@ -813,11 +819,24 @@ const App: React.FC = () => {
         district: enrichedData.district || existingClient.district,
         zip: enrichedData.zip || existingClient.zip,
         region: enrichedData.region || existingClient.region,
+
+        // Classification
         mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
-        secondaryCnaes: enrichedData.secondaryCnaes?.length ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+        secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
+          ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+        category: (enrichedData.category && enrichedData.category.length > 0)
+          ? enrichedData.category : existingClient.category,
+
+        // Geography
         lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
         lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
         plusCode: enrichedData.plusCode || existingClient.plusCode,
+        googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
+
+        // Activity/Metadata
+        purchasedProducts: (enrichedData.purchasedProducts && enrichedData.purchasedProducts.length > 0)
+          ? enrichedData.purchasedProducts : existingClient.purchasedProducts,
+        lastUpdated: new Date().toISOString()
       };
 
       // Remove the duplicate and update the existing

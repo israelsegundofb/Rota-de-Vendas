@@ -14,6 +14,7 @@ export interface SearchResult {
     mainCnae?: string;
     lat?: number;
     lng?: number;
+    googleMapsUri?: string;
     /** Full CNPJ data if fetched */
     fullData?: CNPJResponse;
 }
@@ -79,6 +80,7 @@ export const searchClientByName = async (
             mainCnae: match.mainCnae,
             lat: match.lat,
             lng: match.lng,
+            googleMapsUri: match.googleMapsUri || (match.lat ? `https://www.google.com/maps?q=${match.lat},${match.lng}` : undefined),
         });
     }
 
@@ -114,6 +116,9 @@ export const searchClientByName = async (
                     phone: item.phones?.[0] ? `(${item.phones[0].area}) ${item.phones[0].number}` : undefined,
                     lat: address?.coordinates?.latitude,
                     lng: address?.coordinates?.longitude,
+                    googleMapsUri: address?.coordinates?.latitude
+                        ? `https://www.google.com/maps?q=${address.coordinates.latitude},${address.coordinates.longitude}`
+                        : undefined,
                 });
             }
         }
