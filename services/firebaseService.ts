@@ -356,7 +356,7 @@ export const loadFromCloud = async (): Promise<any | null> => {
         let users = usersSnap.docs.map(d => d.data() as AppUser);
         let clients = clientsSnap.docs.map(d => d.data() as EnrichedClient);
         let products = productsSnap.docs.map(d => d.data() as Product);
-        let metadata: any = metaSnap.exists() ? metaSnap.data() : {};
+        const metadata: any = metaSnap.exists() ? metaSnap.data() : {};
 
         // --- RECOVERY LOGIC: Check Legacy V4 if V5 users look suspicious (only mock users) ---
         const defaultIds = ['admin_dev', '1', '2'];
