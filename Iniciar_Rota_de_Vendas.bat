@@ -41,13 +41,15 @@ IF NOT EXIST "node_modules" (
 )
 
 :: Iniciar servidor em segundo plano e abrir navegador
-ECHO [INFO] Servidor iniciando na porta 3000...
-ECHO [INFO] O navegador abrira em instantes.
-ECHO.
-
-:: Usar timeout para dar tempo do servidor subir antes de abrir o navegador
+:: Iniciar Frontend e Backend em paralelo
+ECHO [INFO] Iniciando Frontend (3000) e Backend (3001)...
 START /B npm run dev
-timeout /t 5 /nobreak >nul
+CD backend
+START /B npm run dev
+CD ..
+
+ECHO [INFO] Aguardando inicializacao dos servicos...
+timeout /t 8 /nobreak >nul
 START "" "http://localhost:3000"
 
 ECHO.
