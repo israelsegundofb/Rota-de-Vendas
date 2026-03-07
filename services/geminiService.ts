@@ -212,8 +212,9 @@ export const processClientsWithAI = async (
     let aiData: any = {};
     let googleMapsUri = "";
 
-    // 1. ATTEMPT AI ENRICHMENT (with Proxy)
+    // 1. ATTEMPT AI ENRICHMENT (with Proxy) — Cache Bust v6.5.2
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    console.log('[AI ENRICHMENT] Using backend:', backendUrl);
 
     while (!success && retries <= MAX_RETRIES) {
       if ((globalThis as any).isUploadCancelled?.current) throw new Error("CANCELLED_BY_USER");

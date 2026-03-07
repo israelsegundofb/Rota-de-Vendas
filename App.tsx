@@ -7,6 +7,7 @@
   
   Developed with passion and technical excellence.
 */
+/* v6.5.2 — Cache Bust 2026-03-07 */
 import React, { useState, useEffect, useRef } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History, Download } from 'lucide-react';
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus, RawClient } from './types';
