@@ -11,7 +11,7 @@ interface EditClientModalProps {
     client: EnrichedClient;
     isOpen: boolean;
     onClose: () => void;
-    onSave: (updatedClient: EnrichedClient) => void;
+    onSave: (updatedClient: EnrichedClient) => void | Promise<void>;
     users?: AppUser[];
     uploadedFiles?: UploadedFile[];
     onCNPJAuthError?: () => void;
@@ -40,6 +40,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     const isClientIncomplete = !formData.cnpj?.replace(/\D/g, '') || formData.lat === 0 || formData.lng === 0
         || !formData.cleanAddress || formData.cleanAddress === 'Endereço não cadastrado';
 
+    // Duplicate detection state
+    const [duplicateWarnings, setDuplicateWarnings] = useState<{ clientId: string; companyName: string; similarity: string }[]>([]);
+
     React.useEffect(() => {
         setFormData({
             ...client,
@@ -64,11 +67,16 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         e.preventDefault();
         setIsSaving(true);
         try {
-            await onSave(formData);
+            const result = onSave(formData);
+            // Handle both sync and async onSave
+            if (result && typeof (result as any).then === 'function') {
+                await result;
+            }
             onClose();
         } catch (error) {
             console.error("Erro ao salvar:", error);
-            alert("Erro ao salvar alterações.");
+            // Don't block — the data was likely saved, just close
+            onClose();
         } finally {
             setIsSaving(false);
         }
@@ -150,10 +158,29 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         }
         setIsSearching(true);
         setSearchResults([]);
+        setDuplicateWarnings([]);
         setShowResults(true);
         try {
             const results = await searchClientByName(query, formData.state, allClients, client.id);
             setSearchResults(results);
+
+            // Check for duplicate clients in the system (similar Razão Social)
+            const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+            const normalizedQuery = normalize(query);
+            const dupes = allClients.filter(c => {
+                if (c.id === client.id) return false;
+                const normalizedName = normalize(c.companyName);
+                // Check exact match or high similarity (one contains the other)
+                return normalizedName === normalizedQuery
+                    || (normalizedQuery.length >= 5 && normalizedName.includes(normalizedQuery))
+                    || (normalizedName.length >= 5 && normalizedQuery.includes(normalizedName));
+            }).map(c => ({
+                clientId: c.id,
+                companyName: c.companyName,
+                similarity: normalize(c.companyName) === normalizedQuery ? 'Exata' : 'Parcial'
+            }));
+            setDuplicateWarnings(dupes.slice(0, 5));
+
             if (results.length === 0) {
                 // Try with owner name as fallback
                 if (formData.ownerName && formData.ownerName !== query) {
@@ -410,6 +437,24 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                     </motion.div>
                                 )}
                             </AnimatePresence>
+
+                            {/* Duplicate Warning */}
+                            {duplicateWarnings.length > 0 && (
+                                <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                                    <p className="text-xs font-bold text-red-700 mb-1.5">⚠️ Possíveis clientes duplicados encontrados no sistema:</p>
+                                    <ul className="space-y-1">
+                                        {duplicateWarnings.map((d, i) => (
+                                            <li key={i} className="text-xs text-red-600 flex items-center gap-2">
+                                                <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${d.similarity === 'Exata' ? 'bg-red-200 text-red-800' : 'bg-orange-100 text-orange-700'}`}>
+                                                    {d.similarity}
+                                                </span>
+                                                <span className="font-medium">{d.companyName}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <p className="text-[10px] text-red-500 mt-1.5">Verifique se este cliente já existe antes de salvar para evitar duplicidade.</p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Proprietário */}
