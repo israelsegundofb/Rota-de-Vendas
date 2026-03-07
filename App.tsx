@@ -342,9 +342,9 @@ const App: React.FC = () => {
       'Iniciar Atualização em Massa?',
       [
         'Este processo utilizará sua API CNPJa para:',
-        '• Buscar CNPJs faltantes via Razão Social',
+        '• Buscar CNPJs faltantes via Razão Social (limpando nomes)',
         '• Atualizar CNAEs (Atividade Econômica)',
-        '• Telefones, Endereços e Georreferenciamento',
+        '• Telefones, Endereços e Georreferenciamento de Fallback',
         `Total de clientes: ${masterClientList.length}`
       ],
       async () => {
@@ -360,14 +360,20 @@ const App: React.FC = () => {
         const limit = pLimit(3);
         let updatedCount = 0;
         let errorCount = 0;
+        let finalUpdatedList = [...masterClientList];
 
         const tasks = masterClientList.map((client, index) => limit(async () => {
           try {
             let activeCnpj = client.cnpj?.replace(/\D/g, '');
 
+            // 1. Limpar Nome para Busca (Remover prefixos de importação)
+            const searchName = client.companyName
+              .replace(/^(Novo - Importação|Novo|Importação)\s*(-|:)?\s*/i, '')
+              .trim();
+
             if (!activeCnpj || activeCnpj.length !== 14) {
               const searchResults = await pesquisarEmpresaPorEndereco({
-                filtros: client.companyName,
+                filtros: searchName,
                 uf: client.state
               });
               if (searchResults && searchResults.length > 0) {
@@ -379,29 +385,51 @@ const App: React.FC = () => {
               const fullData = await consultarCNPJ(activeCnpj);
               if (fullData) {
                 const hasNewAddress = fullData.logradouro && fullData.numero;
-                setMasterClientList(prev => prev.map(c => {
-                  if (c.id === client.id) {
-                    return {
-                      ...c,
-                      cnpj: fullData.cnpj,
-                      companyName: fullData.nome_fantasia || fullData.razao_social || c.companyName,
-                      contact: fullData.ddd_telefone_1 || c.contact,
-                      cleanAddress: hasNewAddress
-                        ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
-                        : c.cleanAddress,
-                      originalAddress: hasNewAddress
-                        ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
-                        : c.originalAddress,
-                      mainCnae: fullData.cnae_fiscal || c.mainCnae,
-                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${String(s.codigo)} - ${s.texto}`) || c.secondaryCnaes || [],
-                      lat: fullData.latitude || c.lat,
-                      lng: fullData.longitude || c.lng,
-                      googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
-                    };
+                let lat = fullData.latitude || client.lat;
+                let lng = fullData.longitude || client.lng;
+                let cleanAddress = hasNewAddress
+                  ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
+                  : client.cleanAddress;
+
+                // 2. Geocoding de Fallback se as coordenadas vierem zeradas ou ausentes
+                if ((!lat || !lng || lat === 0) && cleanAddress) {
+                  try {
+                    const geoRes = await geocodeWithFallback([
+                      cleanAddress,
+                      `${fullData.logradouro}, ${fullData.numero}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                    ]);
+                    if (geoRes) {
+                      lat = geoRes.lat;
+                      lng = geoRes.lng;
+                      if (geoRes.formattedAddress) cleanAddress = geoRes.formattedAddress;
+                    }
+                  } catch (e) {
+                    console.warn(`[ENRICH] Geocode fallback failed for ${searchName}:`, e);
                   }
-                  return c;
-                }));
+                }
+
+                const updatedClient: EnrichedClient = {
+                  ...client,
+                  cnpj: fullData.cnpj,
+                  companyName: fullData.razao_social || fullData.nome_fantasia || searchName,
+                  contact: fullData.ddd_telefone_1 || client.contact,
+                  cleanAddress,
+                  originalAddress: hasNewAddress
+                    ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                    : client.originalAddress,
+                  mainCnae: fullData.cnae_fiscal || client.mainCnae,
+                  secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${String(s.codigo)} - ${s.texto}`) || client.secondaryCnaes || [],
+                  lat,
+                  lng,
+                  googleMapsUri: lat ? `https://www.google.com/maps?q=${lat},${lng}` : client.googleMapsUri
+                };
+
+                // Atualizar na lista final (batch)
+                finalUpdatedList = finalUpdatedList.map(c => c.id === client.id ? updatedClient : c);
                 updatedCount++;
+
+                // Atualizar estado progressivamente para feedback visual
+                setMasterClientList(prev => prev.map(c => c.id === client.id ? updatedClient : c));
               }
             }
           } catch (err: unknown) {
@@ -409,7 +437,6 @@ const App: React.FC = () => {
             console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
             errorCount++;
 
-            // Check for 401 specifically to stop the whole process if the key is invalid
             if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja inválida'))) {
               isUploadCancelled.current = true;
               setProcState(prev => ({ ...prev, status: 'error', errorMessage: 'Autenticação CNPJa falhou. Chave inválida ou expirada.' }));
@@ -422,8 +449,18 @@ const App: React.FC = () => {
 
         await Promise.all(tasks);
 
-        setProcState(prev => ({ ...prev, status: 'completed' }));
+        // 3. Salvamento Final Explícito para garantir persistência total
+        if (isFirebaseConnected && updatedCount > 0) {
+          try {
+            const { saveToCloud: forceSave } = await import('./services/firebaseService');
+            await forceSave(finalUpdatedList, products, categories, users, uploadedFiles);
+            console.log(`[ENRICH] ✅ ${updatedCount} clientes salvos no Firebase.`);
+          } catch (e) {
+            console.error('[ENRICH] Erro no salvamento final:', e);
+          }
+        }
 
+        setProcState(prev => ({ ...prev, status: 'completed' }));
         toast.success(
           `Atualização: ${updatedCount} sucesso, ${errorCount} erros.`,
           'Enriquecimento Concluído'
@@ -710,25 +747,28 @@ const App: React.FC = () => {
               } catch { /* ignore */ }
             }
 
-            // Update state with geocoded data
-            let geoList: EnrichedClient[] = [];
+            // 4. Update state using functional update to ensure we use the LATEST Master List
+            // and avoid race conditions from concurrent geocoding or edits
             setMasterClientList(prev => {
               const newList = prev.map(c => c.id === geoUpdate.id ? geoUpdate : c);
-              geoList = newList;
+
+              // 5. Trigger an ultra-fast background save for this specific geocoded record
+              if (isFirebaseConnected) {
+                (async () => {
+                  try {
+                    const { saveToCloud: forceSave } = await import('./services/firebaseService');
+                    await forceSave(newList, products, categories, users, uploadedFiles);
+                    lastClientsHash.current = JSON.stringify(newList, (key, value) =>
+                      key === 'lastUpdated' ? undefined : value
+                    );
+                    console.log('[APP] ✅ Background geocode persisted.');
+                  } catch (e) {
+                    console.warn('[APP] Background geocode save deferred:', e);
+                  }
+                })();
+              }
               return newList;
             });
-
-            // Save geocoded update
-            if (isFirebaseConnected && geoList.length > 0) {
-              try {
-                const { saveToCloud: forceSave } = await import('./services/firebaseService');
-                await forceSave(geoList, products, categories, users, uploadedFiles);
-                lastClientsHash.current = JSON.stringify(geoList, (key, value) =>
-                  key === 'lastUpdated' ? undefined : value
-                );
-                console.log('[APP] ✅ Background geocode saved.');
-              } catch { /* ignore */ }
-            }
           }
         } catch (err) {
           console.warn('[APP] Background geocoding failed:', err);
