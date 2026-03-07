@@ -26,6 +26,7 @@ interface ClientListProps {
   uploadedFiles?: UploadedFile[];
   onGeneratePlusCodes?: () => void;
   onCNPJAuthError?: () => void;
+  allClients?: EnrichedClient[];
   filterOnlyWithPurchases?: boolean;
   setFilterOnlyWithPurchases?: (value: boolean) => void;
   resetFilters?: () => void;
@@ -50,6 +51,7 @@ const ClientList: React.FC<ClientListProps> = ({
   productCategories = [],
   users = [],
   uploadedFiles = [],
+  allClients = [],
   onGeneratePlusCodes,
   onCNPJAuthError,
   filterOnlyWithPurchases = false,
@@ -295,6 +297,7 @@ const ClientList: React.FC<ClientListProps> = ({
               users={users}
               uploadedFiles={uploadedFiles}
               onCNPJAuthError={onCNPJAuthError}
+              allClients={allClients}
             />
           )
         }

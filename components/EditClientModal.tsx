@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2, Sparkles, MapPin, Building2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { consultarCNPJ } from '../services/cnpjService';
+import { searchClientByName, enrichFromResult, SearchResult } from '../services/clientSearchService';
 import { EnrichedClient, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 import LoadingSpinner from './LoadingSpinner';
@@ -14,9 +15,10 @@ interface EditClientModalProps {
     users?: AppUser[];
     uploadedFiles?: UploadedFile[];
     onCNPJAuthError?: () => void;
+    allClients?: EnrichedClient[];
 }
 
-const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError }) => {
+const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError, allClients = [] }) => {
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
         cnpj: client.cnpj || '',
@@ -28,6 +30,15 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     const [isRefreshingByCNPJ, setIsRefreshingByCNPJ] = useState(false);
     const [refreshStatus, setRefreshStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Auto-enrichment search state
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [showResults, setShowResults] = useState(false);
+    const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
+
+    const isClientIncomplete = !formData.cnpj?.replace(/\D/g, '') || formData.lat === 0 || formData.lng === 0
+        || !formData.cleanAddress || formData.cleanAddress === 'Endereço não cadastrado';
 
     React.useEffect(() => {
         setFormData({
@@ -130,6 +141,95 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         }
     };
 
+    // --- AUTO-ENRICHMENT SEARCH ---
+    const handleSearchByName = async () => {
+        const query = formData.companyName || formData.ownerName;
+        if (!query || query.trim().length < 3) {
+            alert('Informe pelo menos 3 caracteres na Razão Social ou Proprietário para buscar.');
+            return;
+        }
+        setIsSearching(true);
+        setSearchResults([]);
+        setShowResults(true);
+        try {
+            const results = await searchClientByName(query, formData.state, allClients, client.id);
+            setSearchResults(results);
+            if (results.length === 0) {
+                // Try with owner name as fallback
+                if (formData.ownerName && formData.ownerName !== query) {
+                    const ownerResults = await searchClientByName(formData.ownerName, formData.state, allClients, client.id);
+                    setSearchResults(ownerResults);
+                }
+            }
+        } catch (err) {
+            console.error('[EditClientModal] Search failed:', err);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleSelectResult = async (result: SearchResult, index: number) => {
+        setEnrichingIndex(index);
+        try {
+            // If external result, fetch full CNPJ data first
+            let enriched = result;
+            if (result.source === 'cnpja' && result.cnpj) {
+                enriched = await enrichFromResult(result);
+            }
+
+            setFormData(prev => {
+                const updates: Partial<EnrichedClient> = {};
+
+                if (enriched.fullData) {
+                    const fd = enriched.fullData;
+                    const hasAddr = fd.logradouro && fd.numero;
+                    if (fd.cnpj) updates.cnpj = fd.cnpj;
+                    if (fd.nome_fantasia || fd.razao_social) updates.companyName = fd.nome_fantasia || fd.razao_social || prev.companyName;
+                    if (fd.ddd_telefone_1) updates.contact = fd.ddd_telefone_1;
+                    if (hasAddr) {
+                        updates.cleanAddress = `${fd.logradouro}, ${fd.numero}, ${fd.municipio} - ${fd.uf}`;
+                        updates.originalAddress = `${fd.logradouro}, ${fd.numero}${fd.complemento ? ` - ${fd.complemento}` : ''}, ${fd.bairro}, ${fd.municipio} - ${fd.uf}`;
+                    }
+                    if (fd.municipio) updates.city = fd.municipio;
+                    if (fd.uf) {
+                        updates.state = fd.uf;
+                        updates.region = getRegionByUF(fd.uf);
+                    }
+                    if (fd.bairro) updates.district = fd.bairro;
+                    if (fd.cep) updates.zip = fd.cep;
+                    if (fd.cnae_fiscal) updates.mainCnae = fd.cnae_fiscal;
+                    if (fd.cnaes_secundarios) updates.secondaryCnaes = fd.cnaes_secundarios.map((s: any) => `${s.codigo} - ${s.texto}`);
+                    if (fd.latitude) { updates.lat = fd.latitude; updates.lng = fd.longitude || 0; }
+                } else {
+                    // Use partial data from search result
+                    if (enriched.cnpj) updates.cnpj = enriched.cnpj;
+                    if (enriched.companyName) updates.companyName = enriched.companyName;
+                    if (enriched.phone) updates.contact = enriched.phone;
+                    if (enriched.address) updates.cleanAddress = enriched.address;
+                    if (enriched.city) updates.city = enriched.city;
+                    if (enriched.state) {
+                        updates.state = enriched.state;
+                        updates.region = getRegionByUF(enriched.state);
+                    }
+                    if (enriched.district) updates.district = enriched.district;
+                    if (enriched.mainCnae) updates.mainCnae = enriched.mainCnae;
+                    if (enriched.lat && enriched.lng) { updates.lat = enriched.lat; updates.lng = enriched.lng; }
+                }
+
+                return { ...prev, ...updates };
+            });
+
+            setShowResults(false);
+            setRefreshStatus('success');
+            setTimeout(() => setRefreshStatus('idle'), 3000);
+        } catch (err) {
+            console.error('[EditClientModal] Enrichment failed:', err);
+            alert('Erro ao carregar dados do resultado selecionado.');
+        } finally {
+            setEnrichingIndex(null);
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => {
@@ -206,24 +306,110 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     )}
                 </div>
 
+                {/* Incomplete Client Banner */}
+                {isClientIncomplete && (
+                    <div className="mx-6 mb-2 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                        <Sparkles className="w-5 h-5 text-amber-600 shrink-0" />
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-amber-800">Cliente com dados incompletos</p>
+                            <p className="text-[10px] text-amber-700">Use o botão "Buscar Dados" para preencher automaticamente a partir da Razão Social.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSearchByName}
+                            disabled={isSearching}
+                            className="px-3 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-1.5 shrink-0"
+                        >
+                            {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                            Buscar Dados
+                        </button>
+                    </div>
+                )}
+
+                {/* Search Results Dropdown */}
+                <AnimatePresence>
+                    {showResults && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mx-6 mb-2 overflow-hidden"
+                        >
+                            <div className="bg-white border border-primary/30 rounded-xl shadow-lg overflow-hidden">
+                                <div className="px-4 py-2.5 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
+                                    <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                                        <Building2 className="w-3.5 h-3.5" />
+                                        {isSearching ? 'Buscando...' : `${searchResults.length} resultado(s) encontrado(s)`}
+                                    </span>
+                                    <button type="button" onClick={() => setShowResults(false)} className="text-on-surface-variant hover:text-on-surface p-1" title="Fechar resultados"><X className="w-4 h-4" /></button>
+                                </div>
+                                {isSearching ? (
+                                    <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" /><p className="text-xs text-on-surface-variant mt-2">Buscando na base local e APIs externas...</p></div>
+                                ) : searchResults.length === 0 ? (
+                                    <div className="p-6 text-center"><p className="text-sm text-on-surface-variant">Nenhum resultado encontrado para "{formData.companyName}".</p><p className="text-xs text-on-surface-variant mt-1">Tente alterar a Razão Social ou o Nome do Proprietário.</p></div>
+                                ) : (
+                                    <div className="max-h-60 overflow-y-auto custom-scrollbar divide-y divide-gray-100">
+                                        {searchResults.map((r, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleSelectResult(r, idx)}
+                                                disabled={enrichingIndex !== null}
+                                                className="w-full text-left px-4 py-3 hover:bg-primary/5 transition-colors flex items-start gap-3 disabled:opacity-50"
+                                            >
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${r.source === 'local' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    {enrichingIndex === idx ? <Loader2 className="w-4 h-4 animate-spin" /> : r.source === 'local' ? <Store className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-on-surface truncate">{r.companyName}</p>
+                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                                                        {r.cnpj && <span className="text-[10px] text-on-surface-variant font-mono">{r.cnpj}</span>}
+                                                        {r.city && <span className="text-[10px] text-on-surface-variant flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{r.city}{r.state ? ` - ${r.state}` : ''}</span>}
+                                                    </div>
+                                                    {r.address && <p className="text-[10px] text-on-surface-variant truncate mt-0.5">{r.address}</p>}
+                                                </div>
+                                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0 ${r.source === 'local' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    {r.source === 'local' ? 'Local' : 'API'}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Razão Social */}
-                        <div className="space-y-1">
+                        {/* Razão Social + Search Button */}
+                        <div className="space-y-1 md:col-span-2">
                             <label className="text-xs font-medium text-on-surface-variant ml-1">
                                 Razão Social
                             </label>
-                            <input
-                                type="text"
-                                name="companyName"
-                                value={formData.companyName}
-                                onChange={handleChange}
-                                className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
-                                required
-                                title="Razão Social"
-                                placeholder="Razão Social"
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    name="companyName"
+                                    value={formData.companyName}
+                                    onChange={handleChange}
+                                    className="flex-1 bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-all"
+                                    required
+                                    title="Razão Social"
+                                    placeholder="Razão Social"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleSearchByName}
+                                    disabled={isSearching}
+                                    className="px-4 flex items-center gap-2 rounded-xl text-xs font-bold transition-all shadow-sm bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50"
+                                    title="Buscar dados automaticamente pela Razão Social"
+                                >
+                                    {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                    Buscar Dados
+                                </button>
+                            </div>
                         </div>
 
                         {/* Proprietário */}

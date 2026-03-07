@@ -2048,6 +2048,7 @@ const App: React.FC = () => {
                 client={selectedClient}
 
                 users={users}
+                allClients={masterClientList}
               />
             )}
           </React.Suspense>
@@ -2829,6 +2830,7 @@ const App: React.FC = () => {
                           onRegionFilterChange={setFilterRegion}
                           categoryFilter={filterCategory}
                           onCategoryFilterChange={setFilterCategory}
+                          allClients={masterClientList}
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
