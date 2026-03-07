@@ -9,8 +9,8 @@
 */
 import React, { useState, useEffect, useRef } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History, Download } from 'lucide-react';
-import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
-import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
+import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus, RawClient } from './types';
+import { isAdmin, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
@@ -703,7 +703,7 @@ const App: React.FC = () => {
     // 1. Geocode Address if coordinates are missing
     const finalClient: EnrichedClient = {
       ...newClient,
-      id: (newClient as any).id || crypto.randomUUID(),
+      id: newClient.id || crypto.randomUUID(),
       lat: newClient.lat || 0,
       lng: newClient.lng || 0,
       cleanAddress: newClient.cleanAddress || ''
@@ -917,7 +917,7 @@ const App: React.FC = () => {
     isUploadCancelled.current = false;
 
     try {
-      let rawData: any[] = [];
+      let rawData: RawClient[] = [];
       const lowerName = file.name.toLowerCase();
 
       console.log(`Processing file: ${file.name}, Lower: ${lowerName}`); // DEBUG
@@ -972,7 +972,7 @@ const App: React.FC = () => {
         const storagePath = `uploads/clients/${ownerId}/${timestamp}_${file.name}`;
         const downloadUrl = await uploadFileToCloud(file, storagePath);
         if (downloadUrl) {
-          (newFileRecord as any).storageUrl = downloadUrl;
+          newFileRecord.storageUrl = downloadUrl;
           console.log(`[APP] CSV file uploaded to Storage: ${downloadUrl}`);
         }
       } catch (storageErr) {
@@ -1051,7 +1051,7 @@ const App: React.FC = () => {
       }, 5000);
 
     } catch (err: unknown) {
-      const errObj = err as any;
+      const errObj = err as { message?: string };
       const isCancelled = errObj?.message === 'CANCELLED_BY_USER';
       const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (errObj?.message || "Erro desconhecido");
       console.error(errorMsg, err);
@@ -1253,56 +1253,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleReassignFileSalesperson = (fileId: string, newSalespersonId: string) => {
-    // Find the target user
-    const targetUser = users.find(u => u.id === newSalespersonId);
-    const newSalespersonName = targetUser?.name || 'None';
-
-    const file = uploadedFiles.find(f => f.id === fileId);
-    if (!file) return;
-
-    // Update the file record
-    setUploadedFiles(prev => prev.map(f =>
-      f.id === fileId
-        ? { ...f, salespersonId: newSalespersonId, salespersonName: newSalespersonName }
-        : f
-    ));
-
-    if (file.type === 'clients') {
-      // Update all clients from this file to the new salesperson
-      setMasterClientList(prev => prev.map(c =>
-        c.sourceFileId === fileId
-          ? { ...c, salespersonId: newSalespersonId }
-          : c
-      ));
-    } else if (file.type === 'purchases') {
-      // Update all clients that have purchase records from this file
-      setMasterClientList(prev => prev.map(c => {
-        const hasPurchaseFromFile = c.purchasedProducts?.some(p => p.sourceFileId === fileId);
-        if (hasPurchaseFromFile) {
-          return {
-            ...c,
-            salespersonId: newSalespersonId,
-            purchasedProducts: c.purchasedProducts?.map(p =>
-              p.sourceFileId === fileId ? { ...p, salespersonId: newSalespersonId } : p
-            )
-          };
-        }
-        return c;
-      }));
-    }
-
-    // Auto-navigate to map and apply filter
-    if (newSalespersonId) {
-      handleViewNavigation('map');
-      setFilterSalespersonId(newSalespersonId);
-      alert(`Arquivo e ${filteredClients.filter(c => c.sourceFileId === fileId).length} clientes reatribuídos para: ${newSalespersonName}\n\nMapa filtrado automaticamente.`);
-    } else {
-      // Unassigned - show all
-      setFilterSalespersonId('Todos');
-      alert('Arquivo desmarcado. Clientes ficaram sem vendedor até que outro seja atribuído.');
-    }
-  };
 
 
 
@@ -1430,7 +1380,7 @@ const App: React.FC = () => {
             const clientPurchases = groupedByClient[key];
 
             // Map CSV records to PurchaseRecord objects
-            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map((rec: any) => {
+            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
               // Try to enrich with master catalog
               const masterProd = products.find(p =>
                 (rec.sku && p.sku === rec.sku) ||
@@ -1440,7 +1390,7 @@ const App: React.FC = () => {
               if (masterProd) {
                 return {
                   ...masterProd,
-                  purchaseDate: rec.purchaseDate,
+                  purchaseDate: rec.purchaseDate || new Date().toISOString(),
                   quantity: rec.quantity,
                   totalValue: rec.totalValue,
                   sourceFileId: fileId,
@@ -1455,7 +1405,7 @@ const App: React.FC = () => {
                   category: 'Manual',
                   price: rec.price || 0,
                   factoryCode: '',
-                  purchaseDate: rec.purchaseDate,
+                  purchaseDate: rec.purchaseDate || new Date().toISOString(),
                   quantity: rec.quantity,
                   totalValue: rec.totalValue,
                   sourceFileId: fileId,
@@ -1502,18 +1452,18 @@ const App: React.FC = () => {
             ? `${rawCnpj.slice(0, 2)}.${rawCnpj.slice(2, 5)}.${rawCnpj.slice(5, 8)}/${rawCnpj.slice(8, 12)}-${rawCnpj.slice(12, 14)}`
             : rawCnpj;
 
-          const newPurchasedProducts: PurchaseRecord[] = group.purchases.map((rec: any) => {
+          const newPurchasedProducts: PurchaseRecord[] = group.purchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
             const masterProd = products.find(p =>
               (rec.sku && p.sku === rec.sku) ||
               (p.name && rec.name && (p.name || '').toLowerCase().trim() === (rec.name || '').toLowerCase().trim())
             );
             if (masterProd) {
-              return { ...masterProd, purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue, sourceFileId: fileId, salespersonId: targetUserId };
+              return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity, totalValue: rec.totalValue, sourceFileId: fileId, salespersonId: targetUserId };
             }
             return {
               sku: rec.sku || 'N/A', name: rec.name || 'Produto Desconhecido', brand: 'Desconhecido',
               category: 'Manual', price: rec.price || 0, factoryCode: '',
-              purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue,
+              purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity, totalValue: rec.totalValue,
               sourceFileId: fileId, salespersonId: targetUserId
             };
           });
@@ -1583,7 +1533,7 @@ const App: React.FC = () => {
         const timestamp = new Date().getTime();
         const storagePath = `uploads/purchases/${timestamp}_${file.name}`;
         await uploadFileToCloud(file, storagePath).then(url => {
-          if (url) (newFileRecord as any).storageUrl = url;
+          if (url) newFileRecord.storageUrl = url;
         });
       } catch (storageErr) {
         console.error("[APP] Failed to upload purchase file to Storage:", storageErr);
@@ -1598,11 +1548,12 @@ const App: React.FC = () => {
 
       alert(`✅ Atualização de Compras concluída!\n\n🔗 ${updatedCount} clientes existentes atualizados.${createdMsg}\n\n📊 Total: ${updatedCount + unmatchedGroups.length} de ${clientKeysInFile.length} clientes da planilha processados.`);
 
-    } catch (e: any) {
+    } catch (err: unknown) {
       // Always release sync lock on error
       syncLockRef.current = false;
-      console.error(e);
-      setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
+      const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error(errorMsg, err);
+      setProcState(prev => ({ ...prev, status: 'error', errorMessage: errorMsg }));
       setUploadedFiles(prev => [...prev, {
         id: fileId,
         fileName: file.name,
@@ -1612,7 +1563,7 @@ const App: React.FC = () => {
         type: 'purchases',
         itemCount: 0,
         status: 'error',
-        errorMessage: e.message
+        errorMessage: errorMsg
       }]);
     }
   };
@@ -1660,7 +1611,7 @@ const App: React.FC = () => {
         const storagePath = `uploads/products/${timestamp}_${file.name}`;
         const downloadUrl = await uploadFileToCloud(file, storagePath);
         if (downloadUrl) {
-          (newFileRecord as any).storageUrl = downloadUrl;
+          newFileRecord.storageUrl = downloadUrl;
         }
       } catch (storageErr) {
         console.error("[APP] Failed to upload product file to Storage:", storageErr);
@@ -1676,11 +1627,12 @@ const App: React.FC = () => {
       setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
       alert(`${newProducts.length} produtos importados com sucesso.`);
 
-    } catch (e: any) {
-      console.error(e);
-      setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error(errorMsg, err);
+      setProcState(prev => ({ ...prev, status: 'error', errorMessage: errorMsg }));
       // Update file status to error instead of removing
-      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: e.message } : f));
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
     }
   };
 

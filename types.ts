@@ -17,6 +17,13 @@ export interface RawClient {
   longitude?: number;
   salespersonName?: string; // Optional: Extracted from CSV/Excel
   salespersonId?: string;   // Optional: Matched with system users
+  // Common Raw Input fields across different imports
+  name?: string;
+  sku?: string;
+  purchaseDate?: string;
+  quantity?: number;
+  totalValue?: number;
+  price?: number;
 }
 
 export interface Product {
@@ -107,6 +114,7 @@ export interface UploadedFile {
   itemCount: number;
   status: 'processing' | 'completed' | 'error';
   errorMessage?: string;
+  storageUrl?: string;
 }
 
 export interface ChatMessage {
@@ -137,6 +145,6 @@ export interface SystemLog {
     duration?: number; // Duration in seconds
     elementId?: string; // ID for clicks
     path?: string; // Path for navigation
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
