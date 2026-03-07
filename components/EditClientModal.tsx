@@ -326,60 +326,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     </div>
                 )}
 
-                {/* Search Results Dropdown */}
-                <AnimatePresence>
-                    {showResults && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mx-6 mb-2 overflow-hidden"
-                        >
-                            <div className="bg-white border border-primary/30 rounded-xl shadow-lg overflow-hidden">
-                                <div className="px-4 py-2.5 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
-                                    <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-                                        <Building2 className="w-3.5 h-3.5" />
-                                        {isSearching ? 'Buscando...' : `${searchResults.length} resultado(s) encontrado(s)`}
-                                    </span>
-                                    <button type="button" onClick={() => setShowResults(false)} className="text-on-surface-variant hover:text-on-surface p-1" title="Fechar resultados"><X className="w-4 h-4" /></button>
-                                </div>
-                                {isSearching ? (
-                                    <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" /><p className="text-xs text-on-surface-variant mt-2">Buscando na base local e APIs externas...</p></div>
-                                ) : searchResults.length === 0 ? (
-                                    <div className="p-6 text-center"><p className="text-sm text-on-surface-variant">Nenhum resultado encontrado para "{formData.companyName}".</p><p className="text-xs text-on-surface-variant mt-1">Tente alterar a Razão Social ou o Nome do Proprietário.</p></div>
-                                ) : (
-                                    <div className="max-h-60 overflow-y-auto custom-scrollbar divide-y divide-gray-100">
-                                        {searchResults.map((r, idx) => (
-                                            <button
-                                                key={idx}
-                                                type="button"
-                                                onClick={() => handleSelectResult(r, idx)}
-                                                disabled={enrichingIndex !== null}
-                                                className="w-full text-left px-4 py-3 hover:bg-primary/5 transition-colors flex items-start gap-3 disabled:opacity-50"
-                                            >
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${r.source === 'local' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                    {enrichingIndex === idx ? <Loader2 className="w-4 h-4 animate-spin" /> : r.source === 'local' ? <Store className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-on-surface truncate">{r.companyName}</p>
-                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
-                                                        {r.cnpj && <span className="text-[10px] text-on-surface-variant font-mono">{r.cnpj}</span>}
-                                                        {r.city && <span className="text-[10px] text-on-surface-variant flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{r.city}{r.state ? ` - ${r.state}` : ''}</span>}
-                                                    </div>
-                                                    {r.address && <p className="text-[10px] text-on-surface-variant truncate mt-0.5">{r.address}</p>}
-                                                </div>
-                                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0 ${r.source === 'local' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                    {r.source === 'local' ? 'Local' : 'API'}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -410,6 +356,60 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                     Buscar Dados
                                 </button>
                             </div>
+
+                            {/* Search Results — inside the scrollable form, right below Razão Social */}
+                            <AnimatePresence>
+                                {showResults && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -8 }}
+                                        className="mt-2"
+                                    >
+                                        <div className="bg-white border-2 border-primary/40 rounded-xl shadow-xl overflow-hidden">
+                                            <div className="px-4 py-2.5 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
+                                                <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                                                    <Building2 className="w-3.5 h-3.5" />
+                                                    {isSearching ? 'Buscando...' : `${searchResults.length} resultado(s) encontrado(s)`}
+                                                </span>
+                                                <button type="button" onClick={() => setShowResults(false)} className="text-on-surface-variant hover:text-on-surface p-1" title="Fechar resultados"><X className="w-4 h-4" /></button>
+                                            </div>
+                                            {isSearching ? (
+                                                <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" /><p className="text-xs text-on-surface-variant mt-2">Buscando na base local e APIs externas...</p></div>
+                                            ) : searchResults.length === 0 ? (
+                                                <div className="p-6 text-center"><p className="text-sm text-on-surface-variant">Nenhum resultado encontrado para "{formData.companyName}".</p><p className="text-xs text-on-surface-variant mt-1">Tente alterar a Razão Social ou o Nome do Proprietário.</p></div>
+                                            ) : (
+                                                <div className="max-h-60 overflow-y-auto custom-scrollbar divide-y divide-gray-100">
+                                                    {searchResults.map((r, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => handleSelectResult(r, idx)}
+                                                            disabled={enrichingIndex !== null}
+                                                            className="w-full text-left px-4 py-3 hover:bg-primary/5 transition-colors flex items-start gap-3 disabled:opacity-50"
+                                                        >
+                                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${r.source === 'local' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                {enrichingIndex === idx ? <Loader2 className="w-4 h-4 animate-spin" /> : r.source === 'local' ? <Store className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-semibold text-on-surface truncate">{r.companyName}</p>
+                                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                                                                    {r.cnpj && <span className="text-[10px] text-on-surface-variant font-mono">{r.cnpj}</span>}
+                                                                    {r.city && <span className="text-[10px] text-on-surface-variant flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{r.city}{r.state ? ` - ${r.state}` : ''}</span>}
+                                                                </div>
+                                                                {r.address && <p className="text-[10px] text-on-surface-variant truncate mt-0.5">{r.address}</p>}
+                                                            </div>
+                                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0 ${r.source === 'local' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                {r.source === 'local' ? 'Local' : 'API'}
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         {/* Proprietário */}
