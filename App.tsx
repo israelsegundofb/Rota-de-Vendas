@@ -661,29 +661,60 @@ const App: React.FC = () => {
         updatedClient.country || 'Brasil'
       ].filter(Boolean).join(', ');
 
-      const geoResult = await geocodeWithFallback([
-        updatedClient.plusCode,
-        detailedAddress,
-        updatedClient.cleanAddress,
-        updatedClient.originalAddress
-      ]);
+      try {
+        const geoResult = await geocodeWithFallback([
+          updatedClient.plusCode,
+          detailedAddress,
+          updatedClient.cleanAddress,
+          updatedClient.originalAddress
+        ]);
 
-      if (geoResult) {
-        finalClient.lat = geoResult.lat;
-        finalClient.lng = geoResult.lng;
-        if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
+        if (geoResult) {
+          finalClient.lat = geoResult.lat;
+          finalClient.lng = geoResult.lng;
+          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
 
-        if (!finalClient.plusCode) {
-          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-          if (plusCode) finalClient.plusCode = plusCode;
+          if (!finalClient.plusCode) {
+            const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+            if (plusCode) finalClient.plusCode = plusCode;
+          }
         }
+      } catch (geoErr) {
+        console.error('[APP] Geocode failed:', geoErr);
+        toast.error('Falha ao obter coordenadas. Salvo sem localização.');
+        // Continue without updating lat/lng
       }
     } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
-      const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-      if (plusCode) finalClient.plusCode = plusCode;
+      try {
+        const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+        if (plusCode) finalClient.plusCode = plusCode;
+      } catch (plusErr) {
+        console.error('[APP] Reverse geocode plus code failed:', plusErr);
+      }
     }
 
-    setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
+    let capturedNewList: EnrichedClient[] = [];
+    setMasterClientList(prev => {
+      const newList = prev.map(c => c.id === finalClient.id ? finalClient : c);
+      capturedNewList = newList;
+      return newList;
+    });
+
+    // Immediate persistence to cloud to prevent race conditions or data reversion
+    if (isFirebaseConnected && capturedNewList.length > 0) {
+      try {
+        const { saveToCloud: forceSave } = await import('./services/firebaseService');
+        await forceSave(capturedNewList, products, categories, users, uploadedFiles);
+        console.log('[APP] ✅ Edit force-saved to Firebase.');
+        // Update hash ref so real-time subscription won't overwrite after unlock
+        lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) =>
+          key === 'lastUpdated' ? undefined : value
+        );
+      } catch (saveErr) {
+        console.error('[APP] Failed to force-save edited client:', saveErr);
+        // We don't throw here to avoid blocking UI onClose, but logging is critical
+      }
+    }
 
     if (currentUser) {
       logActivityToCloud({
@@ -698,7 +729,7 @@ const App: React.FC = () => {
       });
     }
     toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
