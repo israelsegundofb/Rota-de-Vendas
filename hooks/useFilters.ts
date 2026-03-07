@@ -212,8 +212,13 @@ export const useFilters = (
                 }
             }
 
-            // Only with Purchases Filter
-            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (c.purchasedProducts && c.purchasedProducts.length > 0);
+            // Only with Purchases Filter: Context-aware
+            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (
+                c.purchasedProducts && c.purchasedProducts.length > 0 && (
+                    // If salesperson is specified, only match if THEY sold something to this client
+                    (filterSalespersonId === 'Todos' || c.purchasedProducts.some(p => p.salespersonId === filterSalespersonId))
+                )
+            );
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });

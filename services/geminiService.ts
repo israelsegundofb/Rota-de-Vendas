@@ -11,6 +11,7 @@ export interface AssistantContext {
     activeClients: number; // e.g. clients with purchases
   };
   filteredData?: string; // Serialized short version of current view
+  aggregation?: string;  // Serialized aggregation (macro view)
 }
 
 // Use batch size 1 to ensure accurate association of Maps Grounding metadata (URIs) to specific clients.
@@ -519,14 +520,18 @@ export const askAssistantRV = async (
     - Total de Produtos no Catálogo: ${context.stats.totalProducts}
     - Clientes Ativos (Positivados): ${context.stats.activeClients}
 
-    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual)]
+    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual - Até 1000 itens)]
     ${context.filteredData ? context.filteredData : 'Nenhum filtro específico aplicado no momento ou dados muito extensos para leitura individual.'}
+
+    [VISÃO MACRO (Base Total - Estatísticas Agregadas)]
+    ${context.aggregation ? context.aggregation : 'Estatísticas agregadas não disponíveis no momento.'}
 
     [INSTRUÇÕES GERAIS]
     1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
     2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
     3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
-    4. Se a reposta demandar algo que não está no contexto, informe polidamente que como "Assistente Lite" você visualiza no momento o recorte primário da tela.
+    4. Se a resposta demandar algo que não está no contexto detalhado (filteredData), recorra à VISÃO MACRO para dar números totais (ex: "No total da sua base de 3000 clientes, as cidades X e Y são as mais fortes...").
+    5. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 1000 clientes, mas tem ciência das estatísticas globais da base.
     
     Pergunta do Usuário:
     "${prompt}"

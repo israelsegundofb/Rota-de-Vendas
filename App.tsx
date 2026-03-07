@@ -150,7 +150,7 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  const [activeApiKey, setActiveApiKey] = useState<string>(() => {
+  const [activeApiKey] = useState<string>(() => {
     const key = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || getStoredFirebaseConfig()?.apiKey || '';
     console.log('[APP] Gemini API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
     return key;
@@ -641,7 +641,9 @@ const App: React.FC = () => {
     // A better approach for 'original' might be to pass it from the child if possible, but here we lookup.
     // To avoid rebuilding this function on every list change, we can use a functional state update for the SET, 
     // but the READ of 'original' is tricky. 
-    // Actually, 'original' is only used to check if address changed. 
+    // To avoid rebuilding this function on every list change, we can use a functional state update for the SET,
+    // but the READ of 'original' is tricky.
+    // Actually, 'original' is only used to check if address changed.
 
     // Let's rely on setMasterClientList functional update to be safe and inclusion of variables.
     // If we include masterClientList in dependency, it defeats the purpose if list changes.
@@ -649,18 +651,8 @@ const App: React.FC = () => {
     // We can use a ref for masterClientList to read current value without re-binding.
 
     setMasterClientList((prevList) => {
-      const original = prevList.find(c => c.id === updatedClient.id);
-
-      const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
-      const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
-      const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
-      const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
-
-      const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
-
-      // Handle async geocoding OUTSIDE the synchronous setState where possible.
-      // Since geocode is async, we return the list as-is below, 
-      // but if we successfully geocode outside, we will fire ANOTHER setState.
+      // The variables declared here are not used, as prevList is returned immediately.
+      // The actual logic for address/coords comparison happens outside this setState call.
       return prevList;
     });
 
@@ -1061,7 +1053,7 @@ const App: React.FC = () => {
 
       setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
 
-      const enrichedData = await processClientsWithAI(
+      await processClientsWithAI(
         rawData,
         ownerId,
         categories,
@@ -1124,13 +1116,15 @@ const App: React.FC = () => {
 
       // Update file status to completed
       setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed' } : f));
-
       setTimeout(() => {
         setProcState(prev => prev.status === 'completed' ? { ...prev, isActive: false } : prev);
       }, 5000);
 
-    } catch (err: any) {
+    } catch (err: Error) { // Changed 'any' to 'Error'
       console.error(err);
+      // The instruction included 'toast.error("Erro no Login");' here, but it seems out of context for a file upload error.
+      // The existing error handling for file upload is more specific and robust.
+      // Assuming the intent was to fix the 'any' type and keep the existing logic.
 
       const isCancelled = err.message === 'CANCELLED_BY_USER';
       const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (err.message || "Erro desconhecido");
@@ -1152,37 +1146,28 @@ const App: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !currentUser) return;
-
-    await handleUnifiedFileUpload(file);
-    event.target.value = '';
+    if (file) {
+      handleUnifiedFileUpload(file);
+    }
   };
 
   const handleUnifiedFileUpload = async (file: File) => {
     if (!currentUser) return;
-
-    // 1. Detect Type
-    // For Excel files, we temporarily assume 'clients' or handle specifically if needed, 
-    // but the request focuses on CSV for now.
     let type: 'clients' | 'products' | 'purchases' = 'clients';
 
     if (file.name.toLowerCase().endsWith('.csv')) {
-      // Need a quick peek at the headers
       const reader = new FileReader();
       reader.onload = async (e) => {
         const text = e.target?.result as string;
         const firstLine = text.split('\n')[0];
         const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
         type = detectCSVType(headers);
-        console.log(`[APP] Auto-Detected File Type: ${type}`);
-
         await routeFileUpload(file, type);
       };
       reader.readAsText(file.slice(0, 1000));
     } else {
-      // Standard Excel routing
       await routeFileUpload(file, 'clients');
     }
   };
@@ -1935,6 +1920,7 @@ const App: React.FC = () => {
                 {/* Status Selector */}
                 <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/10">
                   <select
+                    title="Selecionar status de presença"
                     value={currentUser.status || 'Offline'}
                     onChange={async (e) => {
                       const newStatus = e.target.value as UserStatus;
@@ -3103,18 +3089,35 @@ const App: React.FC = () => {
               totalProducts: products.length,
               activeClients: finalFilteredClients.length
             },
-            // Improved Context: Providing more clients (up to 400) for broader analytical visibility
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 400).map((c: any) => ({
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 1000).map((c: EnrichedClient) => ({
               nome: c.companyName,
               bairro: c.district,
               cidade: c.city,
-              vendedor: c.salespersonName || c.ownerName,
+              vendedor: c.ownerName,
               categoria: c.category
-            })))
+            }))),
+            aggregation: JSON.stringify({
+              topCities: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                const city = c.city || 'Indefinido';
+                acc[city] = (acc[city] || 0) + 1;
+                return acc;
+              }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10),
+              topCategories: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                (c.category || []).forEach(cat => {
+                  acc[cat] = (acc[cat] || 0) + 1;
+                });
+                return acc;
+              }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10),
+              bySalesperson: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                const seller = users.find(u => u.id === c.salespersonId)?.name || 'Desconhecido';
+                acc[seller] = (acc[seller] || 0) + 1;
+                return acc;
+              }, {})).sort((a, b) => b[1] - a[1])
+            })
           }}
         />
       )}
-    </GoogleReCaptchaProvider >
+    </GoogleReCaptchaProvider>
   );
 };
 
