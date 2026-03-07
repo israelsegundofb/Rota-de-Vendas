@@ -53,7 +53,7 @@ import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import CustomDialog, { DialogType } from './components/CustomDialog';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom'; (Unused)
 import ErrorBoundary from './components/ErrorBoundary';
 import { useChat } from './hooks/useChat';
 import { usePageTracking } from './hooks/useAnalytics';
@@ -183,9 +183,9 @@ const App: React.FC = () => {
   // --- Presence Effects ---
   useEffect(() => {
     // Global Google Maps Auth Failure Handler
-    (window as any).gm_authFailure = () => {
+    (window as Window & { gm_authFailure?: () => void }).gm_authFailure = () => {
       console.error("[APP] Google Maps authentication failed globally.");
-      (window as any).gm_authFailure_detected = true;
+      (window as Window & { gm_authFailure_detected?: boolean }).gm_authFailure_detected = true;
       setIsMapApiBroken(true);
       // Force a re-render
       setKeyVersion(v => v + 1);
@@ -271,12 +271,12 @@ const App: React.FC = () => {
         ["Gostaria de parar de enviar o arquivo?", "O progresso atual será perdido."],
         () => {
           isUploadCancelled.current = true;
-          setActiveView(newView as any);
+          setActiveView(newView);
         },
         { confirm: 'Parar Envio', cancel: 'Continuar' }
       );
     } else {
-      setActiveView(newView as any);
+      setActiveView(newView);
     }
   };
 
@@ -395,7 +395,7 @@ const App: React.FC = () => {
                         ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
                         : c.originalAddress,
                       mainCnae: fullData.cnae_fiscal || c.mainCnae,
-                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || c.secondaryCnaes || [],
+                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string; texto: string }) => `${s.codigo} - ${s.texto}`) || c.secondaryCnaes || [],
                       lat: fullData.latitude || c.lat,
                       lng: fullData.longitude || c.lng,
                       googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
@@ -406,7 +406,7 @@ const App: React.FC = () => {
                 updatedCount++;
               }
             }
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
             errorCount++;
 
