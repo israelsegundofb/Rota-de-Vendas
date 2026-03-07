@@ -12,12 +12,12 @@ import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, Lo
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
 import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
-import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
+import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -42,7 +42,6 @@ const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
 const ChatPanel = React.lazy(() => import('./components/ChatPanel'));
 import { AssistantRV } from './components/AssistantRV';
-import { AssistantContext } from './services/geminiService';
 
 import DateRangePicker from './components/DateRangePicker';
 import CookieConsent from './components/CookieConsent';
@@ -238,7 +237,7 @@ const App: React.FC = () => {
     type: 'info'
   });
 
-  const showAlert = (title: string, message: string | string[], type: DialogType = 'info') => {
+  const showAlert = React.useCallback((title: string, message: string | string[], type: DialogType = 'info') => {
     setDialogConfig({
       isOpen: true,
       title,
@@ -246,9 +245,9 @@ const App: React.FC = () => {
       type,
       confirmLabel: 'Entendi'
     });
-  };
+  }, [setDialogConfig]);
 
-  const showConfirm = (title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
+  const showConfirm = React.useCallback((title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
     setDialogConfig({
       isOpen: true,
       title,
@@ -258,13 +257,13 @@ const App: React.FC = () => {
       confirmLabel: labels?.confirm || 'Confirmar',
       cancelLabel: labels?.cancel || 'Cancelar'
     });
-  };
+  }, [setDialogConfig]);
 
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
 
   // Handle View Navigation with Confirmation
-  const handleViewNavigation = (newView: string) => {
+  const handleViewNavigation = (newView: 'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat') => {
     if (procState.isActive && procState.status === 'processing') {
       showConfirm(
         "Parar Envio?",
@@ -280,8 +279,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Admin Upload State
-  const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
 
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -293,7 +290,7 @@ const App: React.FC = () => {
   // User handlers are now imported from useAuth hook
 
 
-  const handleCleanupDuplicates = () => {
+  const handleCleanupDuplicates = React.useCallback(() => {
     showConfirm(
       'Remover Clientes Duplicados?',
       [
@@ -328,7 +325,7 @@ const App: React.FC = () => {
         );
       }
     );
-  };
+  }, [showConfirm, setMasterClientList, toast, masterClientList]);
 
   /**
    * UTILITÁRIO DE ATUALIZAÇÃO EM MASSA (ENRIQUECIMENTO)
@@ -395,7 +392,7 @@ const App: React.FC = () => {
                         ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
                         : c.originalAddress,
                       mainCnae: fullData.cnae_fiscal || c.mainCnae,
-                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string; texto: string }) => `${s.codigo} - ${s.texto}`) || c.secondaryCnaes || [],
+                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${String(s.codigo)} - ${s.texto}`) || c.secondaryCnaes || [],
                       lat: fullData.latitude || c.lat,
                       lng: fullData.longitude || c.lng,
                       googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
@@ -407,11 +404,12 @@ const App: React.FC = () => {
               }
             }
           } catch (err: unknown) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
             console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
             errorCount++;
 
             // Check for 401 specifically to stop the whole process if the key is invalid
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+            if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja inválida'))) {
               isUploadCancelled.current = true;
               setProcState(prev => ({ ...prev, status: 'error', errorMessage: 'Autenticação CNPJa falhou. Chave inválida ou expirada.' }));
               setIsCNPJaModalOpen(true);
@@ -475,11 +473,16 @@ const App: React.FC = () => {
     // distributeProductsToClients(masterClientList, updatedProducts);
   };
 
-  const handleClearProducts = () => {
-    setProducts([]);
-    // Remove purchase history from clients
-    setMasterClientList(prev => prev.map(c => ({ ...c, purchasedProducts: [] })));
-  };
+  const handleClearProducts = React.useCallback(() => {
+    showConfirm(
+      'Limpar Catálogo?',
+      'Isso removerá TODOS os produtos cadastrados. Confirmar?',
+      () => {
+        setProducts([]);
+        toast.success('Catálogo de produtos limpo.');
+      }
+    );
+  }, [showConfirm, setProducts, toast]);
 
   const handleClearAllClients = () => {
     showConfirm(
@@ -562,7 +565,7 @@ const App: React.FC = () => {
 
 
   // Helper for sequential geocoding attempts
-  const geocodeWithFallback = async (addresses: (string | undefined)[]) => {
+  const geocodeWithFallback = React.useCallback(async (addresses: (string | undefined)[]) => {
     for (const addr of addresses) {
       const candidate = addr?.trim();
       if (!candidate) continue;
@@ -574,9 +577,9 @@ const App: React.FC = () => {
       }
     }
     return null;
-  };
+  }, [googleMapsApiKey]);
 
-  const handleBulkGeneratePlusCodes = async () => {
+  const handleBulkGeneratePlusCodes = React.useCallback(async () => {
     const clientsMissingPlusCode = masterClientList.filter(c => !c.plusCode && c.lat && c.lng && c.lat !== 0);
 
     if (clientsMissingPlusCode.length === 0) {
@@ -632,30 +635,9 @@ const App: React.FC = () => {
         toast.success(`Processo concluído! ${updatedCount} Plus Codes gerados.`);
       }
     );
-  };
+  }, [masterClientList, toast, showConfirm, currentUser, googleMapsApiKey, setMasterClientList]);
 
   const handleUpdateClient = React.useCallback(async (updatedClient: EnrichedClient) => {
-    // Need to access current state inside callback or use functional updates where possible
-    // Since we need to find 'original' from 'masterClientList', we should ideally use a ref or include it in dependency
-    // However, masterClientList changes frequently. 
-    // A better approach for 'original' might be to pass it from the child if possible, but here we lookup.
-    // To avoid rebuilding this function on every list change, we can use a functional state update for the SET, 
-    // but the READ of 'original' is tricky. 
-    // To avoid rebuilding this function on every list change, we can use a functional state update for the SET,
-    // but the READ of 'original' is tricky.
-    // Actually, 'original' is only used to check if address changed.
-
-    // Let's rely on setMasterClientList functional update to be safe and inclusion of variables.
-    // If we include masterClientList in dependency, it defeats the purpose if list changes.
-    // OPTIMIZATION: We will trust the passed 'updatedClient' mostly, but for address comparison we need source.
-    // We can use a ref for masterClientList to read current value without re-binding.
-
-    setMasterClientList((prevList) => {
-      // The variables declared here are not used, as prevList is returned immediately.
-      // The actual logic for address/coords comparison happens outside this setState call.
-      return prevList;
-    });
-
     const finalClient = { ...updatedClient };
 
     // Find original directly for comparison
@@ -715,7 +697,7 @@ const App: React.FC = () => {
       });
     }
     toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
@@ -779,56 +761,8 @@ const App: React.FC = () => {
         listContainer.scrollTop = listContainer.scrollHeight;
       }
     }, 100);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, geocodeWithFallback]);
 
-  const handleClearClients = React.useCallback(() => {
-    let targetId: string | undefined;
-    let targetName = "TODOS";
-
-    // Determine context for granular clear
-    if (currentUser && isAdmin(currentUser.role)) {
-      if (filterSalespersonId !== 'Todos') {
-        targetId = filterSalespersonId;
-        const u = users.find(u => u.id === targetId);
-        targetName = u?.name || 'Desconhecido';
-      } else if (targetUploadUserId) {
-        targetId = targetUploadUserId;
-        const u = users.find(u => u.id === targetId);
-        targetName = u?.name || 'Desconhecido';
-      }
-    } else if (currentUser && isSalesTeam(currentUser.role)) {
-      // Salesperson can only clear their own? Or system policy?
-      // Let's assume for now they clear their own view, which is effectively "their" data if segmented.
-      // However, often local storage is shared. Let's ask confirmation.
-      targetId = currentUser.id;
-      targetName = currentUser.name;
-    }
-
-    const isPartial = !!targetId;
-
-    const message = isPartial
-      ? `Deseja remover APENAS os clientes de ${targetName}? (Os outros dados serão mantidos)`
-      : `Tem certeza que deseja DELETAR TODOS os clientes do sistema? Isso removerá todo o histórico.`;
-
-    showConfirm(
-      isPartial ? 'Limpeza Parcial' : 'AVISO CRÍTICO',
-      message,
-      () => {
-        if (isPartial && targetId) {
-          setMasterClientList(prev => prev.filter(c => c.salespersonId !== targetId));
-          toast.success(`Dados de ${targetName} removidos!`);
-        } else {
-          setMasterClientList([]);
-          localStorage.removeItem('vendas_ai_clients');
-          toast.success('Base de dados limpa com sucesso!');
-        }
-
-        setProcState({
-          isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
-        });
-      }
-    );
-  }, [currentUser, filterSalespersonId, targetUploadUserId, users, toast, setMasterClientList]);
 
   // Simulate Sales Logic
   const distributeProductsToClients = (clients: EnrichedClient[], allProducts: Product[]) => {
@@ -897,10 +831,6 @@ const App: React.FC = () => {
     resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
-    if (isAdmin(user.role)) {
-      const firstSeller = users.find(u => isSalesTeam(u.role));
-      if (firstSeller) setTargetUploadUserId(firstSeller.id);
-    }
   };
 
   const handleConfirmCNPJaKey = (key: string) => {
@@ -1120,16 +1050,15 @@ const App: React.FC = () => {
         setProcState(prev => prev.status === 'completed' ? { ...prev, isActive: false } : prev);
       }, 5000);
 
-    } catch (err: Error) { // Changed 'any' to 'Error'
-      console.error(err);
-      // The instruction included 'toast.error("Erro no Login");' here, but it seems out of context for a file upload error.
-      // The existing error handling for file upload is more specific and robust.
-      // Assuming the intent was to fix the 'any' type and keep the existing logic.
+    } catch (err: unknown) {
+      const errObj = err as any;
+      const isCancelled = errObj?.message === 'CANCELLED_BY_USER';
+      const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (errObj?.message || "Erro desconhecido");
+      console.error(errorMsg, err);
 
-      const isCancelled = err.message === 'CANCELLED_BY_USER';
-      const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (err.message || "Erro desconhecido");
+      // Update file status
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
 
-      // Update procState. If cancelled, we might want to hide it or show "Cancelled" state.
       // User said "para de processar na tela", implying the box should close or stop showing progress.
       // Setting isActive: false hides the toast.
       const shouldHide = isCancelled;
@@ -1140,54 +1069,6 @@ const App: React.FC = () => {
         errorMessage: errorMsg,
         isActive: !shouldHide
       }));
-
-      // Update file status
-      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
-    }
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleUnifiedFileUpload(file);
-    }
-  };
-
-  const handleUnifiedFileUpload = async (file: File) => {
-    if (!currentUser) return;
-    let type: 'clients' | 'products' | 'purchases' = 'clients';
-
-    if (file.name.toLowerCase().endsWith('.csv')) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        const firstLine = text.split('\n')[0];
-        const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
-        type = detectCSVType(headers);
-        await routeFileUpload(file, type);
-      };
-      reader.readAsText(file.slice(0, 1000));
-    } else {
-      await routeFileUpload(file, 'clients');
-    }
-  };
-
-  const routeFileUpload = async (file: File, type: 'clients' | 'products' | 'purchases') => {
-    let ownerId = currentUser!.id;
-    if (isAdmin(currentUser!.role) && targetUploadUserId) {
-      ownerId = targetUploadUserId;
-    }
-
-    switch (type) {
-      case 'clients':
-        await handleClientFileDirect(file, ownerId);
-        break;
-      case 'products':
-        await handleProductFileUpload(file);
-        break;
-      case 'purchases':
-        await handlePurchaseUpdateUpload(file, ownerId);
-        break;
     }
   };
 
