@@ -52,6 +52,15 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
 
         const response: any = await generateAIContent(model || 'gemini-2.0-flash', prompt, useMaps);
 
+        // Extract text safely using the SDK's .text() method
+        let responseText = "";
+        try {
+            responseText = response.text();
+        } catch (e) {
+            console.warn('[AI SDK] .text() call failed, falling back to JSON serialization', e);
+            responseText = JSON.stringify(response);
+        }
+
         // Extract Google Maps Grounding URI if available
         let mapsUri = "";
         const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
@@ -63,12 +72,14 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
         }
 
         res.status(200).json({
-            text: response.text || "",
+            text: responseText,
             mapsUri: mapsUri
         });
     } catch (error: any) {
         console.error('[AI PROXY ERROR]:', error);
-        res.status(500).json({ error: error.message || 'Falha ao processar IA' });
+        // Include more details in the error response if available
+        const errorDetail = error.response?.data || error.message || 'Falha ao processar IA';
+        res.status(500).json({ error: errorDetail });
     }
 });
 

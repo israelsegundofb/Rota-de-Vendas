@@ -492,7 +492,7 @@ const App: React.FC = () => {
       async () => {
         if (syncLockRef.current !== undefined) syncLockRef.current = true;
         setMasterClientList([]);
-        setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+        setUploadedFiles([]);
         if (lastClientsHash.current !== undefined) lastClientsHash.current = '';
 
         // Clear LocalStorage to prevent auto-migration back to cloud
@@ -522,6 +522,40 @@ const App: React.FC = () => {
         }
 
         toast.success('Base de clientes limpa com sucesso!');
+      }
+    );
+  };
+
+  const handleClearPurchases = () => {
+    showConfirm(
+      'Limpar Histórico de Vendas?',
+      [
+        '⚠️ Esta ação removerá TODOS os produtos comprados de todos os clientes.',
+        '• Os clientes continuarão cadastrados no sistema.',
+        '• Os arquivos de compras serão removidos da lista.'
+      ],
+      async () => {
+        syncLockRef.current = true;
+
+        // 1. Clear purchases from clients
+        const newList = masterClientList.map(c => ({ ...c, purchasedProducts: [] }));
+        setMasterClientList(newList);
+
+        // 2. Clear purchase files
+        setUploadedFiles(prev => prev.filter(f => f.type !== 'purchases'));
+
+        // 3. Sync to cloud
+        if (isFirebaseConnected) {
+          try {
+            await saveToCloud(newList, products, categories, users, uploadedFiles.filter(f => f.type !== 'purchases'));
+            lastClientsHash.current = JSON.stringify(newList, (key, value) => key === 'lastUpdated' ? undefined : value);
+          } catch (e) {
+            console.error("Erro ao sincronizar limpeza de vendas:", e);
+          }
+        }
+
+        syncLockRef.current = false;
+        toast.success('Histórico de vendas removido com sucesso!');
       }
     );
   };
@@ -1504,7 +1538,7 @@ const App: React.FC = () => {
               newList.forEach((c, idx) => {
                 if (c.salespersonId !== targetUserId) return;
                 const score = getMatchScore(c.companyName || '');
-                if (score > bestScore && score >= 0.6) { // 60% word overlap threshold
+                if (score > bestScore && score >= 0.85) { // 85% word overlap threshold
                   bestScore = score;
                   bestIdx = idx;
                 }
@@ -1514,7 +1548,7 @@ const App: React.FC = () => {
               if (bestIdx === -1) {
                 newList.forEach((c, idx) => {
                   const score = getMatchScore(c.companyName || '');
-                  if (score > bestScore && score >= 0.6) {
+                  if (score > bestScore && score >= 0.85) {
                     bestScore = score;
                     bestIdx = idx;
                   }
@@ -2232,6 +2266,7 @@ const App: React.FC = () => {
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
                     onCleanupDuplicates={handleCleanupDuplicates}
+                    onClearPurchases={handleClearPurchases}
                     totalClients={masterClientList.length}
                   />
                 </div>
@@ -3068,33 +3103,13 @@ const App: React.FC = () => {
               totalProducts: products.length,
               activeClients: finalFilteredClients.length
             },
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 100).map((c: any) => ({
+            // Improved Context: Providing more clients (up to 400) for broader analytical visibility
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 400).map((c: any) => ({
               nome: c.companyName,
               bairro: c.district,
               cidade: c.city,
-              vendedor: c.salespersonName || c.ownerName
-            })))
-          }}
-        />
-      )}
-
-      {currentUser && (
-        <AssistantRV
-          isOpen={isAssistantOpen}
-          setIsOpen={setIsAssistantOpen}
-          context={{
-            userName: currentUser.name || 'Usuário',
-            userRole: currentUser.role || 'Geral',
-            stats: {
-              totalClients: masterClientList.length,
-              totalProducts: products.length,
-              activeClients: finalFilteredClients.length
-            },
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 100).map(c => ({
-              nome: c.companyName,
-              bairro: c.district,
-              cidade: c.city,
-              vendedorID: c.salespersonId
+              vendedor: c.salespersonName || c.ownerName,
+              categoria: c.category
             })))
           }}
         />
