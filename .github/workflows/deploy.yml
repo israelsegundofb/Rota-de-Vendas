@@ -118,12 +118,12 @@ jobs:
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      - name: 'Deploy to Cloud Run from Source'
+      - name: 'Deploy Backend to Cloud Run from Source'
         run: |-
           gcloud run deploy rota-de-vendas-ga \
-            --source . \
+            --source backend \
             --region southamerica-east1 \
             --project gen-lang-client-0586123917 \
             --quiet \
             --allow-unauthenticated \
-            --set-build-env-vars VITE_GOOGLE_API_KEY="${{ secrets.GOOGLE_MAPS_API_KEY }}",VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}",VITE_FIREBASE_PROJECT_ID="gen-lang-client-0586123917",VITE_RECAPTCHA_SITE_KEY="${{ secrets.VITE_RECAPTCHA_SITE_KEY }}"
+            --set-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
