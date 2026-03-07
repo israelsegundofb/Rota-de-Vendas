@@ -16,9 +16,10 @@ interface EditClientModalProps {
     uploadedFiles?: UploadedFile[];
     onCNPJAuthError?: () => void;
     allClients?: EnrichedClient[];
+    onMergeClients?: (existingClientId: string, duplicateClientId: string, enrichedData: Partial<EnrichedClient>) => void;
 }
 
-const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError, allClients = [] }) => {
+const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError, allClients = [], onMergeClients }) => {
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
         cnpj: client.cnpj || '',
@@ -204,58 +205,65 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 enriched = await enrichFromResult(result);
             }
 
-            setFormData(prev => {
-                const updates: Partial<EnrichedClient> = {};
-
-                if (enriched.fullData) {
-                    const fd = enriched.fullData;
-                    const hasAddr = fd.logradouro && fd.numero;
-                    if (fd.cnpj) updates.cnpj = fd.cnpj;
-                    if (fd.nome_fantasia || fd.razao_social) updates.companyName = fd.nome_fantasia || fd.razao_social || prev.companyName;
-                    if (fd.ddd_telefone_1) updates.contact = fd.ddd_telefone_1;
-                    if (hasAddr) {
-                        updates.cleanAddress = `${fd.logradouro}, ${fd.numero}, ${fd.municipio} - ${fd.uf}`;
-                        updates.originalAddress = `${fd.logradouro}, ${fd.numero}${fd.complemento ? ` - ${fd.complemento}` : ''}, ${fd.bairro}, ${fd.municipio} - ${fd.uf}`;
-                    }
-                    if (fd.municipio) updates.city = fd.municipio;
-                    if (fd.uf) {
-                        updates.state = fd.uf;
-                        updates.region = getRegionByUF(fd.uf);
-                    }
-                    if (fd.bairro) updates.district = fd.bairro;
-                    if (fd.cep) updates.zip = fd.cep;
-                    if (fd.cnae_fiscal) updates.mainCnae = fd.cnae_fiscal;
-                    if (fd.cnaes_secundarios) updates.secondaryCnaes = fd.cnaes_secundarios.map((s: any) => `${s.codigo} - ${s.texto}`);
-                    if (fd.latitude) { updates.lat = fd.latitude; updates.lng = fd.longitude || 0; }
-                } else {
-                    // Use partial data from search result
-                    if (enriched.cnpj) updates.cnpj = enriched.cnpj;
-                    if (enriched.companyName) updates.companyName = enriched.companyName;
-                    if (enriched.phone) updates.contact = enriched.phone;
-                    if (enriched.address) updates.cleanAddress = enriched.address;
-                    if (enriched.city) updates.city = enriched.city;
-                    if (enriched.state) {
-                        updates.state = enriched.state;
-                        updates.region = getRegionByUF(enriched.state);
-                    }
-                    if (enriched.district) updates.district = enriched.district;
-                    if (enriched.mainCnae) updates.mainCnae = enriched.mainCnae;
-                    if (enriched.lat && enriched.lng) { updates.lat = enriched.lat; updates.lng = enriched.lng; }
+            // Build enriched data from result
+            const enrichedData: Partial<EnrichedClient> = {};
+            if (enriched.fullData) {
+                const fd = enriched.fullData;
+                const hasAddr = fd.logradouro && fd.numero;
+                if (fd.cnpj) enrichedData.cnpj = fd.cnpj;
+                if (fd.nome_fantasia || fd.razao_social) enrichedData.companyName = fd.nome_fantasia || fd.razao_social;
+                if (fd.ddd_telefone_1) enrichedData.contact = fd.ddd_telefone_1;
+                if (hasAddr) {
+                    enrichedData.cleanAddress = `${fd.logradouro}, ${fd.numero}, ${fd.municipio} - ${fd.uf}`;
+                    enrichedData.originalAddress = `${fd.logradouro}, ${fd.numero}${fd.complemento ? ` - ${fd.complemento}` : ''}, ${fd.bairro}, ${fd.municipio} - ${fd.uf}`;
                 }
+                if (fd.municipio) enrichedData.city = fd.municipio;
+                if (fd.uf) { enrichedData.state = fd.uf; enrichedData.region = getRegionByUF(fd.uf); }
+                if (fd.bairro) enrichedData.district = fd.bairro;
+                if (fd.cep) enrichedData.zip = fd.cep;
+                if (fd.cnae_fiscal) enrichedData.mainCnae = fd.cnae_fiscal;
+                if (fd.cnaes_secundarios) enrichedData.secondaryCnaes = fd.cnaes_secundarios.map((s: any) => `${s.codigo} - ${s.texto}`);
+                if (fd.latitude) { enrichedData.lat = fd.latitude; enrichedData.lng = fd.longitude || 0; }
+            } else {
+                if (enriched.cnpj) enrichedData.cnpj = enriched.cnpj;
+                if (enriched.companyName) enrichedData.companyName = enriched.companyName;
+                if (enriched.phone) enrichedData.contact = enriched.phone;
+                if (enriched.address) enrichedData.cleanAddress = enriched.address;
+                if (enriched.city) enrichedData.city = enriched.city;
+                if (enriched.state) { enrichedData.state = enriched.state; enrichedData.region = getRegionByUF(enriched.state); }
+                if (enriched.district) enrichedData.district = enriched.district;
+                if (enriched.mainCnae) enrichedData.mainCnae = enriched.mainCnae;
+                if (enriched.lat && enriched.lng) { enrichedData.lat = enriched.lat; enrichedData.lng = enriched.lng; }
+            }
 
-                return { ...prev, ...updates };
-            });
+            // AUTO-MERGE: if there are duplicate clients, ask user before merging
+            if (duplicateWarnings.length > 0 && onMergeClients) {
+                const existingName = duplicateWarnings[0].companyName;
+                const shouldMerge = window.confirm(
+                    `Foi encontrado um cliente similar já cadastrado:\n\n"${existingName}"\n\nDeseja mesclar os dados encontrados no cliente existente e remover este cadastro duplicado?\n\n• SIM = Mescla os dados e remove o duplicado\n• NÃO = Preenche apenas este formulário`
+                );
+                if (shouldMerge) {
+                    const existingId = duplicateWarnings[0].clientId;
+                    onMergeClients(existingId, client.id, enrichedData);
+                    setShowResults(false);
+                    onClose();
+                    return;
+                }
+            }
 
+            // No duplicate — just fill the current form
+            setFormData(prev => ({ ...prev, ...enrichedData }));
             setShowResults(false);
             setRefreshStatus('success');
             setTimeout(() => setRefreshStatus('idle'), 3000);
         } catch (err) {
             console.error('[EditClientModal] Enrichment failed:', err);
-            alert('Erro ao carregar dados do resultado selecionado.');
         } finally {
             setEnrichingIndex(null);
         }
     };
+
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;

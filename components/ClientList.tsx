@@ -27,6 +27,7 @@ interface ClientListProps {
   onGeneratePlusCodes?: () => void;
   onCNPJAuthError?: () => void;
   allClients?: EnrichedClient[];
+  onMergeClients?: (existingClientId: string, duplicateClientId: string, enrichedData: Partial<EnrichedClient>) => void;
   filterOnlyWithPurchases?: boolean;
   setFilterOnlyWithPurchases?: (value: boolean) => void;
   resetFilters?: () => void;
@@ -52,6 +53,7 @@ const ClientList: React.FC<ClientListProps> = ({
   users = [],
   uploadedFiles = [],
   allClients = [],
+  onMergeClients,
   onGeneratePlusCodes,
   onCNPJAuthError,
   filterOnlyWithPurchases = false,
@@ -298,6 +300,7 @@ const ClientList: React.FC<ClientListProps> = ({
               uploadedFiles={uploadedFiles}
               onCNPJAuthError={onCNPJAuthError}
               allClients={allClients}
+              onMergeClients={onMergeClients}
             />
           )
         }

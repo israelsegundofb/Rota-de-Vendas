@@ -647,52 +647,10 @@ const App: React.FC = () => {
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
     const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
     const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
-
     const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+    const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
 
-    if (!hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing)) {
-      const detailedAddress = [
-        updatedClient.cleanAddress,
-        updatedClient.district,
-        updatedClient.city,
-        updatedClient.state,
-        updatedClient.zip,
-        updatedClient.region,
-        updatedClient.country || 'Brasil'
-      ].filter(Boolean).join(', ');
-
-      try {
-        const geoResult = await geocodeWithFallback([
-          updatedClient.plusCode,
-          detailedAddress,
-          updatedClient.cleanAddress,
-          updatedClient.originalAddress
-        ]);
-
-        if (geoResult) {
-          finalClient.lat = geoResult.lat;
-          finalClient.lng = geoResult.lng;
-          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
-
-          if (!finalClient.plusCode) {
-            const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-            if (plusCode) finalClient.plusCode = plusCode;
-          }
-        }
-      } catch (geoErr) {
-        console.error('[APP] Geocode failed:', geoErr);
-        toast.error('Falha ao obter coordenadas. Salvo sem localização.');
-        // Continue without updating lat/lng
-      }
-    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
-      try {
-        const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-        if (plusCode) finalClient.plusCode = plusCode;
-      } catch (plusErr) {
-        console.error('[APP] Reverse geocode plus code failed:', plusErr);
-      }
-    }
-
+    // ---- SAVE IMMEDIATELY (no geocoding blocking) ----
     let capturedNewList: EnrichedClient[] = [];
     setMasterClientList(prev => {
       const newList = prev.map(c => c.id === finalClient.id ? finalClient : c);
@@ -700,19 +658,17 @@ const App: React.FC = () => {
       return newList;
     });
 
-    // Immediate persistence to cloud to prevent race conditions or data reversion
+    // Persist to cloud immediately
     if (isFirebaseConnected && capturedNewList.length > 0) {
       try {
         const { saveToCloud: forceSave } = await import('./services/firebaseService');
         await forceSave(capturedNewList, products, categories, users, uploadedFiles);
         console.log('[APP] ✅ Edit force-saved to Firebase.');
-        // Update hash ref so real-time subscription won't overwrite after unlock
         lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) =>
           key === 'lastUpdated' ? undefined : value
         );
       } catch (saveErr) {
         console.error('[APP] Failed to force-save edited client:', saveErr);
-        // We don't throw here to avoid blocking UI onClose, but logging is critical
       }
     }
 
@@ -729,7 +685,137 @@ const App: React.FC = () => {
       });
     }
     toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
+
+    // ---- GEOCODE IN BACKGROUND (non-blocking) ----
+    if (needsGeocoding) {
+      (async () => {
+        try {
+          const detailedAddress = [
+            updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
+            updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
+          ].filter(Boolean).join(', ');
+
+          const geoResult = await geocodeWithFallback([
+            updatedClient.plusCode, detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress
+          ]);
+
+          if (geoResult) {
+            const geoUpdate = { ...finalClient, lat: geoResult.lat, lng: geoResult.lng };
+            if (geoResult.formattedAddress) geoUpdate.cleanAddress = geoResult.formattedAddress;
+
+            if (!geoUpdate.plusCode) {
+              try {
+                const pc = await reverseGeocodePlusCode(geoUpdate.lat, geoUpdate.lng, googleMapsApiKey || '');
+                if (pc) geoUpdate.plusCode = pc;
+              } catch { /* ignore */ }
+            }
+
+            // Update state with geocoded data
+            let geoList: EnrichedClient[] = [];
+            setMasterClientList(prev => {
+              const newList = prev.map(c => c.id === geoUpdate.id ? geoUpdate : c);
+              geoList = newList;
+              return newList;
+            });
+
+            // Save geocoded update
+            if (isFirebaseConnected && geoList.length > 0) {
+              try {
+                const { saveToCloud: forceSave } = await import('./services/firebaseService');
+                await forceSave(geoList, products, categories, users, uploadedFiles);
+                lastClientsHash.current = JSON.stringify(geoList, (key, value) =>
+                  key === 'lastUpdated' ? undefined : value
+                );
+                console.log('[APP] ✅ Background geocode saved.');
+              } catch { /* ignore */ }
+            }
+          }
+        } catch (err) {
+          console.warn('[APP] Background geocoding failed:', err);
+        }
+      })();
+    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
+      // Background plus code generation
+      (async () => {
+        try {
+          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+          if (plusCode) {
+            const updated = { ...finalClient, plusCode };
+            setMasterClientList(prev => prev.map(c => c.id === updated.id ? updated : c));
+          }
+        } catch { /* ignore */ }
+      })();
+    }
   }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
+
+  // Merge enriched data into an existing client and remove the duplicate
+  const handleMergeClients = React.useCallback(async (
+    existingClientId: string,
+    duplicateClientId: string,
+    enrichedData: Partial<EnrichedClient>
+  ) => {
+    let capturedNewList: EnrichedClient[] = [];
+    setMasterClientList(prev => {
+      const existingClient = prev.find(c => c.id === existingClientId);
+      if (!existingClient) return prev;
+
+      // Merge: enriched data overwrites empty/default fields in existing client
+      const merged: EnrichedClient = {
+        ...existingClient,
+        companyName: enrichedData.companyName || existingClient.companyName,
+        cnpj: enrichedData.cnpj || existingClient.cnpj,
+        contact: enrichedData.contact || existingClient.contact,
+        cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
+          ? enrichedData.cleanAddress : existingClient.cleanAddress,
+        originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
+        city: enrichedData.city || existingClient.city,
+        state: enrichedData.state || existingClient.state,
+        district: enrichedData.district || existingClient.district,
+        zip: enrichedData.zip || existingClient.zip,
+        region: enrichedData.region || existingClient.region,
+        mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
+        secondaryCnaes: enrichedData.secondaryCnaes?.length ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+        lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
+        lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
+        plusCode: enrichedData.plusCode || existingClient.plusCode,
+      };
+
+      // Remove the duplicate and update the existing
+      const newList = prev
+        .filter(c => c.id !== duplicateClientId)
+        .map(c => c.id === existingClientId ? merged : c);
+      capturedNewList = newList;
+      return newList;
+    });
+
+    // Persist
+    if (isFirebaseConnected && capturedNewList.length > 0) {
+      try {
+        const { saveToCloud: forceSave } = await import('./services/firebaseService');
+        await forceSave(capturedNewList, products, categories, users, uploadedFiles);
+        lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) =>
+          key === 'lastUpdated' ? undefined : value
+        );
+        console.log('[APP] ✅ Merge saved: duplicate removed, existing updated.');
+      } catch (err) {
+        console.error('[APP] Failed to save merge:', err);
+      }
+    }
+
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'CLIENTS',
+        details: `Mesclou cliente duplicado em cliente existente (${existingClientId})`,
+        metadata: { existingClientId, removedDuplicateId: duplicateClientId }
+      });
+    }
+    toast.success('Cliente duplicado mesclado com sucesso! Cadastro unificado.');
+  }, [currentUser, toast, setMasterClientList, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
@@ -2831,6 +2917,7 @@ const App: React.FC = () => {
                           categoryFilter={filterCategory}
                           onCategoryFilterChange={setFilterCategory}
                           allClients={masterClientList}
+                          onMergeClients={handleMergeClients}
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
