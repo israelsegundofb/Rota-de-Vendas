@@ -15,7 +15,11 @@ const app = express();
 const port = process.env.PORT || '3001';
 
 // 2. Middlewares
-app.use(cors());
+app.use(cors({
+    origin: ['https://gen-lang-client-0586123917.web.app', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // 3. Roteamento

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Bot, X, Send, Loader2, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { askAssistantRV, AssistantContext } from '../services/geminiService';

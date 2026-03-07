@@ -94,7 +94,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
 
     const handleChange = (field: string, value: any) => {
         setFormData(prev => {
-            const updates: any = { [field]: value };
+            const updates: Partial<typeof prev> = { [field]: value };
             if (field === 'state') {
                 updates.region = getRegionByUF(value);
             }
@@ -147,12 +147,13 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                         ? `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`
                         : prev.cleanAddress,
                     mainCnae: data.cnae_fiscal || prev.mainCnae,
-                    secondaryCnaes: data.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
+                    secondaryCnaes: data.cnaes_secundarios?.map((s: { codigo: number | string; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
                 }));
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja'))) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            if (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja')) {
                 // Since we now have fallbacks, a 401 from CNPJa shouldn't block us entirely if fallbacks work.
                 // However, if we reach this catch block, it means ALL fallbacks might have failed or there was a structural error.
                 if (onCNPJAuthError) {
@@ -161,7 +162,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                     setError('Não foi possível buscar os dados nas APIs (Comercial ou Gratuitas). Verifique sua conexão ou a Chave CNPJa.');
                 }
             } else {
-                setError(err.message || 'Erro ao consultar CNPJ. Verifique se o número está correto.');
+                setError(errorMsg || 'Erro ao consultar CNPJ. Verifique se o número está correto.');
             }
         } finally {
             setIsSearchingCNPJ(false);
@@ -187,7 +188,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             contact: formData.contact,
             whatsapp: formData.whatsapp,
             category: formData.category,
-            region: formData.region as any,
+            region: formData.region as EnrichedClient['region'],
             state: formData.state,
             city: formData.city,
             originalAddress: fullAddress,
