@@ -477,7 +477,7 @@ export const categorizeProductsWithAI = async (
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.0-flash',
           prompt: prompt
         }),
         signal: controller.signal
@@ -572,7 +572,7 @@ export const askAssistantRV = async (
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         prompt: fullPrompt
       }),
       signal: controller.signal
