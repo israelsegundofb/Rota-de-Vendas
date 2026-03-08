@@ -27,11 +27,5 @@ export const generateAIContent = async (modelName: string, prompt: string, useMa
         const result = await model.generateContent(prompt);
         return result.response;
     } catch (error) {
-        console.error('[AI SERVICE ERROR]:', error);
-        throw error;
-    }
-};
-console.error('[AI SERVICE ERROR]:', error);
-throw error;
     }
 };
