@@ -3194,6 +3194,7 @@ const App: React.FC = () => {
             productSections: Array.from(new Set(products.map(p => p.section).filter((v): v is string => !!v))),
             filteredData: JSON.stringify(finalFilteredClients.slice(0, 2500).map((c: EnrichedClient) => {
               const sellerUser = users.find(u => u.id === c.salespersonId);
+              const isRecent = c.lastUpdated ? (new Date().getTime() - new Date(c.lastUpdated).getTime()) < 300000 : false;
               return {
                 nome: c.companyName,
                 cnpj: c.cnpj,
@@ -3203,6 +3204,7 @@ const App: React.FC = () => {
                 vendedorId: c.salespersonId,
                 categorias: c.category,
                 cnae: c.mainCnae,
+                recent: isRecent,
                 historico: c.purchasedProducts?.slice(-10).map(p => ({
                   item: p.name,
                   depto: p.category,

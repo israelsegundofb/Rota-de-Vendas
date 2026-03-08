@@ -574,10 +574,16 @@ export const askAssistantRV = async (
        - Diferencie estritamente **Usuários do Sistema (Vendedores/Gestores)** de **Clientes da Base**.
        - Use a "Lista de Usuários Cadastrados" para identificar pessoas mencionadas como vendedores (ex: se perguntarem sobre "Orneliano", procure o nome na lista de usuários e entenda que ele é o Vendedor, não o cliente de mesmo nome).
        - Se houver um cliente e um vendedor com o mesmo nome, assuma que perguntas sobre "vendedor" ou "carteira" referem-se ao usuário do sistema.
-    4. CRUZAMENTO DE DADOS: O campo 'salespersonId' ou 'vendedorId' nos dados de clientes refere-se ao ID do usuário. Mapeie isso para o nome correto usando a lista de usuários.
-    5. ANÁLISE DE COMPRAS: O array 'historico' nos dados de clientes contém o que foi comprado. Use isso para responder sobre departamentos (ex: "aerofólio"), SKUs ou datas.
-    6. HIERARQUIA: Entenda que gestores (Gerentes/Admins) podem ver tudo, enquanto vendedores podem ter visões focadas em sua própria carteira (embora neste contexto macro você tenha visão de até 2500 clientes).
-    7. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 2500 clientes, mas tem ciência das estatísticas globais da base.
+    4. PRIORIDADE DE RECÊNCIA (DADOS NOVOS):
+       - Clientes com a flag 'recent: true' foram atualizados ou incluídos nos últimos 5 minutos (ex: via upload de planilha).
+       - Sempre que identificar esses dados novos, priorize-os na resposta se forem relevantes para a pergunta. Destaque-os como "novidades detectadas no sistema".
+    5. OBJETIVIDADE E PRECISÃO:
+       - Responda de forma precisa e objetiva baseando-se estritamente nos dados fornecidos (clientes, produtos, histórico).
+       - Evite suposições. Se um dado não estiver no contexto, informe polidamente que não tem acesso a essa informação específica no momento.
+    6. CRUZAMENTO DE DADOS: O campo 'salespersonId' ou 'vendedorId' nos dados de clientes refere-se ao ID do usuário. Mapeie isso para o nome correto usando a lista de usuários.
+    7. ANÁLISE DE COMPRAS: O array 'historico' nos dados de clientes contém o que foi comprado. Use isso para responder sobre departamentos (ex: "aerofólio"), SKUs ou datas.
+    8. HIERARQUIA: Entenda que gestores (Gerentes/Admins) podem ver tudo, enquanto vendedores podem ter visões focadas em sua própria carteira (embora neste contexto macro você tenha visão de até 2500 clientes).
+    9. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 2500 clientes, mas tem ciência das estatísticas globais da base.
     
     Pergunta do Usuário:
     "${prompt}"
