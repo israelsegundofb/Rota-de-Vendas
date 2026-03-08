@@ -249,6 +249,40 @@ export const saveToCloud = async (
 };
 
 /**
+ * Atualiza um único cliente no Firestore de forma cirúrgica (V5.1).
+ * Evita o overhead de salvar toda a lista (1300+ documentos).
+ */
+export const updateClientInCloud = async (client: EnrichedClient) => {
+    if (!db) return;
+    try {
+        const clientRef = doc(db, 'rota-vendas-data', 'clients', 'list', client.id);
+        await setDoc(clientRef, {
+            ...removeUndefined(client),
+            lastUpdated: new Date().toISOString()
+        }, { merge: true });
+        console.log(`✅ [FIREBASE] Cliente ${client.id} atualizado cirurgicamente.`);
+    } catch (e) {
+        console.error(`[FIREBASE] Erro ao atualizar cliente ${client.id}:`, e);
+        throw e;
+    }
+};
+
+/**
+ * Remove um único cliente do Firestore de forma cirúrgica (V5.1).
+ */
+export const deleteClientFromCloud = async (clientId: string) => {
+    if (!db) return;
+    try {
+        const clientRef = doc(db, 'rota-vendas-data', 'clients', 'list', clientId);
+        await deleteDoc(clientRef);
+        console.log(`✅ [FIREBASE] Cliente ${clientId} removido.`);
+    } catch (e) {
+        console.error(`[FIREBASE] Erro ao remover cliente ${clientId}:`, e);
+        throw e;
+    }
+};
+
+/**
  * Força a sincronização imediata do array de UploadedFiles no Metadata.
  * Usado primariamente durante deleções manuais para impedir que o debounce
  * de auto-save atrase a remoção e cause arquivos zumbis no reload.

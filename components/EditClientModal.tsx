@@ -69,8 +69,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         setIsSaving(true);
         try {
             const result = onSave(formData);
-            // Handle both sync and async onSave
-            if (result && typeof (result as any).then === 'function') {
+            if (result instanceof Promise) {
                 await result;
             }
             onClose();
@@ -125,7 +124,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     lng: fullData.longitude || 0, // Reset to 0 if not found to force re-geocoding
                     contact: fullData.ddd_telefone_1 || prev.contact,
                     mainCnae: fullData.cnae_fiscal || prev.mainCnae,
-                    secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
+                    secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
                 }));
                 setRefreshStatus('success');
                 setTimeout(() => setRefreshStatus('idle'), 3000);
@@ -133,10 +132,11 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 setRefreshStatus('error');
                 alert('CNPJ não encontrado na base de dados.');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
             setRefreshStatus('error');
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja'))) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja'))) {
                 if (onCNPJAuthError) {
                     onCNPJAuthError();
                 } else {
@@ -228,7 +228,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 if (fd.bairro) enrichedData.district = fd.bairro;
                 if (fd.cep) enrichedData.zip = fd.cep;
                 if (fd.cnae_fiscal) enrichedData.mainCnae = fd.cnae_fiscal;
-                if (fd.cnaes_secundarios) enrichedData.secondaryCnaes = fd.cnaes_secundarios.map((s: any) => `${s.codigo} - ${s.texto}`);
+                if (fd.cnaes_secundarios) enrichedData.secondaryCnaes = fd.cnaes_secundarios.map((s: { codigo: string | number; texto: string }) => `${s.codigo} - ${s.texto}`);
                 if (fd.latitude) {
                     enrichedData.lat = fd.latitude;
                     enrichedData.lng = fd.longitude || 0;
@@ -282,7 +282,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => {
-            const updates: any = { [name]: value };
+            const updates: Partial<EnrichedClient> = { [name]: value } as any; // Cast as any still needed for dynamic key property matching in some TS versions, but using Partial is better.
             if (name === 'state') {
                 updates.region = getRegionByUF(value);
             }

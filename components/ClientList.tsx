@@ -126,7 +126,7 @@ const ClientList: React.FC<ClientListProps> = ({
       client.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`
     ]);
 
-    const escapeCsvField = (field: any) => {
+    const escapeCsvField = (field: string | number | boolean | null | undefined) => {
       if (field === null || field === undefined) return '';
       const stringValue = String(field);
       if (stringValue.includes('"') || stringValue.includes(',') || stringValue.includes('\n')) {
@@ -205,6 +205,27 @@ const ClientList: React.FC<ClientListProps> = ({
             <option value="Todos">Todos Segmentos</option>
             {CATEGORIES.filter(c => c !== 'Todos').map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+
+          <label className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap overflow-hidden">
+            <input
+              type="checkbox"
+              checked={filterOnlyWithPurchases}
+              onChange={(e) => setFilterOnlyWithPurchases?.(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-primary/20"
+            />
+            <span className="hidden sm:inline">Com Compras</span>
+            <span className="sm:hidden">Compras</span>
+          </label>
+
+          {resetFilters && (
+            <button
+              onClick={resetFilters}
+              className="px-2 py-1.5 text-xs text-primary font-bold hover:bg-primary/5 rounded-lg transition-colors whitespace-nowrap"
+              title="Limpar todos os filtros"
+            >
+              Limpar
+            </button>
+          )}
 
           <div className="md:ml-auto flex items-center gap-2 pl-2 border-l border-gray-200">
             {currentUserRole && isSalesTeam(currentUserRole) && onAddClient && (

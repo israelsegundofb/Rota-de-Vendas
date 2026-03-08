@@ -119,6 +119,45 @@ const App: React.FC = () => {
     isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
 
+  // Helper function to distribute products to clients (moved up to fix hoisting)
+  const distributeProductsToClients = React.useCallback((clients: EnrichedClient[], allProducts: Product[]) => {
+    if (!allProducts || allProducts.length === 0) return;
+
+    const updatedClients = clients.map(client => {
+      // If client already has products, keep them unless we want to refresh
+      if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
+
+      // Find products matching client category
+      let eligibleProducts = allProducts.filter(p =>
+        (client.category || []).some(cat =>
+          (p.category || '').toLowerCase().includes((cat || '').toLowerCase()) ||
+          (cat || '').toLowerCase().includes((p.category || '').toLowerCase())
+        )
+      );
+
+      // Fallback if no category match
+      if (eligibleProducts.length === 0) {
+        eligibleProducts = allProducts;
+      }
+
+      // Randomly assign 1-5 products
+      const numProducts = Math.floor(Math.random() * 5) + 1;
+      const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, numProducts);
+
+      return {
+        ...client,
+        purchasedProducts: selected.map(p => ({
+          ...p,
+          purchaseDate: new Date().toISOString()
+        })) as PurchaseRecord[]
+      };
+    });
+
+    setMasterClientList(updatedClients as EnrichedClient[]);
+  }, [setMasterClientList]);
+
+
   const missingCoordinatesCount = React.useMemo(() => {
     return (visibleClients || []).filter((c: EnrichedClient) => !c.lat || !c.lng || Number(c.lat) === 0 || Number(c.lng) === 0).length;
   }, [visibleClients]);
@@ -348,6 +387,9 @@ const App: React.FC = () => {
         `Total de clientes: ${masterClientList.length}`
       ],
       async () => {
+        // Ativar Lock de Sincronização para evitar sobrescrita por real-time sync
+        if (syncLockRef) syncLockRef.current = true;
+
         setProcState({
           isActive: true,
           current: 0,
@@ -384,9 +426,24 @@ const App: React.FC = () => {
             if (activeCnpj && activeCnpj.length === 14) {
               const fullData = await consultarCNPJ(activeCnpj);
               if (fullData) {
+                // 2. Antes de aplicar, verificar se já existe outro cliente com este CNPJ no sistema
+                const existingWithCnpj = finalUpdatedList.find(c =>
+                  c.id !== client.id &&
+                  c.cnpj?.replace(/\D/g, '') === activeCnpj
+                );
+
                 const hasNewAddress = fullData.logradouro && fullData.numero;
                 let lat = fullData.latitude || client.lat;
                 let lng = fullData.longitude || client.lng;
+
+                // Fallback de Geocodificação se CNPJa não retornou coordenadas
+                if ((!lat || lat === 0) && hasNewAddress) {
+                  try {
+                    const geo = await geocodeWithFallback(`${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`);
+                    if (geo) { lat = geo.lat; lng = geo.lng; }
+                  } catch (e) { console.warn('Geo fallback failed for mass update:', e); }
+                }
+
                 let cleanAddress = hasNewAddress
                   ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
                   : client.cleanAddress;
@@ -421,15 +478,41 @@ const App: React.FC = () => {
                   secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${String(s.codigo)} - ${s.texto}`) || client.secondaryCnaes || [],
                   lat,
                   lng,
-                  googleMapsUri: lat ? `https://www.google.com/maps?q=${lat},${lng}` : client.googleMapsUri
+                  googleMapsUri: lat ? `https://www.google.com/maps?q=${lat},${lng}` : client.googleMapsUri,
+                  lastUpdated: new Date().toISOString()
                 };
 
-                // Atualizar na lista final (batch)
-                finalUpdatedList = finalUpdatedList.map(c => c.id === client.id ? updatedClient : c);
-                updatedCount++;
+                // DUPLICATE HANDLING: If we found another client with the same CNPJ, MERGE!
+                if (existingWithCnpj) {
+                  const mergedClient: EnrichedClient = {
+                    ...existingWithCnpj,
+                    ...updatedClient,
+                    id: existingWithCnpj.id, // Keep the one already in DB if it was fuller
+                    purchasedProducts: [...(existingWithCnpj.purchasedProducts || []), ...(client.purchasedProducts || [])]
+                      .filter((v, i, a) => a.findIndex(t => t.sku === v.sku && t.purchaseDate === v.purchaseDate) === i)
+                  };
 
-                // Atualizar estado progressivamente para feedback visual
-                setMasterClientList(prev => prev.map(c => c.id === client.id ? updatedClient : c));
+                  // Update final list: Remove the current 'indefinido' (client.id) and update the 'existing' (existingWithCnpj.id)
+                  finalUpdatedList = finalUpdatedList
+                    .filter(c => c.id !== client.id)
+                    .map(c => c.id === existingWithCnpj.id ? mergedClient : c);
+
+                  setMasterClientList(prev => prev
+                    .filter(c => c.id !== client.id)
+                    .map(c => c.id === existingWithCnpj.id ? mergedClient : c)
+                  );
+
+                  // Delete duplicate from cloud immediately
+                  if (isFirebaseConnected) {
+                    import('./services/firebaseService').then(m => m.deleteClientFromCloud(client.id)).catch(console.error);
+                  }
+                } else {
+                  // Normal update
+                  finalUpdatedList = finalUpdatedList.map(c => c.id === client.id ? updatedClient : c);
+                  setMasterClientList(prev => prev.map(c => c.id === client.id ? updatedClient : c));
+                }
+
+                updatedCount++;
               }
             }
           } catch (err: unknown) {
@@ -455,6 +538,11 @@ const App: React.FC = () => {
             const { saveToCloud: forceSave } = await import('./services/firebaseService');
             await forceSave(finalUpdatedList, products, categories, users, uploadedFiles);
             console.log(`[ENRICH] ✅ ${updatedCount} clientes salvos no Firebase.`);
+
+            // Refresh hash to prevent sync issues
+            lastClientsHash.current = JSON.stringify(finalUpdatedList, (key, value) =>
+              key === 'lastUpdated' ? undefined : value
+            );
           } catch (e) {
             console.error('[ENRICH] Erro no salvamento final:', e);
           }
@@ -468,6 +556,7 @@ const App: React.FC = () => {
 
         setTimeout(() => {
           setProcState(prev => ({ ...prev, isActive: false }));
+          if (syncLockRef) syncLockRef.current = false;
         }, 3000);
       }
     );
@@ -687,26 +776,28 @@ const App: React.FC = () => {
     const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
     const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
 
-    // ---- SAVE IMMEDIATELY (no geocoding blocking) ----
-    let capturedNewList: EnrichedClient[] = [];
-    setMasterClientList(prev => {
-      const newList = prev.map(c => c.id === finalClient.id ? finalClient : c);
-      capturedNewList = newList;
-      return newList;
-    });
+    // ---- SAVE IMMEDIATELY (surgical update) ----
+    setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
 
-    // Persist to cloud immediately
-    if (isFirebaseConnected && capturedNewList.length > 0) {
-      try {
-        const { saveToCloud: forceSave } = await import('./services/firebaseService');
-        await forceSave(capturedNewList, products, categories, users, uploadedFiles);
-        console.log('[APP] ✅ Edit force-saved to Firebase.');
-        lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) =>
-          key === 'lastUpdated' ? undefined : value
-        );
-      } catch (saveErr) {
-        console.error('[APP] Failed to force-save edited client:', saveErr);
-      }
+    // Persist to cloud surgicaly
+    if (isFirebaseConnected) {
+      (async () => {
+        try {
+          const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
+          await surgicalUpdate(finalClient);
+          console.log('[APP] ✅ Edit surgical-saved to Firebase.');
+
+          // Still update hash for local consistency check if needed
+          setMasterClientList(current => {
+            lastClientsHash.current = JSON.stringify(current, (key, value) =>
+              key === 'lastUpdated' ? undefined : value
+            );
+            return current;
+          });
+        } catch (saveErr) {
+          console.error('[APP] Failed to surgical-save edited client:', saveErr);
+        }
+      })();
     }
 
     if (currentUser) {
@@ -748,20 +839,25 @@ const App: React.FC = () => {
             }
 
             // 4. Update state using functional update to ensure we use the LATEST Master List
-            // and avoid race conditions from concurrent geocoding or edits
             setMasterClientList(prev => {
               const newList = prev.map(c => c.id === geoUpdate.id ? geoUpdate : c);
 
-              // 5. Trigger an ultra-fast background save for this specific geocoded record
+              // 5. Trigger an surgical background save for this specific geocoded record
               if (isFirebaseConnected) {
                 (async () => {
                   try {
-                    const { saveToCloud: forceSave } = await import('./services/firebaseService');
-                    await forceSave(newList, products, categories, users, uploadedFiles);
-                    lastClientsHash.current = JSON.stringify(newList, (key, value) =>
-                      key === 'lastUpdated' ? undefined : value
-                    );
-                    console.log('[APP] ✅ Background geocode persisted.');
+                    const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
+                    await surgicalUpdate(geoUpdate);
+
+                    setMasterClientList(current => {
+                      if (lastClientsHash) {
+                        lastClientsHash.current = JSON.stringify(current, (key, value) =>
+                          key === 'lastUpdated' ? undefined : value
+                        );
+                      }
+                      return current;
+                    });
+                    console.log('[APP] ✅ Background geocode persisted surgicaly.');
                   } catch (e) {
                     console.warn('[APP] Background geocode save deferred:', e);
                   }
@@ -781,12 +877,20 @@ const App: React.FC = () => {
           const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
           if (plusCode) {
             const updated = { ...finalClient, plusCode };
-            setMasterClientList(prev => prev.map(c => c.id === updated.id ? updated : c));
+            setMasterClientList(prev => {
+              const newList = prev.map(c => c.id === updated.id ? updated : c);
+              if (lastClientsHash) {
+                lastClientsHash.current = JSON.stringify(newList, (key, value) =>
+                  key === 'lastUpdated' ? undefined : value
+                );
+              }
+              return newList;
+            });
           }
         } catch { /* ignore */ }
       })();
     }
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash, syncLockRef]);
 
   // Merge enriched data into an existing client and remove the duplicate
   const handleMergeClients = React.useCallback(async (
@@ -794,70 +898,82 @@ const App: React.FC = () => {
     duplicateClientId: string,
     enrichedData: Partial<EnrichedClient>
   ) => {
-    let capturedNewList: EnrichedClient[] = [];
+    // 1. Find existing client in current state
+    const existingClient = masterClientList.find(c => c.id === existingClientId);
+    if (!existingClient) {
+      console.warn('[APP] Merge failed: Existing client not found in list.');
+      return;
+    }
+
+    // 2. Perform the Merge logic upfront (Sync/Deterministic)
+    const merged: EnrichedClient = {
+      ...existingClient,
+      // Identification
+      companyName: enrichedData.companyName || existingClient.companyName,
+      cnpj: enrichedData.cnpj || existingClient.cnpj,
+      ownerName: enrichedData.ownerName || existingClient.ownerName,
+      contact: enrichedData.contact || existingClient.contact,
+      whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
+
+      // Address
+      cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
+        ? enrichedData.cleanAddress : existingClient.cleanAddress,
+      originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
+      city: enrichedData.city || existingClient.city,
+      state: enrichedData.state || existingClient.state,
+      district: enrichedData.district || existingClient.district,
+      zip: enrichedData.zip || existingClient.zip,
+      region: enrichedData.region || existingClient.region,
+
+      // Classification
+      mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
+      secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
+        ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+      category: (enrichedData.category && enrichedData.category.length > 0)
+        ? enrichedData.category : existingClient.category,
+
+      // Geography
+      lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
+      lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
+      plusCode: enrichedData.plusCode || existingClient.plusCode,
+      googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
+
+      // Activity/Metadata
+      purchasedProducts: (enrichedData.purchasedProducts && enrichedData.purchasedProducts.length > 0)
+        ? enrichedData.purchasedProducts : existingClient.purchasedProducts,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // 3. Update Local State (Functional)
     setMasterClientList(prev => {
-      const existingClient = prev.find(c => c.id === existingClientId);
-      if (!existingClient) return prev;
-
-      // Merge: enriched data overwrites empty/default fields in existing client
-      // IMPORTANT: We MUST preserve all fields not in enrichedData (like products, ownerName, etc.)
-      const merged: EnrichedClient = {
-        ...existingClient,
-        // Identification
-        companyName: enrichedData.companyName || existingClient.companyName,
-        cnpj: enrichedData.cnpj || existingClient.cnpj,
-        ownerName: enrichedData.ownerName || existingClient.ownerName,
-        contact: enrichedData.contact || existingClient.contact,
-        whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
-
-        // Address
-        cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
-          ? enrichedData.cleanAddress : existingClient.cleanAddress,
-        originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
-        city: enrichedData.city || existingClient.city,
-        state: enrichedData.state || existingClient.state,
-        district: enrichedData.district || existingClient.district,
-        zip: enrichedData.zip || existingClient.zip,
-        region: enrichedData.region || existingClient.region,
-
-        // Classification
-        mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
-        secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
-          ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
-        category: (enrichedData.category && enrichedData.category.length > 0)
-          ? enrichedData.category : existingClient.category,
-
-        // Geography
-        lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
-        lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
-        plusCode: enrichedData.plusCode || existingClient.plusCode,
-        googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
-
-        // Activity/Metadata
-        purchasedProducts: (enrichedData.purchasedProducts && enrichedData.purchasedProducts.length > 0)
-          ? enrichedData.purchasedProducts : existingClient.purchasedProducts,
-        lastUpdated: new Date().toISOString()
-      };
-
-      // Remove the duplicate and update the existing
-      const newList = prev
+      return prev
         .filter(c => c.id !== duplicateClientId)
         .map(c => c.id === existingClientId ? merged : c);
-      capturedNewList = newList;
-      return newList;
     });
 
-    // Persist
-    if (isFirebaseConnected && capturedNewList.length > 0) {
+    // 4. Persist surgicaly to Cloud (Immediate)
+    if (isFirebaseConnected) {
       try {
-        const { saveToCloud: forceSave } = await import('./services/firebaseService');
-        await forceSave(capturedNewList, products, categories, users, uploadedFiles);
-        lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) =>
-          key === 'lastUpdated' ? undefined : value
-        );
-        console.log('[APP] ✅ Merge saved: duplicate removed, existing updated.');
+        const { updateClientInCloud: surgicalUpdate, deleteClientFromCloud } = await import('./services/firebaseService');
+
+        // Parallel but awaited for result
+        await Promise.all([
+          surgicalUpdate(merged),
+          deleteClientFromCloud(duplicateClientId)
+        ]);
+
+        console.log('[APP] ✅ Merge saved surgicaly: duplicate removed, existing updated.');
+
+        // Update local hash after successful cloud sync
+        setMasterClientList(current => {
+          lastClientsHash.current = JSON.stringify(current, (key, value) =>
+            key === 'lastUpdated' ? undefined : value
+          );
+          return current;
+        });
       } catch (err) {
-        console.error('[APP] Failed to save merge:', err);
+        console.error('[APP] Failed to surgical-save merge:', err);
+        toast.error('Erro ao salvar mesclagem na nuvem. Verifique conexão.');
       }
     }
 
@@ -874,7 +990,7 @@ const App: React.FC = () => {
       });
     }
     toast.success('Cliente duplicado mesclado com sucesso! Cadastro unificado.');
-  }, [currentUser, toast, setMasterClientList, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
+  }, [currentUser, toast, setMasterClientList, masterClientList, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
@@ -941,37 +1057,7 @@ const App: React.FC = () => {
   }, [currentUser, googleMapsApiKey, toast, setMasterClientList, geocodeWithFallback]);
 
 
-  // Simulate Sales Logic
-  const distributeProductsToClients = (clients: EnrichedClient[], allProducts: Product[]) => {
-    if (allProducts.length === 0) return;
-
-    const updatedClients = clients.map(client => {
-      // If client already has products, keep them unless we want to refresh
-      if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
-
-      // Find products matching client category
-      let eligibleProducts = allProducts.filter(p =>
-        (client.category || []).some(cat =>
-          (p.category || '').toLowerCase().includes((cat || '').toLowerCase()) ||
-          (cat || '').toLowerCase().includes((p.category || '').toLowerCase())
-        )
-      );
-
-      // Fallback if no category match
-      if (eligibleProducts.length === 0) {
-        eligibleProducts = allProducts;
-      }
-
-      // Randomly assign 1-5 products
-      const numProducts = Math.floor(Math.random() * 5) + 1;
-      const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, numProducts);
-
-      return { ...client, purchasedProducts: selected.map(p => ({ ...p, purchaseDate: new Date().toISOString() })) };
-    });
-
-    setMasterClientList(updatedClients as EnrichedClient[]);
-  };
+  // View State (Replaced moved function with space)
 
   const handleInvalidKey = async () => {
     setIsGoogleMapsModalOpen(true);
