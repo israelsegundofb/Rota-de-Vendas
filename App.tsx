@@ -16,7 +16,7 @@ import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
-import { processClientsWithAI } from './services/geminiService';
+import { processClientsWithAI, syncDataToAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
@@ -118,6 +118,18 @@ const App: React.FC = () => {
     resetFilters,
     isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
+
+  // --- AI MASTER DATA SYNC (1GB+ Knowledge) ---
+  useEffect(() => {
+    if (!masterClientList.length) return;
+
+    const timer = setTimeout(async () => {
+      console.log('[AI SYNC] Disparando sincronização automática de conhecimento...');
+      await syncDataToAI(masterClientList, products);
+    }, 15000); // 15s debounce para garantir que dados pesados sejam enviados apenas em repouso
+
+    return () => clearTimeout(timer);
+  }, [masterClientList.length, products.length]);
 
   // Helper function to distribute products to clients (moved up to fix hoisting)
   const distributeProductsToClients = React.useCallback((clients: EnrichedClient[], allProducts: Product[]) => {
@@ -3189,9 +3201,9 @@ const App: React.FC = () => {
               activeClients: finalFilteredClients.length
             },
             users: users.map(u => ({ name: u.name, role: u.role })),
-            allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter(Boolean))),
-            productCategories: Array.from(new Set(products.map(p => p.category).filter(Boolean))),
-            productSections: Array.from(new Set(products.map(p => p.section).filter(Boolean))),
+            allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter((v): v is string => !!v))),
+            productCategories: Array.from(new Set(products.map(p => p.category).filter((v): v is string => !!v))),
+            productSections: Array.from(new Set(products.map(p => p.section).filter((v): v is string => !!v))),
             filteredData: JSON.stringify(finalFilteredClients.slice(0, 1000).map((c: EnrichedClient) => ({
               nome: c.companyName,
               cnpj: c.cnpj,

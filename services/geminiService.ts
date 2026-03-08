@@ -18,6 +18,28 @@ export interface AssistantContext {
   aggregation?: string;  // Serialized aggregation (macro view)
 }
 
+/**
+ * Sincroniza a base de dados massiva (>1GB) com o backend.
+ * Chamado periodicamente ou após carregamento de arquivos.
+ */
+export const syncDataToAI = async (clients: EnrichedClient[], products: Product[]) => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  try {
+    console.log(`[AI SYNC] Enviando snapshot de ${clients.length} clientes e ${products.length} produtos...`);
+    const response = await fetch(`${backendUrl}/api/ai/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clients, products })
+    });
+    if (!response.ok) throw new Error("Falha na sincronização com o backend");
+    console.log("[AI SYNC] Base de dados sincronizada com sucesso!");
+    return true;
+  } catch (error) {
+    console.error("[AI SYNC ERROR]", error);
+    return false;
+  }
+};
+
 // Use batch size 1 to ensure accurate association of Maps Grounding metadata (URIs) to specific clients.
 const BATCH_SIZE = 1;
 
@@ -513,44 +535,36 @@ export const askAssistantRV = async (
 ): Promise<string> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-  // Build the super-prompt with context
+  // Prompt Mestre: Focado em orquestração e uso de ferramentas
   const fullPrompt = `
-    Você é o "Assistente RV", um assistente de inteligência artificial corporativo focado em análise de vendas do sistema "Rota de Vendas".
-    Sua função é fornecer análises claras, responder perguntas sobre a carteira de clientes, e ajudar o usuário a tomar decisões.
+    Você é o "Assistente RV", um Consultor de Dados e Estrategista Comercial de elite para o sistema "Rota de Vendas" (Graves & Agudos).
     
-    [CONTEXTO ATUAL DO USUÁRIO LIGADO À SUA SESSÃO]
-    - Nome do Usuário: ${context.userName}
-    - Nível de Acesso: ${context.userRole}
-    - Total de Clientes Visíveis no Sistema: ${context.stats.totalClients}
-    - Total de Produtos no Catálogo: ${context.stats.totalProducts}
-    - Clientes Ativos (Positivados): ${context.stats.activeClients}
+    [INFRAESTRUTURA DE DADOS]
+    Você tem acesso a uma base de dados massiva (>1GB) armazenada no servidor. 
+    NÃO tente adivinhar dados; USE AS FERRAMENTAS (Tools) disponíveis para pesquisar clientes, produtos e estatísticas.
 
-    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual - Até 1000 itens)]
-    ${context.filteredData ? context.filteredData : 'Nenhum filtro específico aplicado no momento ou dados muito extensos para leitura individual.'}
-
-    [VISÃO MACRO (Base Total - Estatísticas Agregadas)]
-    ${context.aggregation ? context.aggregation : 'Estatísticas agregadas não disponíveis no momento.'}
-
-    [INSTRUÇÕES GERAIS]
-    1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
-    2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
-    3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
-    4. Se a resposta demandar algo que não está no contexto detalhado (filteredData), recorra à VISÃO MACRO para dar números totais (ex: "No total da sua base de 3000 clientes, as cidades X e Y são as mais fortes...").
-    5. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 1000 clientes, mas tem ciência das estatísticas globais da base.
+    [HIERARQUIA E CONTEXTO ATUAL]
+    - Usuário: ${context.userName} (Role: ${context.userRole})
+    - Visão Macro: ${context.stats.totalClients} clientes | ${context.stats.totalProducts} produtos.
     
-    Pergunta do Usuário:
-    "${prompt}"
+    [ORIENTAÇÕES]
+    1. Se o usuário perguntar sobre clientes de uma cidade, use 'find_clients'.
+    2. Se perguntar sobre faturamento ou marcas, use 'analyze_products'.
+    3. Analise cruzamentos: quem compra o quê, onde estão os buracos na rota.
+    4. Resposta Final: Sempre em PT-BR, rica em insights e formatada com Markdown.
+
+    Pergunta: "${prompt}"
   `;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s para analises complexas
 
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-1.5-pro-002', // Modelo superior para Function Calling
         prompt: fullPrompt
       }),
       signal: controller.signal
@@ -559,16 +573,14 @@ export const askAssistantRV = async (
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`AI Request failed with status: ${response.status}`);
+      const errData = await response.json();
+      throw new Error(errData.error || `Erro ${response.status}`);
     }
 
     const data = await response.json();
-    return data.text || data.response || "Desculpe, não consegui gerar uma resposta. Tente novamente.";
+    return data.text || "Ocorreu um erro ao processar. Tente novamente.";
   } catch (error: any) {
     console.error("AssistantRV Error:", error);
-    if (error.name === 'AbortError') {
-      throw new Error("A requisição ao motor de IA expirou (timeout). Tente novamente.");
-    }
-    throw new Error("Não foi possível conectar ao motor de IA no momento. Tente novamente em instantes.");
+    throw new Error(error.message || "Erro de conexão com o Assistente RV.");
   }
 };

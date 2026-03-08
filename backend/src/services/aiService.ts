@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { aiTools, toolHandlers } from "./toolsService";
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Inicialização segura: o SDK só é instanciado quando necessário
 let genAI: any = null;
 
 const getAIClient = () => {
@@ -19,13 +19,44 @@ export const generateAIContent = async (modelName: string, prompt: string, useMa
         const client = getAIClient();
         if (!client) throw new Error("GEMINI_API_KEY não configurada no servidor.");
 
+        // Configuração com suporte a Tools
         const model = client.getGenerativeModel({
             model: modelName,
-            tools: useMaps ? [{ googleSearchRetrieval: {} }] : undefined // Nota: Cloud Run suporta Search Grounding via Google Search Retrieval
+            tools: [
+                { functionDeclarations: aiTools },
+                ...(useMaps ? [{ googleSearchRetrieval: {} }] : [])
+            ]
         });
 
-        const result = await model.generateContent(prompt);
-        return result.response;
+        // Iniciar chat para suportar multi-turn se necessário, ou gerar conteúdo direto
+        const chat = model.startChat();
+        let result = await chat.sendMessage(prompt);
+        let response = result.response;
+
+        // Loop de execução de funções (Function Calling)
+        // O Gemini sugere uma chamada, nós executamos e devolvemos o resultado
+        const call = response.candidates?.[0]?.content?.parts?.find((p: any) => p.functionCall);
+
+        if (call) {
+            const { name, args } = call.functionCall;
+            console.log(`[AI TOOL CALL] Executando ${name} com args:`, args);
+
+            const handler = toolHandlers[name];
+            if (handler) {
+                const toolResult = handler(args);
+
+                // Enviar o resultado de volta para o modelo para ele gerar a resposta final
+                result = await chat.sendMessage([{
+                    functionResponse: {
+                        name,
+                        response: { content: toolResult }
+                    }
+                }]);
+                response = result.response;
+            }
+        }
+
+        return response;
     } catch (error) {
         console.error('[AI SERVICE ERROR]:', error);
         throw error;
