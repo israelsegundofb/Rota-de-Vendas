@@ -76,8 +76,8 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
         const { model, prompt, useMaps } = req.body;
         if (!prompt) return res.status(400).json({ error: 'Prompt é obrigatório' });
 
-        // Force gemini-1.5-pro for better tool use if possible
-        const aiModel = model || 'gemini-1.5-pro-002';
+        // Force stable gemini-1.5-pro for better tool use
+        const aiModel = model || 'gemini-1.5-pro';
         const response: any = await generateAIContent(aiModel, prompt, useMaps);
 
         let responseText = "";

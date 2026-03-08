@@ -564,7 +564,7 @@ export const askAssistantRV = async (
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemini-1.5-pro-002', // Modelo superior para Function Calling
+        model: 'gemini-1.5-pro', // Modelo superior para Function Calling
         prompt: fullPrompt
       }),
       signal: controller.signal
