@@ -439,7 +439,7 @@ const App: React.FC = () => {
                 // Fallback de Geocodificação se CNPJa não retornou coordenadas
                 if ((!lat || lat === 0) && hasNewAddress) {
                   try {
-                    const geo = await geocodeWithFallback(`${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`);
+                    const geo = await geocodeWithFallback([`${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`]);
                     if (geo) { lat = geo.lat; lng = geo.lng; }
                   } catch (e) { console.warn('Geo fallback failed for mass update:', e); }
                 }
