@@ -3188,12 +3188,25 @@ const App: React.FC = () => {
               totalProducts: products.length,
               activeClients: finalFilteredClients.length
             },
+            users: users.map(u => ({ name: u.name, role: u.role })),
+            allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter(Boolean))),
+            productCategories: Array.from(new Set(products.map(p => p.category).filter(Boolean))),
+            productSections: Array.from(new Set(products.map(p => p.section).filter(Boolean))),
             filteredData: JSON.stringify(finalFilteredClients.slice(0, 1000).map((c: EnrichedClient) => ({
               nome: c.companyName,
+              cnpj: c.cnpj,
               bairro: c.district,
               cidade: c.city,
               vendedor: c.ownerName,
-              categoria: c.category
+              vendedorId: c.salespersonId,
+              categorias: c.category,
+              cnae: c.mainCnae,
+              historico: c.purchasedProducts?.slice(-5).map(p => ({
+                item: p.name,
+                data: p.purchaseDate,
+                qtd: p.quantity,
+                val: p.totalValue
+              }))
             }))),
             aggregation: JSON.stringify({
               topCities: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
@@ -3201,20 +3214,21 @@ const App: React.FC = () => {
                 acc[city] = (acc[city] || 0) + 1;
                 return acc;
               }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10),
-              topCategories: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
+              categoryDistribution: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
                 (c.category || []).forEach(cat => {
                   acc[cat] = (acc[cat] || 0) + 1;
                 });
                 return acc;
-              }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10),
-              bySalesperson: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
-                const seller = users.find(u => u.id === c.salespersonId)?.name || 'Desconhecido';
+              }, {}),
+              sellerStats: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                const seller = c.ownerName || 'N/A';
                 acc[seller] = (acc[seller] || 0) + 1;
                 return acc;
-              }, {})).sort((a, b) => b[1] - a[1])
+              }, {})
             })
           }}
         />
+
       )}
     </GoogleReCaptchaProvider>
   );

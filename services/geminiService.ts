@@ -10,6 +10,10 @@ export interface AssistantContext {
     totalProducts: number;
     activeClients: number; // e.g. clients with purchases
   };
+  users?: any[]; // Full system users list with roles
+  allCnaes?: string[]; // List of all existing CNAEs in the system
+  productCategories?: string[]; // All product departments
+  productSections?: string[]; // All sections (sub-categories)
   filteredData?: string; // Serialized short version of current view
   aggregation?: string;  // Serialized aggregation (macro view)
 }
