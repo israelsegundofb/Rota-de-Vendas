@@ -3188,26 +3188,32 @@ const App: React.FC = () => {
               totalProducts: products.length,
               activeClients: finalFilteredClients.length
             },
-            users: users.map(u => ({ name: u.name, role: u.role })),
+            users: users.map(u => ({ id: u.id, name: u.name, role: u.role })),
             allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter((v): v is string => !!v))),
             productCategories: Array.from(new Set(products.map(p => p.category).filter((v): v is string => !!v))),
             productSections: Array.from(new Set(products.map(p => p.section).filter((v): v is string => !!v))),
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 2500).map((c: EnrichedClient) => ({
-              nome: c.companyName,
-              cnpj: c.cnpj,
-              bairro: c.district,
-              cidade: c.city,
-              vendedor: c.ownerName,
-              vendedorId: c.salespersonId,
-              categorias: c.category,
-              cnae: c.mainCnae,
-              historico: c.purchasedProducts?.slice(-5).map(p => ({
-                item: p.name,
-                data: p.purchaseDate,
-                qtd: p.quantity,
-                val: p.totalValue
-              }))
-            }))),
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 2500).map((c: EnrichedClient) => {
+              const sellerUser = users.find(u => u.id === c.salespersonId);
+              return {
+                nome: c.companyName,
+                cnpj: c.cnpj,
+                bairro: c.district,
+                cidade: c.city,
+                vendedor: sellerUser ? sellerUser.name : 'Vendedor Desconhecido',
+                vendedorId: c.salespersonId,
+                categorias: c.category,
+                cnae: c.mainCnae,
+                historico: c.purchasedProducts?.slice(-10).map(p => ({
+                  item: p.name,
+                  depto: p.category,
+                  secao: p.section,
+                  marca: p.brand,
+                  data: p.purchaseDate,
+                  qtd: p.quantity,
+                  val: p.totalValue
+                }))
+              };
+            })),
             aggregation: JSON.stringify({
               topCities: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
                 const city = c.city || 'Indefinido';
@@ -3221,8 +3227,9 @@ const App: React.FC = () => {
                 return acc;
               }, {}),
               sellerStats: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
-                const seller = c.ownerName || 'N/A';
-                acc[seller] = (acc[seller] || 0) + 1;
+                const sellerUser = users.find(u => u.id === c.salespersonId);
+                const sellerName = sellerUser ? sellerUser.name : 'N/A';
+                acc[sellerName] = (acc[sellerName] || 0) + 1;
                 return acc;
               }, {})
             })
