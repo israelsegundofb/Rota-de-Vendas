@@ -535,36 +535,44 @@ export const askAssistantRV = async (
 ): Promise<string> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-  // Prompt Mestre: Focado em orquestração e uso de ferramentas
+  // Build the super-prompt with context
   const fullPrompt = `
-    Você é o "Assistente RV", um Consultor de Dados e Estrategista Comercial de elite para o sistema "Rota de Vendas" (Graves & Agudos).
+    Você é o "Assistente RV", um assistente de inteligência artificial corporativo focado em análise de vendas do sistema "Rota de Vendas".
+    Sua função é fornecer análises claras, responder perguntas sobre a carteira de clientes, e ajudar o usuário a tomar decisões.
     
-    [INFRAESTRUTURA DE DADOS]
-    Você tem acesso a uma base de dados massiva (>1GB) armazenada no servidor. 
-    NÃO tente adivinhar dados; USE AS FERRAMENTAS (Tools) disponíveis para pesquisar clientes, produtos e estatísticas.
+    [CONTEXTO ATUAL DO USUÁRIO LIGADO À SUA SESSÃO]
+    - Nome do Usuário: ${context.userName}
+    - Nível de Acesso: ${context.userRole}
+    - Total de Clientes Visíveis no Sistema: ${context.stats.totalClients}
+    - Total de Produtos no Catálogo: ${context.stats.totalProducts}
+    - Clientes Ativos (Positivados): ${context.stats.activeClients}
 
-    [HIERARQUIA E CONTEXTO ATUAL]
-    - Usuário: ${context.userName} (Role: ${context.userRole})
-    - Visão Macro: ${context.stats.totalClients} clientes | ${context.stats.totalProducts} produtos.
+    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual - Até 1000 itens)]
+    ${context.filteredData ? context.filteredData : 'Nenhum filtro específico aplicado no momento ou dados muito extensos para leitura individual.'}
+
+    [VISÃO MACRO (Base Total - Estatísticas Agregadas)]
+    ${context.aggregation ? context.aggregation : 'Estatísticas agregadas não disponíveis no momento.'}
+
+    [INSTRUÇÕES GERAIS]
+    1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
+    2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
+    3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
+    4. Se a resposta demandar algo que não está no contexto detalhado (filteredData), recorra à VISÃO MACRO para dar números totais.
+    5. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 1000 clientes, mas tem ciência das estatísticas globais da base.
     
-    [ORIENTAÇÕES]
-    1. Se o usuário perguntar sobre clientes de uma cidade, use 'find_clients'.
-    2. Se perguntar sobre faturamento ou marcas, use 'analyze_products'.
-    3. Analise cruzamentos: quem compra o quê, onde estão os buracos na rota.
-    4. Resposta Final: Sempre em PT-BR, rica em insights e formatada com Markdown.
-
-    Pergunta: "${prompt}"
+    Pergunta do Usuário:
+    "${prompt}"
   `;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s para analises complexas
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemini-1.5-flash', // Flash é mais resiliente para chamadas de rotina
+        model: 'gemini-1.5-flash',
         prompt: fullPrompt
       }),
       signal: controller.signal
@@ -573,14 +581,15 @@ export const askAssistantRV = async (
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errData = await response.json();
+      const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || `Erro ${response.status}`);
     }
 
     const data = await response.json();
-    return data.text || "Ocorreu um erro ao processar. Tente novamente.";
+    return data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.";
   } catch (error: any) {
     console.error("AssistantRV Error:", error);
+    if (error.name === 'AbortError') throw new Error("Tempo limite excedido.");
     throw new Error(error.message || "Erro de conexão com o Assistente RV.");
   }
 };

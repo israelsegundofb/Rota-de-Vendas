@@ -119,18 +119,6 @@ const App: React.FC = () => {
     isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
 
-  // --- AI MASTER DATA SYNC (1GB+ Knowledge) ---
-  useEffect(() => {
-    if (!masterClientList.length) return;
-
-    const timer = setTimeout(async () => {
-      console.log('[AI SYNC] Disparando sincronização automática de conhecimento...');
-      await syncDataToAI(masterClientList, products);
-    }, 15000); // 15s debounce para garantir que dados pesados sejam enviados apenas em repouso
-
-    return () => clearTimeout(timer);
-  }, [masterClientList.length, products.length]);
-
   // Helper function to distribute products to clients (moved up to fix hoisting)
   const distributeProductsToClients = React.useCallback((clients: EnrichedClient[], allProducts: Product[]) => {
     if (!allProducts || allProducts.length === 0) return;
