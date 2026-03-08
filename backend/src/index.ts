@@ -16,26 +16,10 @@ const port = process.env.PORT || '3001';
 
 // 2. Middlewares
 app.use(cors({
-    origin: (origin, callback) => {
-        const allowedOrigins = [
-            'https://gen-lang-client-0586123917.web.app',
-            'https://israelsegundofb.github.io',
-            'http://localhost:5173',
-            'http://localhost:3000'
-        ];
-        // Allow requests with no origin (like mobile apps or curl requests)
-        // Or check if origin is in our allowed list
-        if (!origin || allowedOrigins.some(o => origin.startsWith(o)) || origin.includes('github.io')) {
-            callback(null, true);
-        } else {
-            console.warn(`[CORS] Rejected origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: true,
-    optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+    optionsSuccessStatus: 200
 }));
 app.use(express.json({ limit: '10mb' }));
 
