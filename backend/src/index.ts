@@ -80,20 +80,28 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
         const aiModel = model || 'gemini-1.5-flash';
         const response: any = await generateAIContent(aiModel, prompt, useMaps);
 
+        if (!response) {
+            throw new Error("Resposta da IA está vazia ou malformada.");
+        }
+
         let responseText = "";
         try {
-            responseText = response.text();
+            responseText = typeof response.text === 'function' ? response.text() : "Resposta inválida do SDK";
         } catch (e) {
             console.warn('[AI SDK] .text() call failed', e);
-            responseText = JSON.stringify(response);
+            responseText = "Erro ao extrair texto da resposta.";
         }
 
         let mapsUri = "";
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks && Array.isArray(chunks)) {
-            const mapChunk = chunks.find((c: any) => c.maps?.uri);
-            if (mapChunk && mapChunk.maps && mapChunk.maps.uri) {
-                mapsUri = mapChunk.maps.uri;
+        // Safely access candidates and grounding metadata
+        const candidates = response.candidates;
+        if (candidates && candidates.length > 0) {
+            const chunks = candidates[0].groundingMetadata?.groundingChunks;
+            if (chunks && Array.isArray(chunks)) {
+                const mapChunk = chunks.find((c: any) => c.maps?.uri);
+                if (mapChunk?.maps?.uri) {
+                    mapsUri = mapChunk.maps.uri;
+                }
             }
         }
 
