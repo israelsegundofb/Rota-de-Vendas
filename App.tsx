@@ -3192,7 +3192,7 @@ const App: React.FC = () => {
             allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter((v): v is string => !!v))),
             productCategories: Array.from(new Set(products.map(p => p.category).filter((v): v is string => !!v))),
             productSections: Array.from(new Set(products.map(p => p.section).filter((v): v is string => !!v))),
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 1000).map((c: EnrichedClient) => ({
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 2500).map((c: EnrichedClient) => ({
               nome: c.companyName,
               cnpj: c.cnpj,
               bairro: c.district,

@@ -558,7 +558,7 @@ export const askAssistantRV = async (
     2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
     3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
     4. Se a resposta demandar algo que não está no contexto detalhado (filteredData), recorra à VISÃO MACRO para dar números totais.
-    5. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 1000 clientes, mas tem ciência das estatísticas globais da base.
+    5. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 2500 clientes, mas tem ciência das estatísticas globais da base.
     
     Pergunta do Usuário:
     "${prompt}"
