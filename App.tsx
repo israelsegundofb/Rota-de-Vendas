@@ -620,29 +620,37 @@ const App: React.FC = () => {
 
   const handleClearPurchases = () => {
     showConfirm(
-      'Limpar Histórico de Vendas?',
+      "Deseja limpar todo o histórico de compras?",
       [
-        '⚠️ Esta ação removerá TODOS os produtos comprados de todos os clientes.',
-        '• Os clientes continuarão cadastrados no sistema.',
-        '• Os arquivos de compras serão removidos da lista.'
+        "⚠️ Esta ação é IRREVERSÍVEL.",
+        "• Todos os registros de compras de TODOS os clientes serão removidos.",
+        "• Arquivos de planilhas de compras também serão excluídos da listagem.",
+        "• Os clientes em si NÃO serão removidos, apenas seu histórico."
       ],
       async () => {
         syncLockRef.current = true;
 
         // 1. Clear ALL purchases from clients (reais e mock/fake)
         const newList = masterClientList.map(c => ({ ...c, purchasedProducts: [] }));
-        setMasterClientList(newList);
+        const newFiles = uploadedFiles.filter(f => f.type !== 'purchases');
 
-        // 2. Clear purchase files
-        setUploadedFiles(prev => prev.filter(f => f.type !== 'purchases'));
+        setMasterClientList(newList);
+        setUploadedFiles(newFiles);
+
+        // 2. Clear LocalStorage for purchases metadata
+        localStorage.removeItem('vendas_ai_files');
 
         // 3. Sync to cloud
         if (isFirebaseConnected) {
           try {
-            await saveToCloud(newList, products, categories, users, uploadedFiles.filter(f => f.type !== 'purchases'));
+            const { saveToCloud, syncUploadedFilesMetadata } = await import('./services/firebaseService');
+            await saveToCloud(newList, products, categories, users, newFiles);
+            await syncUploadedFilesMetadata(newFiles);
             lastClientsHash.current = JSON.stringify(newList, (key, value) => key === 'lastUpdated' ? undefined : value);
+            console.log('[APP] ✅ Purchase history cleared and synced.');
           } catch (e) {
             console.error("Erro ao sincronizar limpeza de vendas:", e);
+            toast.error('Erro ao limpar dados na nuvem.');
           }
         }
 
@@ -1301,65 +1309,76 @@ const App: React.FC = () => {
   const handleDeleteFile = async (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (!file) return;
-
     if (!window.confirm(`Tem certeza que deseja excluir o arquivo "${file.fileName}"?\n\nIsso removerá todos os ${file.itemCount} registros associados.`)) {
       return;
     }
 
+    // 1. Calculate new lists first
+    let newClients = [...masterClientList];
+    let newProducts = [...products];
+    const newFiles = uploadedFiles.filter(f => f.id !== fileId);
+
     if (file.type === 'clients') {
-      setMasterClientList(prev => prev.filter(c => c.sourceFileId !== fileId));
+      newClients = masterClientList.filter(c => c.sourceFileId !== fileId);
     } else if (file.type === 'products') {
-      setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
+      newProducts = products.filter(p => p.sourceFileId !== fileId);
     } else if (file.type === 'purchases') {
-      // Activate sync lock to prevent real-time sync from overwriting during cleanup
-      syncLockRef.current = true;
+      // Deep clean purchasedProducts
+      newClients = masterClientList.map(c => {
+        if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
 
-      setMasterClientList(prev => {
-        // 1. Keep all clients (even those auto-created from this file)
-        // 2. Remove purchase records from clients
-        const newList = prev.map(c => {
-          if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
-          // Deep clean: remove products from this file AND any that might not have a sourceFileId (fake/mock data)
-          const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId && p.sourceFileId !== fileId);
-          if (filteredPurchases.length === c.purchasedProducts.length) return c;
-          return { ...c, purchasedProducts: filteredPurchases };
-        });
+        // Remove items linked to this file OR items with no sourceFileId (legacy junk/mock data)
+        const filteredPurchases = c.purchasedProducts.filter(p =>
+          p.sourceFileId && // Must have an ID
+          p.sourceFileId !== fileId // ID must not be the one being deleted
+        );
 
-        // Force-save the cleaned client list to Firebase IMMEDIATELY using the calculated newList
-        if (isFirebaseConnected && newList.length > 0) {
-          (async () => {
-            try {
-              const newUploadedFilesForSave = uploadedFiles.filter(f => f.id !== fileId);
-              await saveToCloud(newList, products, categories, users, newUploadedFilesForSave);
-              lastClientsHash.current = JSON.stringify(newList, (key, value) => key === 'lastUpdated' ? undefined : value);
-              console.log('[APP] ✅ Purchase deletion force-saved to Firebase.');
-            } catch (e) {
-              console.error('[APP] Failed to force-save purchase deletion:', e);
-            } finally {
-              syncLockRef.current = false;
-            }
-          })();
-        } else {
-          syncLockRef.current = false;
-        }
-
-        return newList;
+        if (filteredPurchases.length === c.purchasedProducts.length) return c;
+        return { ...c, purchasedProducts: filteredPurchases };
       });
     }
 
-    const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
-    setUploadedFiles(newUploadedFiles);
+    // 2. Update states synchronously
+    setMasterClientList(newClients);
+    setProducts(newProducts);
+    setUploadedFiles(newFiles);
 
-    // Fix: Force sync the deleted file array immediately to bypass the 3s auto-save debounce
+    // 3. Perform Cloud Sync sequentially
     if (isFirebaseConnected) {
+      syncLockRef.current = true;
       try {
-        await syncUploadedFilesMetadata(newUploadedFiles);
+        // Force immediate sync to cloud
+        await saveToCloud(newClients, newProducts, categories, users, newFiles);
+
+        // Also sync files metadata specifically if needed
+        await syncUploadedFilesMetadata(newFiles);
+
+        // Update hash to prevent auto-save loop
+        lastClientsHash.current = JSON.stringify(newClients, (key, value) => key === 'lastUpdated' ? undefined : value);
+
+        console.log(`[APP] ✅ File "${file.fileName}" and associated data deleted and synced.`);
       } catch (e) {
-        console.error("Failed to sync file deletion immediately", e);
+        console.error("Failed to sync deletion to cloud:", e);
+        toast.error('Erro ao sincronizar exclusão com a nuvem.');
+      } finally {
+        syncLockRef.current = false;
       }
     }
 
-    // alert("Arquivo e dados associados foram removidos.");
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'DELETE',
+        category: 'SYSTEM',
+        details: `Excluiu o arquivo "${file.fileName}" (${file.type})`,
+        metadata: { fileId, type: file.type }
+      });
+    }
+
+    toast.success(`Arquivo "${file.fileName}" removido.`);
   };
 
   const handleReassignFile = (fileId: string, newSalespersonId: string) => {

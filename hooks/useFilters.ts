@@ -73,34 +73,26 @@ export const useFilters = (
     const currentUserId = currentUser?.id;
     const currentUserRole = currentUser?.role;
 
-    // 1. Visible Clients (Permissions)
+    // 1. Visible Clients (Permissions & Contextual Assignment)
     const visibleClients = useMemo(() => {
         if (!currentUserId || !currentUserRole) return [];
-        let baseList = [];
-        if (hasFullDataVisibility(currentUserRole)) {
-            if (filterSalespersonId !== 'Todos') {
-                // Include clients assigned to this salesperson
-                baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
 
-                // When filtering purchases: ALSO include clients from other salespersons
-                // that have purchases sold by the selected salesperson
-                if (filterOnlyWithPurchases) {
-                    const assignedIds = new Set(baseList.map(c => c.id));
-                    const crossSalespersonClients = masterClientList.filter(c =>
-                        !assignedIds.has(c.id) && // Not already included
-                        c.purchasedProducts && c.purchasedProducts.length > 0 &&
-                        c.purchasedProducts.some(p => p.salespersonId === filterSalespersonId)
-                    );
-                    baseList = [...baseList, ...crossSalespersonClients];
-                }
-            } else {
-                baseList = masterClientList;
-            }
-        } else {
-            baseList = masterClientList.filter(c => c.salespersonId === currentUserId);
+        const isAdminUser = hasFullDataVisibility(currentUserRole);
+        const targetSalespersonId = isAdminUser ? filterSalespersonId : currentUserId;
+
+        if (targetSalespersonId !== 'Todos') {
+            // Logic: A client is "visible" for a salesperson if:
+            // a) The client is assigned to them (c.salespersonId === targetSalespersonId)
+            // b) The salesperson has at least one purchase record for that client
+            return masterClientList.filter(c =>
+                c.salespersonId === targetSalespersonId ||
+                (c.purchasedProducts && c.purchasedProducts.some(p => p.salespersonId === targetSalespersonId))
+            );
         }
-        return baseList;
-    }, [currentUserId, currentUserRole, masterClientList, filterSalespersonId, filterOnlyWithPurchases]);
+
+        // 'Todos' (Admin only)
+        return masterClientList;
+    }, [masterClientList, filterSalespersonId, currentUserId, currentUserRole]);
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
@@ -212,12 +204,23 @@ export const useFilters = (
                 }
             }
 
-            // Only with Purchases Filter: Context-aware
+            // Only with Purchases Filter: Context-aware and robust
             const matchOnlyWithPurchases = !filterOnlyWithPurchases || (
-                c.purchasedProducts && c.purchasedProducts.length > 0 && (
-                    // If salesperson is specified, only match if THEY sold something to this client
-                    (filterSalespersonId === 'Todos' || c.purchasedProducts.some(p => p.salespersonId === filterSalespersonId))
-                )
+                c.purchasedProducts && c.purchasedProducts.some(p => {
+                    // 1. Must have valid value
+                    const hasValue = (p.totalValue && p.totalValue > 0) || (p.price && (p.quantity || 1) > 0);
+                    if (!hasValue) return false;
+
+                    // 2. Must match salesperson if filtered
+                    const matchesSalesperson = filterSalespersonId === 'Todos' || p.salespersonId === filterSalespersonId;
+                    if (!matchesSalesperson) return false;
+
+                    // 3. Must match date range if provided
+                    if (startDate && p.purchaseDate < startDate) return false;
+                    if (endDate && p.purchaseDate > endDate) return false;
+
+                    return true;
+                })
             );
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
