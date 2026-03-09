@@ -120,42 +120,7 @@ const App: React.FC = () => {
   } = useFilters(masterClientList, users, currentUser, products);
 
   // Helper function to distribute products to clients (moved up to fix hoisting)
-  const distributeProductsToClients = React.useCallback((clients: EnrichedClient[], allProducts: Product[]) => {
-    if (!allProducts || allProducts.length === 0) return;
-
-    const updatedClients = clients.map(client => {
-      // If client already has products, keep them unless we want to refresh
-      if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
-
-      // Find products matching client category
-      let eligibleProducts = allProducts.filter(p =>
-        (client.category || []).some(cat =>
-          (p.category || '').toLowerCase().includes((cat || '').toLowerCase()) ||
-          (cat || '').toLowerCase().includes((p.category || '').toLowerCase())
-        )
-      );
-
-      // Fallback if no category match
-      if (eligibleProducts.length === 0) {
-        eligibleProducts = allProducts;
-      }
-
-      // Randomly assign 1-5 products
-      const numProducts = Math.floor(Math.random() * 5) + 1;
-      const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, numProducts);
-
-      return {
-        ...client,
-        purchasedProducts: selected.map(p => ({
-          ...p,
-          purchaseDate: new Date().toISOString()
-        })) as PurchaseRecord[]
-      };
-    });
-
-    setMasterClientList(updatedClients as EnrichedClient[]);
-  }, [setMasterClientList]);
+  // REMOVED: distributeProductsToClients function
 
 
   const missingCoordinatesCount = React.useMemo(() => {
@@ -576,8 +541,7 @@ const App: React.FC = () => {
   const handleUploadProducts = (newProducts: Product[]) => {
     setProducts(prev => {
       const updated = [...prev, ...newProducts];
-      // Distribute products to clients immediately for demo purposes
-      distributeProductsToClients(masterClientList, updated);
+      // REMOVED: distributeProductsToClients(masterClientList, updated);
 
       if (currentUser) {
         logActivityToCloud({
@@ -596,8 +560,6 @@ const App: React.FC = () => {
 
   const handleSaveProducts = (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
-    // Optionally redistribute if products logic changes significantly, though strictly not needed for simple price updates
-    // distributeProductsToClients(masterClientList, updatedProducts);
   };
 
   const handleClearProducts = React.useCallback(() => {
@@ -667,7 +629,7 @@ const App: React.FC = () => {
       async () => {
         syncLockRef.current = true;
 
-        // 1. Clear purchases from clients
+        // 1. Clear ALL purchases from clients (reais e mock/fake)
         const newList = masterClientList.map(c => ({ ...c, purchasedProducts: [] }));
         setMasterClientList(newList);
 
@@ -1357,7 +1319,8 @@ const App: React.FC = () => {
         // 2. Remove purchase records from clients
         const newList = prev.map(c => {
           if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
-          const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
+          // Deep clean: remove products from this file AND any that might not have a sourceFileId (fake/mock data)
+          const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId && p.sourceFileId !== fileId);
           if (filteredPurchases.length === c.purchasedProducts.length) return c;
           return { ...c, purchasedProducts: filteredPurchases };
         });
