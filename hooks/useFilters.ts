@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { EnrichedClient, AppUser, Product } from '../types';
 import { isAdmin, hasFullDataVisibility } from '../utils/authUtils';
+import { isValidPurchase } from '../utils/purchaseUtils';
 import useDebounce from './useDebounce';
 import { useUrlParams } from './useUrlParams';
 
@@ -206,21 +207,9 @@ export const useFilters = (
 
             // Only with Purchases Filter: Context-aware and robust
             const matchOnlyWithPurchases = !filterOnlyWithPurchases || (
-                c.purchasedProducts && c.purchasedProducts.some(p => {
-                    // 1. Must have valid value
-                    const hasValue = (p.totalValue && p.totalValue > 0) || (p.price && (p.quantity || 1) > 0);
-                    if (!hasValue) return false;
-
-                    // 2. Must match salesperson if filtered
-                    const matchesSalesperson = filterSalespersonId === 'Todos' || p.salespersonId === filterSalespersonId;
-                    if (!matchesSalesperson) return false;
-
-                    // 3. Must match date range if provided
-                    if (startDate && p.purchaseDate < startDate) return false;
-                    if (endDate && p.purchaseDate > endDate) return false;
-
-                    return true;
-                })
+                c.purchasedProducts && c.purchasedProducts.some(p =>
+                    isValidPurchase(p, filterSalespersonId, startDate, endDate)
+                )
             );
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;

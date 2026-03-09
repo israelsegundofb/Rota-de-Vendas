@@ -2795,10 +2795,11 @@ const App: React.FC = () => {
                               clients={finalFilteredClients}
                               apiKey={googleMapsApiKey}
                               onInvalidKey={handleInvalidKey}
-                              productFilterActive={isProductFilterActive}
-                              highlightProductTerm={searchProductQuery}
                               activeProductCategory={filterProductCategory}
-                              users={users} // Pass users for color coding
+                              users={users}
+                              filterSalespersonId={filterSalespersonId}
+                              startDate={startDate}
+                              endDate={endDate}
                               filterContent={
                                 <div className="bg-gray-100/95 backdrop-blur-sm px-3 py-2 flex flex-col gap-1.5">
                                   {/* Primary Filters Row */}
@@ -3043,7 +3044,6 @@ const App: React.FC = () => {
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
                           onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
-
                           searchTerm={searchQuery}
                           onSearchChange={setSearchQuery}
                           regionFilter={filterRegion}
@@ -3052,6 +3052,9 @@ const App: React.FC = () => {
                           onCategoryFilterChange={setFilterCategory}
                           allClients={masterClientList}
                           onMergeClients={handleMergeClients}
+                          filterSalespersonId={filterSalespersonId}
+                          startDate={startDate}
+                          endDate={endDate}
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
