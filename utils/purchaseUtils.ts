@@ -8,9 +8,9 @@ export const isValidPurchase = (p: PurchaseRecord, filterSalespersonId?: string,
     // 1. Deve ter vínculo de arquivo (sourceFileId) para não ser dado fictício/órfão
     if (!p.sourceFileId) return false;
 
-    // 2. Deve ter valor monetário ou preço/quantidade válidos
-    const hasValue = (p.totalValue && p.totalValue > 0) || (p.price && (p.quantity || 1) > 0);
-    if (!hasValue) return false;
+    // 2. Deve ter quantidade válida ou valor monetário
+    const hasPurchaseData = (p.quantity && p.quantity > 0) || (p.totalValue && p.totalValue > 0) || (p.price && p.price > 0);
+    if (!hasPurchaseData) return false;
 
     // 3. Filtro de Vendedor (opcional)
     if (filterSalespersonId && filterSalespersonId !== 'Todos' && p.salespersonId !== filterSalespersonId) {
