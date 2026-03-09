@@ -1352,7 +1352,6 @@ const App: React.FC = () => {
       // Activate sync lock to prevent real-time sync from overwriting during cleanup
       syncLockRef.current = true;
 
-      let updatedClientList: typeof masterClientList = [];
       setMasterClientList(prev => {
         // 1. Keep all clients (even those auto-created from this file)
         // 2. Remove purchase records from clients
@@ -1363,23 +1362,26 @@ const App: React.FC = () => {
           return { ...c, purchasedProducts: filteredPurchases };
         });
 
-        updatedClientList = newList;
+        // Force-save the cleaned client list to Firebase IMMEDIATELY using the calculated newList
+        if (isFirebaseConnected && newList.length > 0) {
+          (async () => {
+            try {
+              const newUploadedFilesForSave = uploadedFiles.filter(f => f.id !== fileId);
+              await saveToCloud(newList, products, categories, users, newUploadedFilesForSave);
+              lastClientsHash.current = JSON.stringify(newList, (key, value) => key === 'lastUpdated' ? undefined : value);
+              console.log('[APP] ✅ Purchase deletion force-saved to Firebase.');
+            } catch (e) {
+              console.error('[APP] Failed to force-save purchase deletion:', e);
+            } finally {
+              syncLockRef.current = false;
+            }
+          })();
+        } else {
+          syncLockRef.current = false;
+        }
+
         return newList;
       });
-
-      // Force-save the cleaned client list to Firebase
-      if (isFirebaseConnected && updatedClientList.length > 0) {
-        try {
-          const newUploadedFilesForSave = uploadedFiles.filter(f => f.id !== fileId);
-          await saveToCloud(updatedClientList, products, categories, users, newUploadedFilesForSave);
-          lastClientsHash.current = JSON.stringify(updatedClientList, (key, value) => key === 'lastUpdated' ? undefined : value);
-          console.log('[APP] ✅ Purchase deletion force-saved to Firebase.');
-        } catch (e) {
-          console.error('[APP] Failed to force-save purchase deletion:', e);
-        }
-      }
-
-      syncLockRef.current = false;
     }
 
     const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
@@ -1680,9 +1682,14 @@ const App: React.FC = () => {
             // UPDATE CLIENT: ACCUMULATE AND MERGE (With Duplicate Prevention)
             const existingHistory = newList[clientIdx].purchasedProducts || [];
 
-            // Filter out records that already exist (Same SKU and Same Date)
+            // Filter out records that already exist (Same SKU, Same Date AND Same Salesperson)
+            // This allows the same product sale to be recorded if made by a different person (e.g. split regions)
             const filteredNewProducts = newPurchasedProducts.filter(newP =>
-              !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate)
+              !existingHistory.some(oldP =>
+                oldP.sku === newP.sku &&
+                oldP.purchaseDate === newP.purchaseDate &&
+                oldP.salespersonId === newP.salespersonId
+              )
             );
 
             if (filteredNewProducts.length > 0) {
