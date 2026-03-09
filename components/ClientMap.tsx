@@ -597,33 +597,47 @@ const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, pr
                         Produtos Adquiridos
                       </p>
                       <div className="max-h-40 overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
-                        {selectedClient.purchasedProducts.map((prod, idx) => {
-                          const term = highlightProductTerm?.toLowerCase() || '';
-                          const isMatch = term && (
-                            (prod.name || '').toLowerCase().includes(term) ||
-                            (prod.sku || '').toLowerCase().includes(term) ||
-                            (prod.brand || '').toLowerCase().includes(term) ||
-                            (prod.factoryCode || '').toLowerCase().includes(term)
+                        {(() => {
+                          const activePurchases = getFilteredPurchases(
+                            selectedClient.purchasedProducts,
+                            filterSalespersonId,
+                            startDate || undefined,
+                            endDate || undefined
                           );
 
-                          return (
-                            <div key={idx} className={`${isMatch ? 'bg-amber-50 border-amber-200 ring-1 ring-amber-100' : 'bg-gray-50 border-gray-100'} p-2 rounded-lg border flex flex-col gap-0.5 transition-all shadow-sm`}>
-                              <div className="flex justify-between items-start gap-2">
-                                <span className={`text-[10px] font-black leading-tight ${isMatch ? 'text-amber-900' : 'text-gray-800'} line-clamp-2`} title={prod.name}>
-                                  {prod.name}
-                                </span>
-                                <span className="text-[10px] font-black text-blue-700 whitespace-nowrap">
-                                  {prod.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                </span>
+                          return activePurchases.map((prod, idx) => {
+                            const term = highlightProductTerm?.toLowerCase() || '';
+                            const isMatch = term && (
+                              (prod.name || '').toLowerCase().includes(term) ||
+                              (prod.sku || '').toLowerCase().includes(term) ||
+                              (prod.brand || '').toLowerCase().includes(term) ||
+                              (prod.factoryCode || '').toLowerCase().includes(term)
+                            );
+
+                            return (
+                              <div key={idx} className={`${isMatch ? 'bg-amber-50 border-amber-200 ring-1 ring-amber-100' : 'bg-gray-50 border-gray-100'} p-2 rounded-lg border flex flex-col gap-0.5 transition-all shadow-sm`}>
+                                <div className="flex justify-between items-start gap-2">
+                                  <span className={`text-[10px] font-black leading-tight ${isMatch ? 'text-amber-900' : 'text-gray-800'} line-clamp-2`} title={prod.name}>
+                                    {prod.name}
+                                  </span>
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[10px] font-black text-blue-700 whitespace-nowrap">
+                                      {prod.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1 rounded border border-green-100 mt-0.5">
+                                      Qtd: {prod.quantity || 1}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 text-[9px] text-gray-500 font-bold uppercase tracking-tighter mt-0.5">
+                                  <span className="flex items-center gap-0.5 bg-gray-200/50 px-1 rounded">SKU: {prod.sku}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span className="truncate">{prod.brand || 'Sem Marca'}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2 text-[9px] text-gray-500 font-bold uppercase tracking-tighter mt-0.5">
-                                <span className="flex items-center gap-0.5 bg-gray-200/50 px-1 rounded">SKU: {prod.sku}</span>
-                                <span className="text-gray-300">•</span>
-                                <span className="truncate">{prod.brand || 'Sem Marca'}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
                   )}
