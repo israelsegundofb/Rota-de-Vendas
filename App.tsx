@@ -168,6 +168,7 @@ const App: React.FC = () => {
         if (settings.googleMapsApiKey) {
            setGoogleMapsApiKey(settings.googleMapsApiKey);
            console.log('[APP] Google Maps API Key injetada pelo Cloud.');
+           setIsMapApiBroken(false); // Reset error state if a valid key is found
            setKeyVersion(v => v + 1); // Force map re-render when key arrives
         }
         if (settings.cnpjaApiKey) {
