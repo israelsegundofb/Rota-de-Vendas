@@ -11,9 +11,9 @@ const testSearch = async () => {
     try {
         const results = await searchKnowledgeBase(query, 3);
         console.log(`Resultados encontrados: ${results.length}`);
-        results.forEach((r, i) => {
+        results.forEach((r: any, i: number) => {
             console.log(`\n--- Resultado ${i+1} (Score: ${r.score}) ---`);
-            console.log(`Documento: ${r.document}`);
+            console.log(`Documento: ${r.documentTitle || 'N/A'}`);
             console.log(`Conteúdo do Chunk: ${r.content}`);
         });
         

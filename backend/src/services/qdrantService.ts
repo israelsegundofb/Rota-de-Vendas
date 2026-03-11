@@ -12,7 +12,7 @@ let genAI: GoogleGenerativeAI | null = null;
 const GEMINI_EMBEDDING_DIM = 3072; 
 
 // Initializers
-const getQdrantClient = () => {
+export const getQdrantClient = () => {
     if (!qdrantClient) {
         const url = process.env.QDRANT_URL;
         const apiKey = process.env.QDRANT_API_KEY;
