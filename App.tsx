@@ -162,8 +162,10 @@ const App: React.FC = () => {
     if (isFirebaseConnected) {
       unsubscribe = subscribeToSystemSettings((settings) => {
         if (settings.geminiApiKey) {
+           console.log('[APP] Gemini API Key recebida:', settings.geminiApiKey.substring(0, 6) + '...');
            setActiveApiKey(settings.geminiApiKey);
-           console.log('[APP] Gemini API Key injetada pelo Cloud.');
+        } else {
+           console.warn('[APP] Gemini API Key não encontrada no Firestore.');
         }
         if (settings.googleMapsApiKey) {
            setGoogleMapsApiKey(settings.googleMapsApiKey);

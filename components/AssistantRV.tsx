@@ -66,6 +66,7 @@ export const AssistantRV = ({ isOpen, setIsOpen, context, geminiApiKey }: Assist
         setIsLoading(true);
 
         try {
+            console.log('[ASSISTANT] Enviando pergunta. Chave presente:', !!geminiApiKey);
             const result = await askAssistantRV(userMsg, context, sessionId, geminiApiKey);
             if (result.sessionId) setSessionId(result.sessionId);
 
