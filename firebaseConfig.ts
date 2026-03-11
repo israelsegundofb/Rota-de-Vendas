@@ -14,10 +14,8 @@ export interface FirebaseConfig {
 }
 
 export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
-    const stored = localStorage.getItem('firebase_config');
-    if (stored) return JSON.parse(stored);
-
-    const config = {
+    // 1. Prioridade máxima: Variáveis de ambiente fixas (.env) injetadas pelo Vite
+    const envConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
@@ -26,12 +24,20 @@ export const getStoredFirebaseConfig = (): FirebaseConfig | null => {
         appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
     };
 
+    if (envConfig.apiKey && envConfig.projectId) {
+        return envConfig;
+    }
+
+    // 2. Se não encontrou no .env, tenta recuperar do armazenamento local do navegador
+    const stored = localStorage.getItem('firebase_config');
+    if (stored) return JSON.parse(stored);
+
     // Debug: Verificar presença das chaves (apenas primeiros caracteres)
     console.log('[FIREBASE] Environment Config Check:');
-    console.log('- API Key:', config.apiKey ? `FOUND (${config.apiKey.substring(0, 5)}...)` : 'MISSING ❌');
-    console.log('- Project ID:', config.projectId ? `FOUND (${config.projectId})` : 'MISSING ❌');
+    console.log('- API Key:', envConfig.apiKey ? `FOUND (${envConfig.apiKey.substring(0, 5)}...)` : 'MISSING ❌');
+    console.log('- Project ID:', envConfig.projectId ? `FOUND (${envConfig.projectId})` : 'MISSING ❌');
 
-    return config;
+    return envConfig;
 };
 
 export const saveFirebaseConfig = (config: FirebaseConfig) => {
