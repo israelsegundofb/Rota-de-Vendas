@@ -1435,11 +1435,18 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = (updatedUser: AppUser) => {
+    // Security: If password is masked '***', preserve the original password from master state
+    const existingUser = users.find(u => u.id === updatedUser.id);
+    const finalUser = {
+      ...updatedUser,
+      password: updatedUser.password === '***' ? (existingUser?.password || updatedUser.password) : updatedUser.password
+    };
+
     // 1. Local update
-    baseUpdateUser(updatedUser);
+    baseUpdateUser(finalUser);
 
     // 2. Immediate Cloud Save
-    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    const updatedUsers = users.map(u => u.id === finalUser.id ? finalUser : u);
     saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
       .then(() => console.warn('[AUTH] Atualização de usuário na nuvem concluída ✅'))
       .catch(e => console.error('[AUTH] Falha no salvamento imediato da atualização:', e));
@@ -2310,7 +2317,7 @@ const App: React.FC = () => {
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminUserManagement
                     currentUser={currentUser}
-                    users={users}
+                    users={currentUser?.role === 'admin_dev' ? users : publicUsers}
                     onAddUser={handleAddUser}
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
@@ -2345,7 +2352,7 @@ const App: React.FC = () => {
               <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Arquivos..." />}>
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminFileManager
-                    users={users}
+                    users={publicUsers}
                     uploadedFiles={uploadedFiles}
                     onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
                     onUploadProducts={handleProductFileUpload}
@@ -2381,7 +2388,7 @@ const App: React.FC = () => {
                   <AdminDashboard
                     clients={finalFilteredClients}
                     products={products}
-                    users={users}
+                    users={publicUsers}
                     onClose={() => setActiveView('map')}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
