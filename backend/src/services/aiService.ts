@@ -14,7 +14,10 @@ const getAIClient = () => {
     return genAI;
 };
 
-export const generateAIContent = async (modelName: string, prompt: string, useMaps: boolean = false) => {
+// In-memory conversation history storage
+const activeSessions: Record<string, any> = {};
+
+export const generateAIContent = async (modelName: string, prompt: string, useMaps: boolean = false, sessionId?: string) => {
     try {
         const client = getAIClient();
         if (!client) throw new Error("GEMINI_API_KEY não configurada no servidor.");
@@ -34,8 +37,19 @@ export const generateAIContent = async (modelName: string, prompt: string, useMa
             tools: toolsConfig.length > 0 ? toolsConfig : undefined
         });
 
-        // Use startChat to handle the multi-turn function calling flow
-        const chat = model.startChat();
+        // Resolve which chat session to use
+        let chat;
+        const currentSessionId = sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        if (activeSessions[currentSessionId]) {
+            chat = activeSessions[currentSessionId];
+            console.log(`[AI SERVICE] Resuming existing chat session: ${currentSessionId}`);
+        } else {
+            chat = model.startChat();
+            activeSessions[currentSessionId] = chat;
+            console.log(`[AI SERVICE] Created new chat session: ${currentSessionId}`);
+        }
+
         let result = await chat.sendMessage(augmentedPrompt);
 
         // Handle Function Calling Loop
@@ -70,7 +84,10 @@ export const generateAIContent = async (modelName: string, prompt: string, useMa
             currentLoop++;
         }
 
-        return result.response;
+        return {
+            response: result.response,
+            sessionId: currentSessionId
+        };
     } catch (error) {
         console.error('[AI SERVICE ERROR]:', error);
         throw error;

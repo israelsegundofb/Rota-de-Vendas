@@ -531,8 +531,9 @@ export const categorizeProductsWithAI = async (
  */
 export const askAssistantRV = async (
   prompt: string,
-  context: AssistantContext
-): Promise<string> => {
+  context: AssistantContext,
+  sessionId?: string
+): Promise<{ text: string, sessionId: string }> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   // Build the super-prompt with context
@@ -598,7 +599,8 @@ export const askAssistantRV = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gemini-2.0-flash',
-        prompt: fullPrompt
+        prompt: fullPrompt,
+        sessionId: sessionId
       }),
       signal: controller.signal
     });
@@ -611,7 +613,10 @@ export const askAssistantRV = async (
     }
 
     const data = await response.json();
-    return data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.";
+    return {
+      text: data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.",
+      sessionId: data.sessionId
+    };
   } catch (error: any) {
     console.error("AssistantRV Error:", error);
     if (error.name === 'AbortError') throw new Error("Tempo limite excedido.");
