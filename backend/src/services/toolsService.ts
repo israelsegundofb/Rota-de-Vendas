@@ -47,10 +47,24 @@ export const aiTools = [
 let masterClients: any[] = [];
 let masterProducts: any[] = [];
 
-export const syncMasterData = (clients: any[], products: any[]) => {
+import { ensureCollectionsExist, indexClients } from './qdrantService';
+
+export const syncMasterData = async (clients: any[], products: any[]) => {
     masterClients = clients;
     masterProducts = products;
-    console.log(`[STORAGE] Sincronizados ${clients.length} clientes e ${products.length} produtos.`);
+    console.log(`[STORAGE] Sincronizados ${clients.length} clientes e ${products.length} produtos em memória.`);
+
+    // Async Qdrant Sync Trigger
+    try {
+        await ensureCollectionsExist();
+        
+        // Fire and forget Qdrant indexing so it doesn't block the frontend upload response
+        indexClients(clients).catch(err => {
+            console.error('[QDRANT] Background Indexing Error:', err);
+        });
+    } catch (e) {
+        console.error('[QDRANT INITIALIZATION EXCEPTION]', e);
+    }
 };
 
 export const toolHandlers: Record<string, (args: any) => any> = {
