@@ -285,9 +285,22 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
     useEffect(() => {
         if (users.length > 0) {
-            localStorage.setItem('vendas_ai_users', JSON.stringify(users));
+            // SEGURANÇA: Nunca salvar senhas no LocalStorage do navegador
+            const sanitizedUsers = users.map(({ password, ...rest }) => rest);
+            localStorage.setItem('vendas_ai_users', JSON.stringify(sanitizedUsers));
         }
     }, [users]);
+
+    // Limpeza de Segurança: Remover chaves sensíveis legadas que podem estar no LocalStorage
+    useEffect(() => {
+        const sensitiveKeys = ['cnpja_api_key', 'google_maps_api_key', 'gemini_api_key', 'firebase_config'];
+        sensitiveKeys.forEach(key => {
+            if (localStorage.getItem(key)) {
+                console.log(`[SECURITY] Removendo chave sensível órfã do LocalStorage: ${key}`);
+                localStorage.removeItem(key);
+            }
+        });
+    }, []);
 
     return {
         masterClientList,

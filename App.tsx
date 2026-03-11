@@ -174,7 +174,7 @@ const App: React.FC = () => {
            setKeyVersion(v => v + 1); // Force map re-render when key arrives
         }
         if (settings.cnpjaApiKey) {
-            localStorage.setItem('cnpja_api_key', settings.cnpjaApiKey);
+           console.log('[APP] CNPJa API Key injetada pelo Cloud.');
         }
       });
     }

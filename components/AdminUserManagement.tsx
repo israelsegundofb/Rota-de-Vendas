@@ -523,7 +523,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-1">
                   <span>Senha:</span>
-                  <span className="font-mono">{user.password || '***'}</span>
+                  <span className="font-mono">********</span>
                 </div>
               </div>
 
