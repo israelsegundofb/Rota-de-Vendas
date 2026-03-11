@@ -14,20 +14,29 @@ const getAIClient = (apiKeyOverride?: string, firestoreKey?: string) => {
     let source = "NONE";
     let apiKey = "";
 
-    if (apiKeyOverride && apiKeyOverride.trim().length > 10) {
-        apiKey = apiKeyOverride.trim();
+    const clean = (k: string | undefined) => (k || '').trim();
+
+    if (clean(apiKeyOverride).length > 10) {
+        apiKey = clean(apiKeyOverride);
         source = "HEADER";
-    } else if (firestoreKey && firestoreKey.trim().length > 10) {
-        apiKey = firestoreKey.trim();
+    } else if (clean(firestoreKey).length > 10) {
+        apiKey = clean(firestoreKey);
         source = "FIRESTORE";
-    } else {
-        apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    } else if (clean(process.env.GEMINI_API_KEY).length > 10) {
+        apiKey = clean(process.env.GEMINI_API_KEY);
         source = "ENV";
     }
     
-    // Re-initialize only if the key has changed
-    if ((!genAI || apiKey !== currentKey) && apiKey) {
-        console.log(`[AI SERVICE] Initializing client with key from ${source}: ${apiKey.substring(0, 8)}...`);
+    if (!apiKey) {
+        console.error('[AI SERVICE] No valid API Key found in any source (Header, Firestore, or ENV).');
+        genAI = null;
+        currentKey = null;
+        return null;
+    }
+
+    // Re-initialize if the key changed or if genAI is null
+    if (!genAI || apiKey !== currentKey) {
+        console.log(`[AI SERVICE] 🔑 Initializing Gemini Client | Source: ${source} | Key: ${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}`);
         genAI = new GoogleGenerativeAI(apiKey);
         currentKey = apiKey;
     }
