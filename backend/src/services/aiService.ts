@@ -11,11 +11,23 @@ let currentKey: string | null = null;
 
 const getAIClient = (apiKeyOverride?: string, firestoreKey?: string) => {
     // Priority: 1. Instant Header Override | 2. Database Key | 3. Environment Fallback
-    const apiKey = apiKeyOverride || firestoreKey || process.env.GEMINI_API_KEY || '';
+    let source = "NONE";
+    let apiKey = "";
+
+    if (apiKeyOverride && apiKeyOverride.trim().length > 10) {
+        apiKey = apiKeyOverride.trim();
+        source = "HEADER";
+    } else if (firestoreKey && firestoreKey.trim().length > 10) {
+        apiKey = firestoreKey.trim();
+        source = "FIRESTORE";
+    } else {
+        apiKey = (process.env.GEMINI_API_KEY || '').trim();
+        source = "ENV";
+    }
     
     // Re-initialize only if the key has changed
     if ((!genAI || apiKey !== currentKey) && apiKey) {
-        console.log(`[AI SERVICE] Initializing client with key: ${apiKey.substring(0, 8)}...`);
+        console.log(`[AI SERVICE] Initializing client with key from ${source}: ${apiKey.substring(0, 8)}...`);
         genAI = new GoogleGenerativeAI(apiKey);
         currentKey = apiKey;
     }
