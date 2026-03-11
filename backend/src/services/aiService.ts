@@ -121,8 +121,17 @@ export const generateAIContent = async (modelName: string, prompt: string, useMa
             response: result.response,
             sessionId: currentSessionId
         };
-    } catch (error) {
+    } catch (error: any) {
         console.error('[AI SERVICE ERROR]:', error);
-        throw error;
+        
+        // Final check on source for the error message
+        const settings = await getSecureSettings();
+        const firestoreKey = settings?.geminiApiKey;
+        let source = "UNKNOWN";
+        if (apiKeyOverride && apiKeyOverride.trim().length > 10) source = "HEADER";
+        else if (firestoreKey && firestoreKey.trim().length > 10) source = "FIRESTORE";
+        else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10) source = "ENV";
+
+        throw new Error(`[Gemini ${source} Error]: ${error.message || error}`);
     }
 };
