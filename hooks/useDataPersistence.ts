@@ -266,37 +266,20 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         }
     }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
 
-    // Local Persistence
-    useEffect(() => {
-        localStorage.setItem('vendas_ai_clients', JSON.stringify(masterClientList));
-    }, [masterClientList]);
+    // PERSISTÊNCIA REMOVIDA: Dados agora vivem apenas na memória RAM para segurança total.
 
-    useEffect(() => {
-        localStorage.setItem('vendas_ai_categories', JSON.stringify(categories));
-    }, [categories]);
+    // PERSISTÊNCIA REMOVIDA: Nenhuma informação de usuário ou senha fica salva no disco.
 
+    // Limpeza de Segurança: Purga total de dados sensíveis e cache do LocalStorage
     useEffect(() => {
-        localStorage.setItem('vendas_ai_products', JSON.stringify(products));
-    }, [products]);
-
-    useEffect(() => {
-        localStorage.setItem('vendas_ai_files', JSON.stringify(uploadedFiles));
-    }, [uploadedFiles]);
-
-    useEffect(() => {
-        if (users.length > 0) {
-            // SEGURANÇA: Nunca salvar senhas no LocalStorage do navegador
-            const sanitizedUsers = users.map(({ password, ...rest }) => rest);
-            localStorage.setItem('vendas_ai_users', JSON.stringify(sanitizedUsers));
-        }
-    }, [users]);
-
-    // Limpeza de Segurança: Remover chaves sensíveis legadas que podem estar no LocalStorage
-    useEffect(() => {
-        const sensitiveKeys = ['cnpja_api_key', 'google_maps_api_key', 'gemini_api_key', 'firebase_config'];
+        const sensitiveKeys = [
+            'cnpja_api_key', 'google_maps_api_key', 'gemini_api_key', 'firebase_config',
+            'vendas_ai_clients', 'vendas_ai_products', 'vendas_ai_categories', 
+            'vendas_ai_files', 'vendas_ai_users'
+        ];
         sensitiveKeys.forEach(key => {
             if (localStorage.getItem(key)) {
-                console.log(`[SECURITY] Removendo chave sensível órfã do LocalStorage: ${key}`);
+                console.log(`[SECURITY] Purgando dado sensível do disco do navegador: ${key}`);
                 localStorage.removeItem(key);
             }
         });

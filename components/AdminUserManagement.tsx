@@ -258,11 +258,11 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
           <div>
             <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Senha</label>
             <input
-              type="text"
+              type={currentUser.role === 'admin_dev' ? "text" : "password"}
               value={password}
               onChange={e => setPassword(e.target.value)}
               className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
-              placeholder="Senha de acesso"
+              placeholder="••••••"
             />
           </div>
 

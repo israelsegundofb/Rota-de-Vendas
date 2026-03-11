@@ -72,7 +72,7 @@ interface ProcessingState {
 const App: React.FC = () => {
   // --- Custom Hooks ---
   const {
-    users, setUsers, currentUser, login, logout: authLogout,
+    users, publicUsers, setUsers, currentUser, login, logout: authLogout,
     addUser: baseAddUser, updateUser: baseUpdateUser, deleteUser: baseDeleteUser
   } = useAuth();
 
@@ -139,7 +139,7 @@ const App: React.FC = () => {
     messages, conversations, activeConversationId, setActiveConversationId,
     sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread,
     deleteMessage: handleChatDeleteMessage, clearMessages: handleChatClearMessages
-  } = useChat(currentUser, users);
+  } = useChat(currentUser, publicUsers);
 
   // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
@@ -2244,7 +2244,7 @@ const App: React.FC = () => {
                 onSave={handleUpdateClient}
                 client={selectedClient}
 
-                users={users}
+                users={publicUsers}
                 allClients={masterClientList}
               />
             )}
