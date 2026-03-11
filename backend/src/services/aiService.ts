@@ -4,12 +4,20 @@ import dotenv from 'dotenv';
 
 dotenv.config({ override: true });
 
-let genAI: any = null;
+import { getSecureSettings } from "./settingsService";
 
-const getAIClient = () => {
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    if (!genAI && apiKey) {
+let genAI: any = null;
+let currentKey: string | null = null;
+
+const getAIClient = (apiKeyOverride?: string, firestoreKey?: string) => {
+    // Priority: 1. Instant Header Override | 2. Database Key | 3. Environment Fallback
+    const apiKey = apiKeyOverride || firestoreKey || process.env.GEMINI_API_KEY || '';
+    
+    // Re-initialize only if the key has changed
+    if ((!genAI || apiKey !== currentKey) && apiKey) {
+        console.log(`[AI SERVICE] Initializing client with key: ${apiKey.substring(0, 8)}...`);
         genAI = new GoogleGenerativeAI(apiKey);
+        currentKey = apiKey;
     }
     return genAI;
 };
@@ -17,10 +25,14 @@ const getAIClient = () => {
 // In-memory conversation history storage
 const activeSessions: Record<string, any> = {};
 
-export const generateAIContent = async (modelName: string, prompt: string, useMaps: boolean = false, sessionId?: string) => {
+export const generateAIContent = async (modelName: string, prompt: string, useMaps: boolean = false, sessionId?: string, apiKeyOverride?: string) => {
     try {
-        const client = getAIClient();
-        if (!client) throw new Error("GEMINI_API_KEY não configurada no servidor.");
+        // Fetch key from Firestore in background (with cache)
+        const settings = await getSecureSettings();
+        const firestoreKey = settings?.geminiApiKey;
+
+        const client = getAIClient(apiKeyOverride, firestoreKey);
+        if (!client) throw new Error("A chave do Gemini não foi encontrada no servidor nem no Firestore.");
 
         let augmentedPrompt = prompt;
 

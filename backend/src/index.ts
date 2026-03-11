@@ -78,7 +78,9 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
 
         // Force stable gemini-2.0-flash for best compatibility and speed
         const aiModel = model || 'gemini-2.0-flash';
-        const aiResult: any = await generateAIContent(aiModel, prompt, useMaps, sessionId);
+        const apiKeyHeader = req.headers['x-gemini-key'] as string;
+        
+        const aiResult: any = await generateAIContent(aiModel, prompt, useMaps, sessionId, apiKeyHeader);
         const response = aiResult.response;
         const returnedSessionId = aiResult.sessionId;
 

@@ -3147,6 +3147,7 @@ const App: React.FC = () => {
         <AssistantRV
           isOpen={isAssistantOpen}
           setIsOpen={setIsAssistantOpen}
+          geminiApiKey={activeApiKey}
           context={{
             userName: currentUser.name || 'Usuário',
             userRole: currentUser.role || 'Geral',

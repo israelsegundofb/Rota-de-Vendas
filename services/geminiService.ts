@@ -532,7 +532,8 @@ export const categorizeProductsWithAI = async (
 export const askAssistantRV = async (
   prompt: string,
   context: AssistantContext,
-  sessionId?: string
+  sessionId?: string,
+  geminiApiKey?: string
 ): Promise<{ text: string, sessionId: string }> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -589,12 +590,15 @@ export const askAssistantRV = async (
 
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gemini-2.0-flash',
-        prompt: fullPrompt,
-        sessionId: sessionId
-      }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Gemini-Key': geminiApiKey || ''
+        },
+        body: JSON.stringify({
+          model: 'gemini-2.0-flash',
+          prompt: fullPrompt,
+          sessionId: sessionId
+        }),
       signal: controller.signal
     });
 

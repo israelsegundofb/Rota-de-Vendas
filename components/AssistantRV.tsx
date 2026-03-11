@@ -10,14 +10,14 @@ interface Message {
     role: 'user' | 'assistant' | 'system';
     content: string;
 }
-
 interface AssistantRVProps {
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
     context: AssistantContext;
+    geminiApiKey?: string;
 }
 
-export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) => {
+export const AssistantRV = ({ isOpen, setIsOpen, context, geminiApiKey }: AssistantRVProps) => {
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
@@ -66,7 +66,7 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
         setIsLoading(true);
 
         try {
-            const result = await askAssistantRV(userMsg, context, sessionId);
+            const result = await askAssistantRV(userMsg, context, sessionId, geminiApiKey);
             if (result.sessionId) setSessionId(result.sessionId);
 
             const assistantMsg: Message = {
