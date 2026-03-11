@@ -71,6 +71,28 @@ export const aiTools = [
                 query: { type: "string", description: "A dúvida institucional ou sobre regras" }
             }
         }
+    },
+    {
+        name: "externo_lookup_cnpj",
+        description: "Busca dados oficiais de uma empresa na internet (Receita Federal) através do número do CNPJ. Use quando o cliente não estiver na nossa base local ou quando precisar de dados atualizados da internet.",
+        parameters: {
+            type: "object",
+            properties: {
+                cnpj: { type: "string", description: "O número do CNPJ (apenas números ou formatado)" }
+            },
+            required: ["cnpj"]
+        }
+    },
+    {
+        name: "externo_search_empresa",
+        description: "Busca empresas na internet (Brasil) pelo Nome Fantasia ou Razão Social. Use para descobrir o CNPJ de prospectos ou empresas que o vendedor mencionou mas não conhece o documento.",
+        parameters: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "Nome da empresa, razão social ou termo de busca" }
+            },
+            required: ["query"]
+        }
     }
 ];
 
@@ -80,6 +102,8 @@ let masterClients: any[] = [];
 let masterProducts: any[] = [];
 
 import { ensureCollectionsExist, indexClients, indexProducts, searchClients, searchProducts, searchKnowledgeBase } from './qdrantService';
+import { lookupCNPJExternal, searchCompanyByNameExternal } from "./cnpjService";
+import dotenv from 'dotenv';
 
 export const syncMasterData = async (clients: any[], products: any[]) => {
     masterClients = clients;
@@ -174,6 +198,20 @@ export const toolHandlers: Record<string, (args: any) => any> = {
         return {
             rag_chunks_found: results.length,
             relevant_excerpts: results
+        };
+    },
+    externo_lookup_cnpj: async (args) => {
+        const { cnpj } = args;
+        const result = await lookupCNPJExternal(cnpj);
+        if (!result) return { error: "CNPJ não encontrado nas bases externas (BrasilAPI/CNPJa)." };
+        return result;
+    },
+    externo_search_empresa: async (args) => {
+        const { query } = args;
+        const results = await searchCompanyByNameExternal(query);
+        return {
+            total_found: results.length,
+            results: results
         };
     }
 };
