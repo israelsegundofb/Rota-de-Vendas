@@ -1,9 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { aiTools, toolHandlers } from "./toolsService";
-import { searchClients } from "./qdrantService";
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 let genAI: any = null;
 
@@ -22,34 +21,55 @@ export const generateAIContent = async (modelName: string, prompt: string, useMa
 
         let augmentedPrompt = prompt;
 
-        // Perform semantic search to augment the prompt if Qdrant is configured
-        if (process.env.QDRANT_API_KEY) {
-            console.log('[AI SERVICE] Interceptando prompt para Busca Vetorial RAG...');
-            
-            // Extract the actual user question from the super-prompt. We look for "Pergunta do Usuário:"
-            let userQuestion = prompt;
-            const questionMatch = prompt.match(/Pergunta do Usuário:\s*"([\s\S]*?)"/);
-            if (questionMatch && questionMatch[1]) {
-                userQuestion = questionMatch[1];
-            }
-
-            const relevantClients = await searchClients(userQuestion, 10);
-            
-            if (relevantClients.length > 0) {
-                const ragContext = relevantClients.map(c => 
-                    `- ${c.companyName} (${c.cleanAddress || c.city}): ${Array.isArray(c.category) ? c.category.join(', ') : c.category}. CNPJ: ${c.cnpj || 'N/A'}`
-                ).join('\n');
-
-                augmentedPrompt = prompt + `\n\n[DADOS VETORIAIS DO QDRANT]\nOs seguintes 10 clientes (mais semelhantes semanticamente à pergunta) foram encontrados:\n${ragContext}`;
-            }
+        const toolsConfig: any = [];
+        if (aiTools && aiTools.length > 0) {
+            toolsConfig.push({ functionDeclarations: aiTools });
+        }
+        if (useMaps) {
+            toolsConfig.push({ googleSearchRetrieval: {} });
         }
 
         const model = client.getGenerativeModel({
             model: modelName,
-            tools: useMaps ? [{ googleSearchRetrieval: {} }] : undefined
+            tools: toolsConfig.length > 0 ? toolsConfig : undefined
         });
 
-        const result = await model.generateContent(augmentedPrompt);
+        // Use startChat to handle the multi-turn function calling flow
+        const chat = model.startChat();
+        let result = await chat.sendMessage(augmentedPrompt);
+
+        // Handle Function Calling Loop
+        let call = result.response.functionCalls()?.[0];
+        let maxLoops = 3; // Prevent infinite loops
+        let currentLoop = 0;
+
+        while (call && currentLoop < maxLoops) {
+            console.log(`[AI SERVICE] Executando ferramenta: ${call.name}`);
+            let apiResponse = {};
+            
+            try {
+                if (toolHandlers[call.name]) {
+                    apiResponse = await toolHandlers[call.name](call.args);
+                } else {
+                    apiResponse = { error: `Ferramenta ${call.name} não encontrada.` };
+                }
+            } catch (err: any) {
+                console.error(`Erro ao executar ferramenta ${call.name}:`, err);
+                apiResponse = { error: err.message };
+            }
+
+            // Send the function execution result back to the model
+            result = await chat.sendMessage([{
+                functionResponse: {
+                    name: call.name,
+                    response: apiResponse
+                }
+            }]);
+
+            call = result.response.functionCalls()?.[0];
+            currentLoop++;
+        }
+
         return result.response;
     } catch (error) {
         console.error('[AI SERVICE ERROR]:', error);

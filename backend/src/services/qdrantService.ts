@@ -3,13 +3,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid'; // we need to mock or use numerical IDs. Let's use string IDs as qdrant supports UUIDs. Wait, if uuid is not installed, we can generate a uuid manually or use a hash. Let's just create a simple UUID v4 generator.
 
-dotenv.config();
+dotenv.config({ override: true });
 
 let qdrantClient: QdrantClient | null = null;
 let genAI: GoogleGenerativeAI | null = null;
 
-// The dimensions for Gemini's text-embedding-004 model
-const GEMINI_EMBEDDING_DIM = 768; 
+// The dimensions for Gemini's gemini-embedding-001 model
+const GEMINI_EMBEDDING_DIM = 3072; 
 
 // Initializers
 const getQdrantClient = () => {
@@ -44,7 +44,7 @@ export const ensureCollectionsExist = async () => {
         const collections = await client.getCollections();
         const collectionNames = collections.collections.map((c: any) => c.name);
 
-        const requiredCollections = ['clients', 'products'];
+        const requiredCollections = ['clients', 'products', 'knowledge_base'];
 
         for (const col of requiredCollections) {
             if (!collectionNames.includes(col)) {
@@ -70,8 +70,8 @@ export const generateEmbedding = async (text: string): Promise<number[]> => {
     const ai = getAIClient();
     if (!ai) throw new Error("GEMINI_API_KEY is not set.");
     
-    // We use the recommended model for text embeddings
-    const model = ai.getGenerativeModel({ model: "text-embedding-004" });
+    // We use the available model for text embeddings
+    const model = ai.getGenerativeModel({ model: "gemini-embedding-001" });
     const result = await model.embedContent(text);
     return result.embedding.values;
 };
@@ -175,6 +175,197 @@ export const searchClients = async (queryText: string, limit: number = 10) => {
         });
     } catch (error) {
         console.error('[QDRANT SEARCH ERROR]', error);
+        return [];
+    }
+};
+
+/**
+ * Indexes a batch of products into Qdrant
+ */
+export const indexProducts = async (products: any[]) => {
+    const client = getQdrantClient();
+    if (!client || products.length === 0) return;
+
+    console.log(`[QDRANT] Starting embedding generation for ${products.length} products...`);
+    
+    try {
+        const points = [];
+        
+        for (const p of products) {
+            const textRepresentation = `
+                Produto: ${p.name || ''}
+                SKU/Código: ${p.sku || ''}
+                Categoria/Departamento: ${p.category || ''}
+                Seção: ${p.section || ''}
+                Especificações Técnicas: ${p.technicalDetails || ''}
+            `.replace(/\s+/g, ' ').trim();
+
+            try {
+                const vector = await generateEmbedding(textRepresentation);
+                const pointId = generateUUID(); 
+
+                points.push({
+                    id: pointId,
+                    vector: vector,
+                    payload: {
+                        originalId: p.id,
+                        name: p.name,
+                        sku: p.sku,
+                        category: p.category,
+                        rawJSON: JSON.stringify(p)
+                    }
+                });
+            } catch (embedError) {
+                console.warn(`Failed to generate embedding for product ${p.name}:`, embedError);
+            }
+            
+            // Artificial delay to prevent API rate limiting from Gemini
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        if (points.length > 0) {
+            await client.upsert('products', {
+                wait: true,
+                points: points
+            });
+            console.log(`[QDRANT] Successfully indexed ${points.length} products into Qdrant.`);
+        }
+    } catch (error) {
+        console.error('[QDRANT INDEXING ERROR - PRODUCTS]', error);
+    }
+};
+
+/**
+ * Helper to chunk large pieces of text
+ */
+const chunkText = (text: string, maxTokens: number = 800): string[] => {
+    // A simple heuristic: 1 token is approx 4 characters.
+    const maxChars = maxTokens * 4;
+    const chunks: string[] = [];
+    let currentIdx = 0;
+
+    while (currentIdx < text.length) {
+        let chunk = text.substring(currentIdx, currentIdx + maxChars);
+        // Try to break at a natural boundary like a newline or period
+        if (currentIdx + maxChars < text.length) {
+            const lastNewline = chunk.lastIndexOf('\n');
+            const lastPeriod = chunk.lastIndexOf('. ');
+            const breakPoint = Math.max(lastNewline, lastPeriod);
+            
+            if (breakPoint > maxChars * 0.5) { // Only break if it makes sense, not at the very beginning
+                chunk = chunk.substring(0, breakPoint + 1);
+            }
+        }
+        chunks.push(chunk.trim());
+        currentIdx += chunk.length;
+    }
+    
+    return chunks;
+};
+
+/**
+ * Indexes a large text manual/document into the Knowledge Base collection
+ */
+export const indexKnowledge = async (title: string, fullText: string, metadata: any = {}) => {
+    const client = getQdrantClient();
+    if (!client || !fullText) return;
+
+    console.log(`[QDRANT] Starting embedding generation for knowledge document: ${title}...`);
+    
+    try {
+        const textChunks = chunkText(fullText);
+        const points = [];
+        
+        for (let i = 0; i < textChunks.length; i++) {
+            const chunk = textChunks[i];
+            const textRepresentation = `
+                Documento: ${title}
+                Parte: ${i + 1}/${textChunks.length}
+                Conteúdo: ${chunk}
+            `.replace(/\s+/g, ' ').trim();
+
+            try {
+                const vector = await generateEmbedding(textRepresentation);
+                const pointId = generateUUID(); 
+
+                points.push({
+                    id: pointId,
+                    vector: vector,
+                    payload: {
+                        documentTitle: title,
+                        chunkIndex: i,
+                        totalChunks: textChunks.length,
+                        content: chunk,
+                        ...metadata
+                    }
+                });
+            } catch (embedError) {
+                console.warn(`Failed to generate embedding for knowledge chunk ${i}:`, embedError);
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        if (points.length > 0) {
+            await client.upsert('knowledge_base', {
+                wait: true,
+                points: points
+            });
+            console.log(`[QDRANT] Successfully indexed knowledge base doc "${title}" with ${points.length} chunks.`);
+        }
+    } catch (error) {
+        console.error('[QDRANT INDEXING ERROR - KNOWLEDGE]', error);
+    }
+};
+
+/**
+ * Searches products using semantic similarity
+ */
+export const searchProducts = async (queryText: string, limit: number = 10) => {
+    const client = getQdrantClient();
+    if (!client) return [];
+
+    try {
+        const queryVector = await generateEmbedding(queryText);
+        const searchResult = await client.search('products', {
+            vector: queryVector,
+            limit: limit,
+            with_payload: true
+        });
+
+        return searchResult.map(result => {
+            if (result.payload && typeof result.payload.rawJSON === 'string') {
+                return JSON.parse(result.payload.rawJSON);
+            }
+            return result.payload;
+        });
+    } catch (error) {
+        console.error('[QDRANT SEARCH ERROR - PRODUCTS]', error);
+        return [];
+    }
+};
+
+/**
+ * Searches knowledge base using semantic similarity
+ */
+export const searchKnowledgeBase = async (queryText: string, limit: number = 5) => {
+    const client = getQdrantClient();
+    if (!client) return [];
+
+    try {
+        const queryVector = await generateEmbedding(queryText);
+        const searchResult = await client.search('knowledge_base', {
+            vector: queryVector,
+            limit: limit,
+            with_payload: true
+        });
+
+        return searchResult.map(result => ({
+            score: result.score,
+            ...result.payload
+        }));
+    } catch (error) {
+        console.error('[QDRANT SEARCH ERROR - KNOWLEDGE]', error);
         return [];
     }
 };

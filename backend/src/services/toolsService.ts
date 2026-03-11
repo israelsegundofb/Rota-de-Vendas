@@ -39,6 +39,38 @@ export const aiTools = [
                 cnaeCode: { type: "string", description: "Código CNAE (ex: 47.44-0-01)" }
             }
         }
+    },
+    {
+        name: "search_clients_knowledge",
+        description: "Busca na base de dados de clientes, por similaridade semântica (conceitos, características obscuras, histórico complexo). Retorna clientes que se assemelham à descrição.",
+        parameters: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "O que você quer buscar sobre os clientes?" },
+                limit: { type: "number", description: "Número máximo de resultados (default 5)" }
+            }
+        }
+    },
+    {
+        name: "search_products_knowledge",
+        description: "Busca no catálogo de produtos por similaridade semântica. Útil se você não souber o SKU ou a categoria exata, ajudando a encontrar itens pelas suas especificações.",
+        parameters: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "Características ou descrição do produto desejado" },
+                limit: { type: "number", description: "Número máximo de resultados (default 5)" }
+            }
+        }
+    },
+    {
+        name: "search_company_rules",
+        description: "Busca na Base de Conhecimento (Manuais, Regras da Empresa, Políticas). Use sempre que precisar saber sobre regras de negócio, tabelas de preço, comissões, etc.",
+        parameters: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "A dúvida específica sobre as regras da empresa" }
+            }
+        }
     }
 ];
 
@@ -47,7 +79,7 @@ export const aiTools = [
 let masterClients: any[] = [];
 let masterProducts: any[] = [];
 
-import { ensureCollectionsExist, indexClients } from './qdrantService';
+import { ensureCollectionsExist, indexClients, indexProducts, searchClients, searchProducts, searchKnowledgeBase } from './qdrantService';
 
 export const syncMasterData = async (clients: any[], products: any[]) => {
     masterClients = clients;
@@ -60,7 +92,11 @@ export const syncMasterData = async (clients: any[], products: any[]) => {
         
         // Fire and forget Qdrant indexing so it doesn't block the frontend upload response
         indexClients(clients).catch(err => {
-            console.error('[QDRANT] Background Indexing Error:', err);
+            console.error('[QDRANT] Background Indexing Error (Clients):', err);
+        });
+        
+        indexProducts(products).catch(err => {
+            console.error('[QDRANT] Background Indexing Error (Products):', err);
         });
     } catch (e) {
         console.error('[QDRANT INITIALIZATION EXCEPTION]', e);
@@ -113,6 +149,31 @@ export const toolHandlers: Record<string, (args: any) => any> = {
             cnae: cnaeCode,
             total_clients: matching.length,
             sample_cities: Array.from(new Set(matching.map(c => c.city))).slice(0, 5)
+        };
+    },
+    search_clients_knowledge: async (args) => {
+        const { query, limit = 5 } = args;
+        const results = await searchClients(query, limit);
+        return {
+            rag_results_found: results.length,
+            data: results
+        };
+    },
+    search_products_knowledge: async (args) => {
+        const { query, limit = 5 } = args;
+        const results = await searchProducts(query, limit);
+        return {
+            rag_results_found: results.length,
+            data: results
+        };
+    },
+    search_company_rules: async (args) => {
+        const { query } = args;
+        // Search knowledge base gives back scored chunks of texts
+        const results = await searchKnowledgeBase(query, 3);
+        return {
+            rag_chunks_found: results.length,
+            relevant_excerpts: results
         };
     }
 };
