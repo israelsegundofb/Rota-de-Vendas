@@ -1,7 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from 'dotenv';
+
+dotenv.config({ override: true });
 
 const test = async () => {
-    const key = "AIzaSyCEb9uL6A4cG_upvzgWNwMWw-q-9AWOAh4";
+    const key = process.env.GEMINI_API_KEY || '';
     const genAI = new GoogleGenerativeAI(key);
     console.log("Testando chave direta...");
     const modelsToTest = [
