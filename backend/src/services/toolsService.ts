@@ -64,11 +64,11 @@ export const aiTools = [
     },
     {
         name: "search_company_rules",
-        description: "Busca na Base de Conhecimento (Manuais, Regras da Empresa, Políticas). Use sempre que precisar saber sobre regras de negócio, tabelas de preço, comissões, etc.",
+        description: "Busca na Base de Conhecimento Institucional (Quem somos, História da Graves & Agudos, Regras da Empresa, Políticas, Manuais). Use sempre que precisar saber sobre a identidade da empresa, regras de negócio ou procedimentos internos.",
         parameters: {
             type: "object",
             properties: {
-                query: { type: "string", description: "A dúvida específica sobre as regras da empresa" }
+                query: { type: "string", description: "A dúvida institucional ou sobre regras" }
             }
         }
     }
