@@ -5,21 +5,22 @@ let isInitialized = false;
 export const getFirestore = () => {
     if (!isInitialized) {
         try {
-            // Attempt to initialize with application default credentials
-            // (Works automatically on GCP/Firebase Hosting/Cloud Run)
-            admin.initializeApp();
-            console.log('[FIREBASE ADMIN] Initialized with default credentials');
+            // Check if already initialized by another module
+            if (admin.apps.length === 0) {
+                admin.initializeApp();
+                console.log('[FIREBASE ADMIN] Initialized with default credentials');
+            }
             isInitialized = true;
         } catch (e) {
-            console.warn('[FIREBASE ADMIN] Default initialization failed, checking local credentials...', e);
-            try {
-                // Here you could add manual serviceAccount fallback if needed
-                // For now, if default fails, we might be in dev mode without credentials
-                isInitialized = true;
-            } catch (err) {
-                console.error('[FIREBASE ADMIN] Initialization failed completely:', err);
-            }
+            console.warn('[FIREBASE ADMIN] Initialization failed, will retry on next call or work without Firestore.', e);
         }
     }
-    return admin.firestore();
+    
+    try {
+        return admin.firestore();
+    } catch (err) {
+        console.warn('[FIREBASE ADMIN] Firestore access failed. Check credentials.');
+        // Return a mock object or throw a descriptive error that we catch in services
+        throw new Error("FIREBASE_NOT_INITIALIZED");
+    }
 };

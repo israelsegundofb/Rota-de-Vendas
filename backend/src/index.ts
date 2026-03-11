@@ -19,7 +19,7 @@ const port = process.env.PORT || '3001';
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gemini-Key'],
     optionsSuccessStatus: 200
 }));
 
