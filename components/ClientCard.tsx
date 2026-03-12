@@ -1,81 +1,79 @@
 import React from 'react';
-import { MapPin, Store, Briefcase, ShoppingBag, ExternalLink, Edit2, Phone, Calendar } from 'lucide-react';
-import { EnrichedClient } from '../types';
+import { MapPin, ShoppingBag, ExternalLink, Edit2 } from 'lucide-react';
+import { EnrichedClient, Product, AppUser } from '../types';
+import { getFilteredPurchases } from '../utils/purchaseUtils';
 
 interface ClientCardProps {
     client: EnrichedClient;
     onEdit: (client: EnrichedClient) => void;
     onAssignProducts: (client: EnrichedClient) => void;
     style?: React.CSSProperties;
+    filterSalespersonId?: string;
+    startDate?: string | null;
+    endDate?: string | null;
 }
 
-const ClientCard: React.FC<ClientCardProps> = ({ client, onEdit, onAssignProducts, style }) => {
+const ClientCard: React.FC<ClientCardProps> = ({
+    client,
+    onEdit,
+    onAssignProducts,
+    style,
+    filterSalespersonId,
+    startDate,
+    endDate
+}) => {
+    // Determine if we have valid purchases for the current UI context
+    const activePurchases = getFilteredPurchases(
+        client.purchasedProducts,
+        filterSalespersonId,
+        startDate || undefined,
+        endDate || undefined
+    );
+    const hasPurchases = activePurchases.length > 0;
+
     // Helper to get initials
     const getInitials = (name: string) => name.charAt(0).toUpperCase();
 
-    // Helper for region colors (Consistent with ClientList)
-    const getRegionColor = (region: string) => {
+    // Determine region color
+    const getRegionClass = (region: string) => {
         switch (region) {
-            case 'Nordeste': return 'bg-orange-100 text-orange-800';
-            case 'Sudeste': return 'bg-blue-100 text-blue-800';
-            case 'Sul': return 'bg-purple-100 text-purple-800';
-            case 'Norte': return 'bg-green-100 text-green-800';
-            default: return 'bg-yellow-100 text-yellow-800';
+            case 'Sul': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'Norte': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case 'Nordeste': return 'bg-amber-100 text-amber-700 border-amber-200';
+            case 'Sudeste': return 'bg-purple-100 text-purple-700 border-purple-200';
+            case 'Centro-Oeste': return 'bg-rose-100 text-rose-700 border-rose-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
         }
     };
 
-    const hasPurchases = client.purchasedProducts && client.purchasedProducts.length > 0;
-    const regionClass = getRegionColor(client.region);
+    const regionClass = getRegionClass(client.region);
 
-    // Optimization: Replaced framer-motion with pure CSS animations to improve list rendering performance
     return (
-        <div
-            style={style}
-            className="p-2 h-full animate-fade-in-up"
-        >
-            <div
-                className="h-full bg-white border border-gray-200 rounded-xl hover:shadow-lg transition-shadow duration-200 group relative flex flex-col overflow-hidden transform transition-all hover:scale-[1.01]"
-            >
-
-                {/* Header / Banner */}
-                <div className="flex justify-between items-start p-4 pb-2 gap-2">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                        {/* Avatar */}
-                        <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-lg shrink-0 border border-gray-200">
-                            {getInitials(client.companyName)}
-                        </div>
-
-                        {/* Info */}
-                        <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-gray-900 truncate leading-tight mb-0.5" title={client.companyName}>
-                                {client.companyName}
-                            </h3>
-                            <div className="flex flex-col items-start gap-1">
-                                <span className="text-xs text-gray-500 font-medium truncate w-full" title={client.category.join(', ')}>
-                                    {client.category.length > 0 ? client.category.join(', ') : 'Outros'}
-                                </span>
-                                {client.mainCnae && (
-                                    <div className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100 max-w-full" title={`CNAE: ${client.mainCnae}`}>
-                                        <Briefcase className="w-2.5 h-2.5 mr-1 shrink-0" />
-                                        <span className="truncate">{client.mainCnae}</span>
-                                    </div>
-                                )}
+        <div className="h-full" style={style}>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full group">
+                {/* Header with Avatar and Region */}
+                <div className="p-4 flex-1">
+                    <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shadow-sm border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                                {getInitials(client.companyName)}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-1" title={client.companyName}>
+                                    {client.companyName}
+                                </h3>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${regionClass}`}>
+                                        {client.region}
+                                    </span>
+                                    {client.state && (
+                                        <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-100">
+                                            {client.state}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-
-                    {/* Region Badge */}
-                    <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${regionClass}`}>
-                        {client.region}
-                    </span>
-                </div>
-
-                {/* Content Body */}
-                <div className="px-4 py-2 space-y-2 flex-grow">
-                    {/* Owner & Address */}
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Store className="w-4 h-4 text-gray-400 shrink-0" />
-                        <span className="truncate" title={client.ownerName}>{client.ownerName}</span>
                     </div>
 
                     <div className="flex items-start gap-2 text-sm text-gray-600">
@@ -84,16 +82,16 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onEdit, onAssignProduct
                     </div>
 
                     {/* Purchase Stats (If any) */}
-                    {hasPurchases && client.purchasedProducts && (
+                    {hasPurchases && (
                         <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
                             <div className="flex items-center gap-3 text-xs text-gray-600">
-                                <span className="flex items-center font-medium bg-green-50 px-2 py-0.5 rounded-md text-green-700 border border-green-100">
+                                <span className="flex items-center font-medium bg-green-50 px-2 py-0.5 rounded-md text-green-700 border border-green-100" title="Itens que atendem aos filtros atuais">
                                     <ShoppingBag className="w-3 h-3 mr-1" />
-                                    {client.purchasedProducts.length} itens
+                                    {activePurchases.length} itens {filterSalespersonId !== 'Todos' || startDate || endDate ? '(Filtrado)' : ''}
                                 </span>
                                 <span className="text-gray-400">|</span>
                                 <span className="text-gray-500">
-                                    Última: {client.purchasedProducts[0]?.purchaseDate ? new Date(client.purchasedProducts[0].purchaseDate).toLocaleDateString('pt-BR') : 'N/A'}
+                                    Última: {activePurchases[0]?.purchaseDate ? new Date(activePurchases[0].purchaseDate).toLocaleDateString('pt-BR') : 'N/A'}
                                 </span>
                             </div>
                         </div>

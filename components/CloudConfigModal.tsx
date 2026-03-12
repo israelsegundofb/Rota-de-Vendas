@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Cloud, Check, Loader2, Trash2, X, Info } from 'lucide-react';
+import { Cloud, Check, Loader2, Trash2, X, Info } from 'lucide-react';
 import { FirebaseConfig, getStoredFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig } from '../firebaseConfig';
 import { initializeFirebase } from '../services/firebaseService';
+import { getSystemSettings, saveSystemSettings, SystemSettings } from '../services/settingsService';
 
 interface CloudConfigModalProps {
     isOpen: boolean;
@@ -27,6 +28,14 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
         messagingSenderId: '',
         appId: ''
     });
+    
+    // Configurações Globais do Sistema (Chaves API)
+    const [settingsData, setSettingsData] = useState<SystemSettings>({
+        googleMapsApiKey: '',
+        geminiApiKey: '',
+        cnpjaApiKey: '',
+    });
+    
     const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [message, setMessage] = useState('');
 
@@ -40,8 +49,17 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
                     setMessage('Configuração salva encontrada.');
                 }, 0);
             }
+            
+            // Carrega chaves de API globais do banco de dados (se conectado)
+            if (isFirebaseConnected) {
+                getSystemSettings().then(settings => {
+                    if (settings) {
+                        setSettingsData(settings);
+                    }
+                });
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, isFirebaseConnected]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -64,6 +82,9 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
             const success = await initializeFirebase(formData);
             if (success) {
                 saveFirebaseConfig(formData);
+                console.log('[CONFIG] Salvando chaves API no cloud...');
+                await saveSystemSettings(settingsData);
+                
                 setStatus('success');
                 setMessage('Conexão bem sucedida! Configuração salva.');
 
@@ -75,9 +96,9 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
                 setStatus('error');
                 setMessage('Falha ao conectar. Verifique as credenciais.');
             }
-        } catch (e) {
+        } catch (e: unknown) {
             setStatus('error');
-            setMessage('Erro: ' + (e as any).message);
+            setMessage('Erro: ' + (e instanceof Error ? e.message : String(e)));
         }
     };
 
@@ -143,12 +164,57 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
                                         type="text"
                                         name={field}
                                         placeholder={field}
-                                        value={(formData as any)[field]}
+                                        value={formData[field as keyof FirebaseConfig] as string}
                                         onChange={handleChange}
                                         className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-700 placeholder:text-gray-400 focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none transition-all font-mono"
                                     />
                                 </div>
                             ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">Chaves de API do Sistema (Segurança Avançada)</p>
+                        <div className="space-y-3">
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/30 group-focus-within:bg-blue-500 transition-colors"></div>
+                                </div>
+                                <input
+                                    type="text"
+                                    name="googleMapsApiKey"
+                                    placeholder="Google Maps API Key (Ex: AIzaSy...)"
+                                    value={settingsData.googleMapsApiKey || ''}
+                                    onChange={(e) => setSettingsData({ ...settingsData, googleMapsApiKey: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-700 placeholder:text-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-mono"
+                                />
+                            </div>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/30 group-focus-within:bg-blue-500 transition-colors"></div>
+                                </div>
+                                <input
+                                    type="text"
+                                    name="geminiApiKey"
+                                    placeholder="Google Gemini API Key (Ex: AIzaSy...)"
+                                    value={settingsData.geminiApiKey || ''}
+                                    onChange={(e) => setSettingsData({ ...settingsData, geminiApiKey: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-700 placeholder:text-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-mono"
+                                />
+                            </div>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/30 group-focus-within:bg-blue-500 transition-colors"></div>
+                                </div>
+                                <input
+                                    type="password"
+                                    name="cnpjaApiKey"
+                                    placeholder="CNPJa API Key"
+                                    value={settingsData.cnpjaApiKey || ''}
+                                    onChange={(e) => setSettingsData({ ...settingsData, cnpjaApiKey: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-700 placeholder:text-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-mono"
+                                />
+                            </div>
                         </div>
                     </div>
 

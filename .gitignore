@@ -29,3 +29,10 @@ dist-ssr
 .env
 .env.local
 .env.*
+
+# Test and Temp files
+test_*.js
+test_*.ts
+*.test.js
+*.spec.js
+temp_*

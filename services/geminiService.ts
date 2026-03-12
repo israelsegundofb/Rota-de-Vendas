@@ -531,8 +531,10 @@ export const categorizeProductsWithAI = async (
  */
 export const askAssistantRV = async (
   prompt: string,
-  context: AssistantContext
-): Promise<string> => {
+  context: AssistantContext,
+  sessionId?: string,
+  geminiApiKey?: string
+): Promise<{ text: string, sessionId: string }> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   // Build the super-prompt with context
@@ -550,15 +552,33 @@ export const askAssistantRV = async (
     [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual - Até 1000 itens)]
     ${context.filteredData ? context.filteredData : 'Nenhum filtro específico aplicado no momento ou dados muito extensos para leitura individual.'}
 
+    [USUÁRIOS E HIERARQUIA DO SISTEMA]
+    ${context.users && context.users.length > 0
+      ? `Lista de Usuários Cadastrados:\n${context.users.map(u => `- ${u.name} (Função: ${u.role})`).join('\n')}`
+      : 'Informação de usuários não disponível.'}
+
+    Regras de Hierarquia (do maior para o menor poder):
+    1. Admin DEV (Controle total)
+    2. Admin Geral / Admin (Gestão do sistema)
+    3. Gerente Geral (Visão de toda a operação)
+    4. Gerente de Vendas (Foco em performance de equipe)
+    5. Supervisor (Gestão de vendedores)
+    6. Visualizador Geral (Apenas leitura)
+    7. Vendedor Interno / Vendedor Externo (Atendimento direto a clientes)
+
     [VISÃO MACRO (Base Total - Estatísticas Agregadas)]
     ${context.aggregation ? context.aggregation : 'Estatísticas agregadas não disponíveis no momento.'}
 
+    [INSTRUÇÕES DE FERRAMENTAS (CRÍTICO)]
+    Você possui ferramentas poderosas de busca vetorial no Qdrant. Use-as PROATIVAMENTE sempre que a informação não estiver listada nos dados acima:
+    1. **search_company_rules**: Use SEMPRE para perguntas sobre quem é a Graves & Agudos, sua história, horários de funcionamento, regras da empresa, manuais ou a marca VO6. Se o usuário perguntar "O que você sabe sobre nós?", esta é a ferramenta certa.
+    2. **search_clients_knowledge**: Use para buscar clientes por características subjetivas (ex: "quem foca em suspensão?") ou para encontrar clientes não listados no resumo.
+    3. **search_products_knowledge**: Use para buscar no catálogo de produtos por descrição.
+    
     [INSTRUÇÕES GERAIS]
-    1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
-    2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
-    3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
-    4. Se a resposta demandar algo que não está no contexto detalhado (filteredData), recorra à VISÃO MACRO para dar números totais.
-    5. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 2500 clientes, mas tem ciência das estatísticas globais da base.
+    1. Responda em Português (PT-BR) de forma amigável e profissional.
+    2. Use Markdown para clareza (tabelas, negrito, listas).
+    3. Se houver dúvida institucional, use a ferramenta **search_company_rules** antes de dizer que não sabe.
     
     Pergunta do Usuário:
     "${prompt}"
@@ -570,11 +590,15 @@ export const askAssistantRV = async (
 
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gemini-2.0-flash',
-        prompt: fullPrompt
-      }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Gemini-Key': geminiApiKey || ''
+        },
+        body: JSON.stringify({
+          model: 'gemini-2.0-flash',
+          prompt: fullPrompt,
+          sessionId: sessionId
+        }),
       signal: controller.signal
     });
 
@@ -586,7 +610,10 @@ export const askAssistantRV = async (
     }
 
     const data = await response.json();
-    return data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.";
+    return {
+      text: data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.",
+      sessionId: data.sessionId
+    };
   } catch (error: any) {
     console.error("AssistantRV Error:", error);
     if (error.name === 'AbortError') throw new Error("Tempo limite excedido.");
