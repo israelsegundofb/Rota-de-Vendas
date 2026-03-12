@@ -16,7 +16,7 @@ import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
-import { processClientsWithAI, syncDataToAI } from './services/geminiService';
+import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
@@ -36,8 +36,6 @@ const AdminCategoryManagement = React.lazy(() => import('./components/AdminCateg
 const AdminProductManagement = React.lazy(() => import('./components/AdminProductManagement'));
 const CloudConfigModal = React.lazy(() => import('./components/CloudConfigModal'));
 const AdminFileManager = React.lazy(() => import('./components/AdminFileManager'));
-const GoogleMapsKeyModal = React.lazy(() => import('./components/GoogleMapsKeyModal'));
-const CNPJaKeyModal = React.lazy(() => import('./components/CNPJaKeyModal'));
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
 const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
@@ -47,7 +45,6 @@ import { AssistantRV } from './components/AssistantRV';
 import DateRangePicker from './components/DateRangePicker';
 import CookieConsent from './components/CookieConsent';
 import LoadingScreen from './components/LoadingScreen';
-import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
@@ -58,6 +55,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useChat } from './hooks/useChat';
 import { usePageTracking } from './hooks/useAnalytics';
 import { useToast } from './contexts/ToastContext';
+import { subscribeToSystemSettings } from './services/settingsService';
 
 // Initial Mock Data
 interface ProcessingState {
@@ -74,7 +72,7 @@ interface ProcessingState {
 const App: React.FC = () => {
   // --- Custom Hooks ---
   const {
-    users, setUsers, currentUser, login, logout: authLogout,
+    users, publicUsers, setUsers, currentUser, login, logout: authLogout,
     addUser: baseAddUser, updateUser: baseUpdateUser, deleteUser: baseDeleteUser
   } = useAuth();
 
@@ -120,42 +118,7 @@ const App: React.FC = () => {
   } = useFilters(masterClientList, users, currentUser, products);
 
   // Helper function to distribute products to clients (moved up to fix hoisting)
-  const distributeProductsToClients = React.useCallback((clients: EnrichedClient[], allProducts: Product[]) => {
-    if (!allProducts || allProducts.length === 0) return;
-
-    const updatedClients = clients.map(client => {
-      // If client already has products, keep them unless we want to refresh
-      if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
-
-      // Find products matching client category
-      let eligibleProducts = allProducts.filter(p =>
-        (client.category || []).some(cat =>
-          (p.category || '').toLowerCase().includes((cat || '').toLowerCase()) ||
-          (cat || '').toLowerCase().includes((p.category || '').toLowerCase())
-        )
-      );
-
-      // Fallback if no category match
-      if (eligibleProducts.length === 0) {
-        eligibleProducts = allProducts;
-      }
-
-      // Randomly assign 1-5 products
-      const numProducts = Math.floor(Math.random() * 5) + 1;
-      const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, numProducts);
-
-      return {
-        ...client,
-        purchasedProducts: selected.map(p => ({
-          ...p,
-          purchaseDate: new Date().toISOString()
-        })) as PurchaseRecord[]
-      };
-    });
-
-    setMasterClientList(updatedClients as EnrichedClient[]);
-  }, [setMasterClientList]);
+  // REMOVED: distributeProductsToClients function
 
 
   const missingCoordinatesCount = React.useMemo(() => {
@@ -176,7 +139,7 @@ const App: React.FC = () => {
     messages, conversations, activeConversationId, setActiveConversationId,
     sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread,
     deleteMessage: handleChatDeleteMessage, clearMessages: handleChatClearMessages
-  } = useChat(currentUser, users);
+  } = useChat(currentUser, publicUsers);
 
   // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
@@ -189,18 +152,34 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  const [activeApiKey] = useState<string>(() => {
-    const key = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || getStoredFirebaseConfig()?.apiKey || '';
-    console.log('[APP] Gemini API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
-    return key;
-  });
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(() => {
-    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || localStorage.getItem('google_maps_api_key') || import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || '';
-    console.log('[APP] Maps API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
-    return key;
-  });
+  const [activeApiKey, setActiveApiKey] = useState<string>('');
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>('');
   const [keyVersion, setKeyVersion] = useState(0);
   const [isMapApiBroken, setIsMapApiBroken] = useState(false);
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+    if (isFirebaseConnected) {
+      unsubscribe = subscribeToSystemSettings((settings) => {
+        if (settings.geminiApiKey) {
+           console.log('[APP] Gemini API Key recebida:', settings.geminiApiKey.substring(0, 6) + '...');
+           setActiveApiKey(settings.geminiApiKey);
+        } else {
+           console.warn('[APP] Gemini API Key não encontrada no Firestore.');
+        }
+        if (settings.googleMapsApiKey) {
+           setGoogleMapsApiKey(settings.googleMapsApiKey);
+           console.log('[APP] Google Maps API Key injetada pelo Cloud.');
+           setIsMapApiBroken(false); // Reset error state if a valid key is found
+           setKeyVersion(v => v + 1); // Force map re-render when key arrives
+        }
+        if (settings.cnpjaApiKey) {
+           console.log('[APP] CNPJa API Key injetada pelo Cloud.');
+        }
+      });
+    }
+    return () => unsubscribe();
+  }, [isFirebaseConnected]);
 
   // Assistant State
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -256,10 +235,7 @@ const App: React.FC = () => {
   }, [currentUser, users]);
   // isFirebaseConnected handled by hook
   const [selectedClient] = useState<EnrichedClient | undefined>(undefined);
-  const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
-  const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
-  const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
   // Custom Dialog State
   const [dialogConfig, setDialogConfig] = useState<{
@@ -277,15 +253,7 @@ const App: React.FC = () => {
     type: 'info'
   });
 
-  const showAlert = React.useCallback((title: string, message: string | string[], type: DialogType = 'info') => {
-    setDialogConfig({
-      isOpen: true,
-      title,
-      message,
-      type,
-      confirmLabel: 'Entendi'
-    });
-  }, [setDialogConfig]);
+
 
   const showConfirm = React.useCallback((title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
     setDialogConfig({
@@ -523,7 +491,8 @@ const App: React.FC = () => {
             if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja inválida'))) {
               isUploadCancelled.current = true;
               setProcState(prev => ({ ...prev, status: 'error', errorMessage: 'Autenticação CNPJa falhou. Chave inválida ou expirada.' }));
-              setIsCNPJaModalOpen(true);
+              setIsCloudConfigOpen(true);
+              toast.error('Falha de Autenticação CNPJa. Configure a chave na aba Cloud.');
             }
           } finally {
             setProcState(prev => ({ ...prev, current: index + 1 }));
@@ -576,8 +545,7 @@ const App: React.FC = () => {
   const handleUploadProducts = (newProducts: Product[]) => {
     setProducts(prev => {
       const updated = [...prev, ...newProducts];
-      // Distribute products to clients immediately for demo purposes
-      distributeProductsToClients(masterClientList, updated);
+      // REMOVED: distributeProductsToClients(masterClientList, updated);
 
       if (currentUser) {
         logActivityToCloud({
@@ -596,8 +564,6 @@ const App: React.FC = () => {
 
   const handleSaveProducts = (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
-    // Optionally redistribute if products logic changes significantly, though strictly not needed for simple price updates
-    // distributeProductsToClients(masterClientList, updatedProducts);
   };
 
   const handleClearProducts = React.useCallback(() => {
@@ -658,29 +624,37 @@ const App: React.FC = () => {
 
   const handleClearPurchases = () => {
     showConfirm(
-      'Limpar Histórico de Vendas?',
+      "Deseja limpar todo o histórico de compras?",
       [
-        '⚠️ Esta ação removerá TODOS os produtos comprados de todos os clientes.',
-        '• Os clientes continuarão cadastrados no sistema.',
-        '• Os arquivos de compras serão removidos da lista.'
+        "⚠️ Esta ação é IRREVERSÍVEL.",
+        "• Todos os registros de compras de TODOS os clientes serão removidos.",
+        "• Arquivos de planilhas de compras também serão excluídos da listagem.",
+        "• Os clientes em si NÃO serão removidos, apenas seu histórico."
       ],
       async () => {
         syncLockRef.current = true;
 
-        // 1. Clear purchases from clients
+        // 1. Clear ALL purchases from clients (reais e mock/fake)
         const newList = masterClientList.map(c => ({ ...c, purchasedProducts: [] }));
-        setMasterClientList(newList);
+        const newFiles = uploadedFiles.filter(f => f.type !== 'purchases');
 
-        // 2. Clear purchase files
-        setUploadedFiles(prev => prev.filter(f => f.type !== 'purchases'));
+        setMasterClientList(newList);
+        setUploadedFiles(newFiles);
+
+        // 2. Clear LocalStorage for purchases metadata
+        localStorage.removeItem('vendas_ai_files');
 
         // 3. Sync to cloud
         if (isFirebaseConnected) {
           try {
-            await saveToCloud(newList, products, categories, users, uploadedFiles.filter(f => f.type !== 'purchases'));
+            const { saveToCloud, syncUploadedFilesMetadata } = await import('./services/firebaseService');
+            await saveToCloud(newList, products, categories, users, newFiles);
+            await syncUploadedFilesMetadata(newFiles);
             lastClientsHash.current = JSON.stringify(newList, (key, value) => key === 'lastUpdated' ? undefined : value);
+            console.log('[APP] ✅ Purchase history cleared and synced.');
           } catch (e) {
             console.error("Erro ao sincronizar limpeza de vendas:", e);
+            toast.error('Erro ao limpar dados na nuvem.');
           }
         }
 
@@ -1060,16 +1034,8 @@ const App: React.FC = () => {
   // View State (Replaced moved function with space)
 
   const handleInvalidKey = async () => {
-    setIsGoogleMapsModalOpen(true);
-  };
-
-  const handleConfirmMapKey = (newKey: string) => {
-    if (newKey && newKey.trim()) {
-      setGoogleMapsApiKey(newKey.trim());
-      localStorage.setItem('google_maps_api_key', newKey.trim());
-      setKeyVersion(v => v + 1);
-      setIsGoogleMapsModalOpen(false);
-    }
+    toast.error('Chave do Google Maps inválida ou ausente. Acesse Configurações da Nuvem para configurar.');
+    setIsMapApiBroken(true);
   };
 
   // --- Derived Data ---
@@ -1094,12 +1060,6 @@ const App: React.FC = () => {
     resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
-  };
-
-  const handleConfirmCNPJaKey = (key: string) => {
-    localStorage.setItem('cnpja_api_key', key);
-    setIsCNPJaModalOpen(false);
-    showAlert("Sucesso", "Chave CNPJa atualizada! Tente realizar a consulta novamente.", "success");
   };
 
   const handleLogout = async () => {
@@ -1339,62 +1299,76 @@ const App: React.FC = () => {
   const handleDeleteFile = async (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (!file) return;
-
     if (!window.confirm(`Tem certeza que deseja excluir o arquivo "${file.fileName}"?\n\nIsso removerá todos os ${file.itemCount} registros associados.`)) {
       return;
     }
 
+    // 1. Calculate new lists first
+    let newClients = [...masterClientList];
+    let newProducts = [...products];
+    const newFiles = uploadedFiles.filter(f => f.id !== fileId);
+
     if (file.type === 'clients') {
-      setMasterClientList(prev => prev.filter(c => c.sourceFileId !== fileId));
+      newClients = masterClientList.filter(c => c.sourceFileId !== fileId);
     } else if (file.type === 'products') {
-      setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
+      newProducts = products.filter(p => p.sourceFileId !== fileId);
     } else if (file.type === 'purchases') {
-      // Activate sync lock to prevent real-time sync from overwriting during cleanup
-      syncLockRef.current = true;
+      // Deep clean purchasedProducts
+      newClients = masterClientList.map(c => {
+        if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
 
-      let updatedClientList: typeof masterClientList = [];
-      setMasterClientList(prev => {
-        // 1. Keep all clients (even those auto-created from this file)
-        // 2. Remove purchase records from clients
-        const newList = prev.map(c => {
-          if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
-          const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
-          if (filteredPurchases.length === c.purchasedProducts.length) return c;
-          return { ...c, purchasedProducts: filteredPurchases };
-        });
+        // Remove items linked to this file OR items with no sourceFileId (legacy junk/mock data)
+        const filteredPurchases = c.purchasedProducts.filter(p =>
+          p.sourceFileId && // Must have an ID
+          p.sourceFileId !== fileId // ID must not be the one being deleted
+        );
 
-        updatedClientList = newList;
-        return newList;
+        if (filteredPurchases.length === c.purchasedProducts.length) return c;
+        return { ...c, purchasedProducts: filteredPurchases };
       });
-
-      // Force-save the cleaned client list to Firebase
-      if (isFirebaseConnected && updatedClientList.length > 0) {
-        try {
-          const newUploadedFilesForSave = uploadedFiles.filter(f => f.id !== fileId);
-          await saveToCloud(updatedClientList, products, categories, users, newUploadedFilesForSave);
-          lastClientsHash.current = JSON.stringify(updatedClientList, (key, value) => key === 'lastUpdated' ? undefined : value);
-          console.log('[APP] ✅ Purchase deletion force-saved to Firebase.');
-        } catch (e) {
-          console.error('[APP] Failed to force-save purchase deletion:', e);
-        }
-      }
-
-      syncLockRef.current = false;
     }
 
-    const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
-    setUploadedFiles(newUploadedFiles);
+    // 2. Update states synchronously
+    setMasterClientList(newClients);
+    setProducts(newProducts);
+    setUploadedFiles(newFiles);
 
-    // Fix: Force sync the deleted file array immediately to bypass the 3s auto-save debounce
+    // 3. Perform Cloud Sync sequentially
     if (isFirebaseConnected) {
+      syncLockRef.current = true;
       try {
-        await syncUploadedFilesMetadata(newUploadedFiles);
+        // Force immediate sync to cloud
+        await saveToCloud(newClients, newProducts, categories, users, newFiles);
+
+        // Also sync files metadata specifically if needed
+        await syncUploadedFilesMetadata(newFiles);
+
+        // Update hash to prevent auto-save loop
+        lastClientsHash.current = JSON.stringify(newClients, (key, value) => key === 'lastUpdated' ? undefined : value);
+
+        console.log(`[APP] ✅ File "${file.fileName}" and associated data deleted and synced.`);
       } catch (e) {
-        console.error("Failed to sync file deletion immediately", e);
+        console.error("Failed to sync deletion to cloud:", e);
+        toast.error('Erro ao sincronizar exclusão com a nuvem.');
+      } finally {
+        syncLockRef.current = false;
       }
     }
 
-    // alert("Arquivo e dados associados foram removidos.");
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'DELETE',
+        category: 'SYSTEM',
+        details: `Excluiu o arquivo "${file.fileName}" (${file.type})`,
+        metadata: { fileId, type: file.type }
+      });
+    }
+
+    toast.success(`Arquivo "${file.fileName}" removido.`);
   };
 
   const handleReassignFile = (fileId: string, newSalespersonId: string) => {
@@ -1461,11 +1435,18 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = (updatedUser: AppUser) => {
+    // Security: If password is masked '***', preserve the original password from master state
+    const existingUser = users.find(u => u.id === updatedUser.id);
+    const finalUser = {
+      ...updatedUser,
+      password: updatedUser.password === '***' ? (existingUser?.password || updatedUser.password) : updatedUser.password
+    };
+
     // 1. Local update
-    baseUpdateUser(updatedUser);
+    baseUpdateUser(finalUser);
 
     // 2. Immediate Cloud Save
-    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    const updatedUsers = users.map(u => u.id === finalUser.id ? finalUser : u);
     saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
       .then(() => console.warn('[AUTH] Atualização de usuário na nuvem concluída ✅'))
       .catch(e => console.error('[AUTH] Falha no salvamento imediato da atualização:', e));
@@ -1680,9 +1661,14 @@ const App: React.FC = () => {
             // UPDATE CLIENT: ACCUMULATE AND MERGE (With Duplicate Prevention)
             const existingHistory = newList[clientIdx].purchasedProducts || [];
 
-            // Filter out records that already exist (Same SKU and Same Date)
+            // Filter out records that already exist (Same SKU, Same Date AND Same Salesperson)
+            // This allows the same product sale to be recorded if made by a different person (e.g. split regions)
             const filteredNewProducts = newPurchasedProducts.filter(newP =>
-              !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate)
+              !existingHistory.some(oldP =>
+                oldP.sku === newP.sku &&
+                oldP.purchaseDate === newP.purchaseDate &&
+                oldP.salespersonId === newP.salespersonId
+              )
             );
 
             if (filteredNewProducts.length > 0) {
@@ -2245,19 +2231,6 @@ const App: React.FC = () => {
               isFirebaseConnected={isFirebaseConnected}
             />
 
-            <GoogleMapsKeyModal
-              isOpen={isGoogleMapsModalOpen}
-              onClose={() => setIsGoogleMapsModalOpen(false)}
-              onConfirm={handleConfirmMapKey}
-              suggestedKey={SUGGESTED_MAP_KEY}
-            />
-
-            <CNPJaKeyModal
-              isOpen={isCNPJaModalOpen}
-              onClose={() => setIsCNPJaModalOpen(false)}
-              onConfirm={handleConfirmCNPJaKey}
-            />
-
             {isAddModalOpen && (
               <AddClientModal
                 isOpen={isAddModalOpen}
@@ -2278,7 +2251,7 @@ const App: React.FC = () => {
                 onSave={handleUpdateClient}
                 client={selectedClient}
 
-                users={users}
+                users={publicUsers}
                 allClients={masterClientList}
               />
             )}
@@ -2344,7 +2317,7 @@ const App: React.FC = () => {
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminUserManagement
                     currentUser={currentUser}
-                    users={users}
+                    users={currentUser?.role === 'admin_dev' ? users : publicUsers}
                     onAddUser={handleAddUser}
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
@@ -2379,7 +2352,7 @@ const App: React.FC = () => {
               <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Arquivos..." />}>
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminFileManager
-                    users={users}
+                    users={publicUsers}
                     uploadedFiles={uploadedFiles}
                     onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
                     onUploadProducts={handleProductFileUpload}
@@ -2415,7 +2388,7 @@ const App: React.FC = () => {
                   <AdminDashboard
                     clients={finalFilteredClients}
                     products={products}
-                    users={users}
+                    users={publicUsers}
                     onClose={() => setActiveView('map')}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
@@ -2786,7 +2759,7 @@ const App: React.FC = () => {
                             A chave do Google Maps expirou ou é inválida. Por favor, atualize as chaves nas configurações.
                           </p>
                           <button
-                            onClick={() => setIsGoogleMapsModalOpen(true)}
+                            onClick={() => setIsCloudConfigOpen(true)}
                             className="px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all font-bold shadow-md"
                           >
                             Configurar Chaves
@@ -2806,10 +2779,11 @@ const App: React.FC = () => {
                               clients={finalFilteredClients}
                               apiKey={googleMapsApiKey}
                               onInvalidKey={handleInvalidKey}
-                              productFilterActive={isProductFilterActive}
-                              highlightProductTerm={searchProductQuery}
                               activeProductCategory={filterProductCategory}
-                              users={users} // Pass users for color coding
+                              users={users}
+                              filterSalespersonId={filterSalespersonId}
+                              startDate={startDate}
+                              endDate={endDate}
                               filterContent={
                                 <div className="bg-gray-100/95 backdrop-blur-sm px-3 py-2 flex flex-col gap-1.5">
                                   {/* Primary Filters Row */}
@@ -3053,8 +3027,7 @@ const App: React.FC = () => {
                           users={users}
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
-                          onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
-
+                          onCNPJAuthError={() => { toast.error('Chave do CNPJa ausente ou inválida. Configure na Nuvem.'); setIsCloudConfigOpen(true); }}
                           searchTerm={searchQuery}
                           onSearchChange={setSearchQuery}
                           regionFilter={filterRegion}
@@ -3063,6 +3036,9 @@ const App: React.FC = () => {
                           onCategoryFilterChange={setFilterCategory}
                           allClients={masterClientList}
                           onMergeClients={handleMergeClients}
+                          filterSalespersonId={filterSalespersonId}
+                          startDate={startDate}
+                          endDate={endDate}
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
@@ -3180,6 +3156,7 @@ const App: React.FC = () => {
         <AssistantRV
           isOpen={isAssistantOpen}
           setIsOpen={setIsAssistantOpen}
+          geminiApiKey={activeApiKey}
           context={{
             userName: currentUser.name || 'Usuário',
             userRole: currentUser.role || 'Geral',

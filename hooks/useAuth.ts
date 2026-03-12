@@ -41,8 +41,17 @@ export const useAuth = () => {
         if (currentUserId === userId) setCurrentUserId(null);
     };
 
+    const publicUsers = useMemo(() => {
+        const isAdmDev = currentUser?.role === 'admin_dev';
+        return users.map(u => {
+            if (isAdmDev) return u;
+            return { ...u, password: '***' };
+        });
+    }, [users, currentUser]);
+
     return {
-        users,
+        users, // Raw list for Login/Admin
+        publicUsers, // Sanitized list for General UI
         setUsers,
         currentUser,
         login,

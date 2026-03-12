@@ -14,7 +14,7 @@ import { AnimatePresence } from 'framer-motion';
 
 interface ClientListProps {
   clients: EnrichedClient[];
-  isLoading?: boolean; // New Prop
+  isLoading?: boolean;
   onUpdateClient: (updatedClient: EnrichedClient) => void;
   onAddClient?: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
   currentUserRole?: UserRole;
@@ -39,6 +39,11 @@ interface ClientListProps {
   onRegionFilterChange: (value: string) => void;
   categoryFilter: string;
   onCategoryFilterChange: (value: string) => void;
+
+  // Purchase Filter Context
+  filterSalespersonId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 const ClientList: React.FC<ClientListProps> = ({
@@ -60,16 +65,17 @@ const ClientList: React.FC<ClientListProps> = ({
   setFilterOnlyWithPurchases,
   resetFilters,
 
-  // Destructure new props
   searchTerm,
   onSearchChange,
   regionFilter,
   onRegionFilterChange,
   categoryFilter,
   onCategoryFilterChange,
-  isLoading = false
+  isLoading = false,
+  filterSalespersonId,
+  startDate,
+  endDate
 }) => {
-  // Mobile Detection
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -78,12 +84,9 @@ const ClientList: React.FC<ClientListProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Modal State
   const [selectedClient, setSelectedClient] = useState<EnrichedClient | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  // Product Assignment Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [clientForProductAssignment, setClientForProductAssignment] = useState<EnrichedClient | null>(null);
 
@@ -97,14 +100,11 @@ const ClientList: React.FC<ClientListProps> = ({
     setIsProductModalOpen(true);
   }, []);
 
-  // Proactively check loading state
   if (isLoading) {
     return <ClientListSkeleton />;
   }
 
-  // filteredClientsLogic removed - clients prop is already filtered
   const filteredClients = clients;
-
 
   const handleExportCSV = () => {
     const headers = [
@@ -148,9 +148,8 @@ const ClientList: React.FC<ClientListProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    link.remove();
   };
-
-
 
   const handleSaveProductAssignment = (clientId: string, products: Product[]) => {
     const clientToUpdate = clients.find(c => c.id === clientId);
@@ -166,12 +165,9 @@ const ClientList: React.FC<ClientListProps> = ({
     }
   };
 
-  /* REMOVED INLINE CARDS - Using Imported ClientCard Component */
-
   return (
     <div className="flex flex-col h-full bg-white relative">
       <div className="px-3 py-2.5 border-b border-gray-200 flex flex-col md:flex-row gap-3 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none">
-        {/* Search */}
         <div className="relative w-full md:max-w-xs group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary transition-colors" />
           <input
@@ -184,7 +180,6 @@ const ClientList: React.FC<ClientListProps> = ({
           />
         </div>
 
-        {/* Filters and Actions */}
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
           <select
             value={regionFilter}
@@ -274,9 +269,12 @@ const ClientList: React.FC<ClientListProps> = ({
             data={filteredClients}
             itemContent={(index, client) => (
               <ClientCard
-                client={client} // Client object changes ref on update, so Card re-renders. This is correct.
+                client={client}
                 onEdit={openEditModal}
                 onAssignProducts={openProductAssignmentModal}
+                filterSalespersonId={filterSalespersonId}
+                startDate={startDate}
+                endDate={endDate}
               />
             )}
             className="custom-scrollbar"
@@ -301,6 +299,9 @@ const ClientList: React.FC<ClientListProps> = ({
                 onEdit={openEditModal}
                 onAssignProducts={openProductAssignmentModal}
                 style={{ height: '100%' }}
+                filterSalespersonId={filterSalespersonId}
+                startDate={startDate}
+                endDate={endDate}
               />
             )}
             className="custom-scrollbar"
@@ -351,9 +352,6 @@ const ClientList: React.FC<ClientListProps> = ({
   );
 };
 
-// Memoize the entire component to prevent re-renders from parent when props are stable. 
-// Custom equality function: Ignore 'users' array changes for memoization, 
-// since users are only used when modals are OPEN, and realtime presence updates break the grid scrolling.
 export default React.memo(ClientList, (prevProps, nextProps) => {
   return (
     prevProps.clients === nextProps.clients &&
@@ -362,9 +360,9 @@ export default React.memo(ClientList, (prevProps, nextProps) => {
     prevProps.searchTerm === nextProps.searchTerm &&
     prevProps.regionFilter === nextProps.regionFilter &&
     prevProps.categoryFilter === nextProps.categoryFilter &&
-    // Functions are typically stable via useCallback in App, 
-    // but we can let them pass if they don't change.
+    prevProps.filterSalespersonId === nextProps.filterSalespersonId &&
+    prevProps.startDate === nextProps.startDate &&
+    prevProps.endDate === nextProps.endDate &&
     prevProps.onUpdateClient === nextProps.onUpdateClient
-    // Ignoring 'users' to prevent realtime presence updates from tearing down the grid
   );
 });

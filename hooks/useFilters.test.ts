@@ -41,7 +41,7 @@ const mockClients: EnrichedClient[] = [
         salespersonId: 'user2',
         lat: 0, lng: 0,
         purchasedProducts: [
-            { sku: 'PROD1', name: 'Produto 1', category: 'Cat1', price: 10, quantity: 1, purchaseDate: '2023-01-01', brand: 'Brand1', factoryCode: 'F1' }
+            { sku: 'PROD1', name: 'Produto 1', category: 'Cat1', price: 10, quantity: 1, purchaseDate: '2023-01-01', brand: 'Brand1', factoryCode: 'F1', sourceFileId: 'file1' }
         ],
         contact: '8199999999',
         originalAddress: 'Rua B, 456'
