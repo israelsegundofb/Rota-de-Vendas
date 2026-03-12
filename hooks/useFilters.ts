@@ -149,57 +149,62 @@ export const useFilters = (
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // Check Category (Brand often used as category in this context) -> Now acts as Department
-                    const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => (p.category || '') === filterProductCategory);
+                    // ⚡ BOLT OPTIMIZATION: Loop Fusion
+                    // Consolidated 5 separate .some() iterations over purchasedProducts into a single pass.
+                    // Tracks independent conditions and breaks early when all are met, turning O(5N) into O(N).
+                    let hasCat = filterProductCategory === 'Todos';
+                    let hasSection = filterProductSection === 'Todas';
+                    let hasSku = filterProductSku === 'Todos';
+                    let hasMatch = prodQuery === '';
+                    let matchDate = !hasDateFilter;
 
-                    // Check Section
-                    const hasSection = filterProductSection === 'Todas' || c.purchasedProducts.some(p => (p.section || '') === filterProductSection);
+                    for (let i = 0; i < c.purchasedProducts.length; i++) {
+                        const p = c.purchasedProducts[i];
 
-                    // Check Specific SKU
-                    const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => (p.sku || '') === filterProductSku);
+                        if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
+                        if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
+                        if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                    // Check Search Query (Includes Brand and Category/Department)
-                    const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
-                        (p.name || '').toLowerCase().includes(prodQuery) ||
-                        (p.sku || '').toLowerCase().includes(prodQuery) ||
-                        (p.brand || '').toLowerCase().includes(prodQuery) ||
-                        (p.category || '').toLowerCase().includes(prodQuery) ||
-                        (p.section || '').toLowerCase().includes(prodQuery) ||
-                        (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                        (p.price || 0).toString().includes(prodQuery)
-                    );
+                        if (!hasMatch && (
+                            (p.name || '').toLowerCase().includes(prodQuery) ||
+                            (p.sku || '').toLowerCase().includes(prodQuery) ||
+                            (p.brand || '').toLowerCase().includes(prodQuery) ||
+                            (p.category || '').toLowerCase().includes(prodQuery) ||
+                            (p.section || '').toLowerCase().includes(prodQuery) ||
+                            (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
+                            (p.price || 0).toString().includes(prodQuery)
+                        )) {
+                            hasMatch = true;
+                        }
 
-                    // Date Range Filter
-                    const matchDate = (!hasDateFilter) || c.purchasedProducts.some(p => {
-                        if (!p.purchaseDate) return false;
+                        if (!matchDate && p.purchaseDate) {
+                            let pDate = new Date(p.purchaseDate);
 
-                        // Robust Date Parsing
-                        let pDate = new Date(p.purchaseDate);
+                            if (isNaN(pDate.getTime())) {
+                                const parts = p.purchaseDate.split('/');
+                                if (parts.length === 3) {
+                                    pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                } else {
+                                    const partsHyphen = p.purchaseDate.split('-');
+                                    if (partsHyphen.length === 3) {
+                                        pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                                    }
+                                }
+                            }
 
-                        // Fallback for DD/MM/YYYY
-                        if (isNaN(pDate.getTime())) {
-                            const parts = p.purchaseDate.split('/');
-                            if (parts.length === 3) {
-                                pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                            } else {
-                                // Try DD-MM-YYYY
-                                const partsHyphen = p.purchaseDate.split('-');
-                                if (partsHyphen.length === 3) {
-                                    pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                            if (!isNaN(pDate.getTime())) {
+                                pDate.setHours(0, 0, 0, 0);
+                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
+                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                                if (isAfterStart && isBeforeEnd) {
+                                    matchDate = true;
                                 }
                             }
                         }
 
-                        if (isNaN(pDate.getTime())) return false; // Invalid date in data
-
-                        // Reset time for comparison
-                        pDate.setHours(0, 0, 0, 0);
-
-                        if (parsedStartDate && pDate < parsedStartDate) return false;
-                        if (parsedEndDate && pDate > parsedEndDate) return false;
-
-                        return true;
-                    });
+                        // Break early if all criteria are satisfied
+                        if (hasCat && hasSection && hasSku && hasMatch && matchDate) break;
+                    }
 
                     matchProduct = hasCat && hasSection && hasSku && hasMatch && matchDate;
                 }
