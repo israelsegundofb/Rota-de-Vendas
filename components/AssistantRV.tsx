@@ -10,14 +10,14 @@ interface Message {
     role: 'user' | 'assistant' | 'system';
     content: string;
 }
-
 interface AssistantRVProps {
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
     context: AssistantContext;
+    geminiApiKey?: string;
 }
 
-export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) => {
+export const AssistantRV = ({ isOpen, setIsOpen, context, geminiApiKey }: AssistantRVProps) => {
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
@@ -27,6 +27,7 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
     ]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [sessionId, setSessionId] = useState<string | undefined>();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom of chat
@@ -65,12 +66,14 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
         setIsLoading(true);
 
         try {
-            const responseText = await askAssistantRV(userMsg, context);
+            console.log('[ASSISTANT] Enviando pergunta. Chave presente:', !!geminiApiKey);
+            const result = await askAssistantRV(userMsg, context, sessionId, geminiApiKey);
+            if (result.sessionId) setSessionId(result.sessionId);
 
             const assistantMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: responseText
+                content: result.text
             };
 
             setMessages(prev => [...prev, assistantMsg]);

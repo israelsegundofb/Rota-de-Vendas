@@ -531,8 +531,10 @@ export const categorizeProductsWithAI = async (
  */
 export const askAssistantRV = async (
   prompt: string,
-  context: AssistantContext
-): Promise<string> => {
+  context: AssistantContext,
+  sessionId?: string,
+  geminiApiKey?: string
+): Promise<{ text: string, sessionId: string }> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   // Build the super-prompt with context
@@ -567,23 +569,16 @@ export const askAssistantRV = async (
     [VISÃO MACRO (Base Total - Estatísticas Agregadas)]
     ${context.aggregation ? context.aggregation : 'Estatísticas agregadas não disponíveis no momento.'}
 
+    [INSTRUÇÕES DE FERRAMENTAS (CRÍTICO)]
+    Você possui ferramentas poderosas de busca vetorial no Qdrant. Use-as PROATIVAMENTE sempre que a informação não estiver listada nos dados acima:
+    1. **search_company_rules**: Use SEMPRE para perguntas sobre quem é a Graves & Agudos, sua história, horários de funcionamento, regras da empresa, manuais ou a marca VO6. Se o usuário perguntar "O que você sabe sobre nós?", esta é a ferramenta certa.
+    2. **search_clients_knowledge**: Use para buscar clientes por características subjetivas (ex: "quem foca em suspensão?") ou para encontrar clientes não listados no resumo.
+    3. **search_products_knowledge**: Use para buscar no catálogo de produtos por descrição.
+    
     [INSTRUÇÕES GERAIS]
-    1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
-    2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
-    3. RECONHECIMENTO DE USUÁRIOS E CLIENTES: 
-       - Diferencie estritamente **Usuários do Sistema (Vendedores/Gestores)** de **Clientes da Base**.
-       - Use a "Lista de Usuários Cadastrados" para identificar pessoas mencionadas como vendedores (ex: se perguntarem sobre "Orneliano", procure o nome na lista de usuários e entenda que ele é o Vendedor, não o cliente de mesmo nome).
-       - Se houver um cliente e um vendedor com o mesmo nome, assuma que perguntas sobre "vendedor" ou "carteira" referem-se ao usuário do sistema.
-    4. PRIORIDADE DE RECÊNCIA (DADOS NOVOS):
-       - Clientes com a flag 'recent: true' foram atualizados ou incluídos nos últimos 5 minutos (ex: via upload de planilha).
-       - Sempre que identificar esses dados novos, priorize-os na resposta se forem relevantes para a pergunta. Destaque-os como "novidades detectadas no sistema".
-    5. OBJETIVIDADE E PRECISÃO:
-       - Responda de forma precisa e objetiva baseando-se estritamente nos dados fornecidos (clientes, produtos, histórico).
-       - Evite suposições. Se um dado não estiver no contexto, informe polidamente que não tem acesso a essa informação específica no momento.
-    6. CRUZAMENTO DE DADOS: O campo 'salespersonId' ou 'vendedorId' nos dados de clientes refere-se ao ID do usuário. Mapeie isso para o nome correto usando a lista de usuários.
-    7. ANÁLISE DE COMPRAS: O array 'historico' nos dados de clientes contém o que foi comprado. Use isso para responder sobre departamentos (ex: "aerofólio"), SKUs ou datas.
-    8. HIERARQUIA: Entenda que gestores (Gerentes/Admins) podem ver tudo, enquanto vendedores podem ter visões focadas em sua própria carteira (embora neste contexto macro você tenha visão de até 2500 clientes).
-    9. Informe polidamente que como "Assistente RV" você visualiza no momento o recorte detalhado de até 2500 clientes, mas tem ciência das estatísticas globais da base.
+    1. Responda em Português (PT-BR) de forma amigável e profissional.
+    2. Use Markdown para clareza (tabelas, negrito, listas).
+    3. Se houver dúvida institucional, use a ferramenta **search_company_rules** antes de dizer que não sabe.
     
     Pergunta do Usuário:
     "${prompt}"
@@ -595,11 +590,15 @@ export const askAssistantRV = async (
 
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gemini-2.0-flash',
-        prompt: fullPrompt
-      }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Gemini-Key': geminiApiKey || ''
+        },
+        body: JSON.stringify({
+          model: 'gemini-2.0-flash',
+          prompt: fullPrompt,
+          sessionId: sessionId
+        }),
       signal: controller.signal
     });
 
@@ -611,7 +610,10 @@ export const askAssistantRV = async (
     }
 
     const data = await response.json();
-    return data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.";
+    return {
+      text: data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.",
+      sessionId: data.sessionId
+    };
   } catch (error: any) {
     console.error("AssistantRV Error:", error);
     if (error.name === 'AbortError') throw new Error("Tempo limite excedido.");

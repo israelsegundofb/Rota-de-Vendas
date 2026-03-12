@@ -16,7 +16,7 @@ import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
-import { processClientsWithAI, syncDataToAI } from './services/geminiService';
+import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
@@ -36,8 +36,6 @@ const AdminCategoryManagement = React.lazy(() => import('./components/AdminCateg
 const AdminProductManagement = React.lazy(() => import('./components/AdminProductManagement'));
 const CloudConfigModal = React.lazy(() => import('./components/CloudConfigModal'));
 const AdminFileManager = React.lazy(() => import('./components/AdminFileManager'));
-const GoogleMapsKeyModal = React.lazy(() => import('./components/GoogleMapsKeyModal'));
-const CNPJaKeyModal = React.lazy(() => import('./components/CNPJaKeyModal'));
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
 const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
@@ -47,7 +45,6 @@ import { AssistantRV } from './components/AssistantRV';
 import DateRangePicker from './components/DateRangePicker';
 import CookieConsent from './components/CookieConsent';
 import LoadingScreen from './components/LoadingScreen';
-import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
@@ -58,6 +55,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useChat } from './hooks/useChat';
 import { usePageTracking } from './hooks/useAnalytics';
 import { useToast } from './contexts/ToastContext';
+import { subscribeToSystemSettings } from './services/settingsService';
 
 // Initial Mock Data
 interface ProcessingState {
@@ -74,7 +72,7 @@ interface ProcessingState {
 const App: React.FC = () => {
   // --- Custom Hooks ---
   const {
-    users, setUsers, currentUser, login, logout: authLogout,
+    users, publicUsers, setUsers, currentUser, login, logout: authLogout,
     addUser: baseAddUser, updateUser: baseUpdateUser, deleteUser: baseDeleteUser
   } = useAuth();
 
@@ -141,7 +139,7 @@ const App: React.FC = () => {
     messages, conversations, activeConversationId, setActiveConversationId,
     sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread,
     deleteMessage: handleChatDeleteMessage, clearMessages: handleChatClearMessages
-  } = useChat(currentUser, users);
+  } = useChat(currentUser, publicUsers);
 
   // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
@@ -154,18 +152,34 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  const [activeApiKey] = useState<string>(() => {
-    const key = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || getStoredFirebaseConfig()?.apiKey || '';
-    console.log('[APP] Gemini API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
-    return key;
-  });
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(() => {
-    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || localStorage.getItem('google_maps_api_key') || import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || '';
-    console.log('[APP] Maps API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
-    return key;
-  });
+  const [activeApiKey, setActiveApiKey] = useState<string>('');
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>('');
   const [keyVersion, setKeyVersion] = useState(0);
   const [isMapApiBroken, setIsMapApiBroken] = useState(false);
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+    if (isFirebaseConnected) {
+      unsubscribe = subscribeToSystemSettings((settings) => {
+        if (settings.geminiApiKey) {
+           console.log('[APP] Gemini API Key recebida:', settings.geminiApiKey.substring(0, 6) + '...');
+           setActiveApiKey(settings.geminiApiKey);
+        } else {
+           console.warn('[APP] Gemini API Key não encontrada no Firestore.');
+        }
+        if (settings.googleMapsApiKey) {
+           setGoogleMapsApiKey(settings.googleMapsApiKey);
+           console.log('[APP] Google Maps API Key injetada pelo Cloud.');
+           setIsMapApiBroken(false); // Reset error state if a valid key is found
+           setKeyVersion(v => v + 1); // Force map re-render when key arrives
+        }
+        if (settings.cnpjaApiKey) {
+           console.log('[APP] CNPJa API Key injetada pelo Cloud.');
+        }
+      });
+    }
+    return () => unsubscribe();
+  }, [isFirebaseConnected]);
 
   // Assistant State
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -221,10 +235,7 @@ const App: React.FC = () => {
   }, [currentUser, users]);
   // isFirebaseConnected handled by hook
   const [selectedClient] = useState<EnrichedClient | undefined>(undefined);
-  const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
-  const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
-  const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
   // Custom Dialog State
   const [dialogConfig, setDialogConfig] = useState<{
@@ -242,15 +253,7 @@ const App: React.FC = () => {
     type: 'info'
   });
 
-  const showAlert = React.useCallback((title: string, message: string | string[], type: DialogType = 'info') => {
-    setDialogConfig({
-      isOpen: true,
-      title,
-      message,
-      type,
-      confirmLabel: 'Entendi'
-    });
-  }, [setDialogConfig]);
+
 
   const showConfirm = React.useCallback((title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
     setDialogConfig({
@@ -488,7 +491,8 @@ const App: React.FC = () => {
             if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja inválida'))) {
               isUploadCancelled.current = true;
               setProcState(prev => ({ ...prev, status: 'error', errorMessage: 'Autenticação CNPJa falhou. Chave inválida ou expirada.' }));
-              setIsCNPJaModalOpen(true);
+              setIsCloudConfigOpen(true);
+              toast.error('Falha de Autenticação CNPJa. Configure a chave na aba Cloud.');
             }
           } finally {
             setProcState(prev => ({ ...prev, current: index + 1 }));
@@ -1030,16 +1034,8 @@ const App: React.FC = () => {
   // View State (Replaced moved function with space)
 
   const handleInvalidKey = async () => {
-    setIsGoogleMapsModalOpen(true);
-  };
-
-  const handleConfirmMapKey = (newKey: string) => {
-    if (newKey && newKey.trim()) {
-      setGoogleMapsApiKey(newKey.trim());
-      localStorage.setItem('google_maps_api_key', newKey.trim());
-      setKeyVersion(v => v + 1);
-      setIsGoogleMapsModalOpen(false);
-    }
+    toast.error('Chave do Google Maps inválida ou ausente. Acesse Configurações da Nuvem para configurar.');
+    setIsMapApiBroken(true);
   };
 
   // --- Derived Data ---
@@ -1064,12 +1060,6 @@ const App: React.FC = () => {
     resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
-  };
-
-  const handleConfirmCNPJaKey = (key: string) => {
-    localStorage.setItem('cnpja_api_key', key);
-    setIsCNPJaModalOpen(false);
-    showAlert("Sucesso", "Chave CNPJa atualizada! Tente realizar a consulta novamente.", "success");
   };
 
   const handleLogout = async () => {
@@ -1445,11 +1435,18 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = (updatedUser: AppUser) => {
+    // Security: If password is masked '***', preserve the original password from master state
+    const existingUser = users.find(u => u.id === updatedUser.id);
+    const finalUser = {
+      ...updatedUser,
+      password: updatedUser.password === '***' ? (existingUser?.password || updatedUser.password) : updatedUser.password
+    };
+
     // 1. Local update
-    baseUpdateUser(updatedUser);
+    baseUpdateUser(finalUser);
 
     // 2. Immediate Cloud Save
-    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    const updatedUsers = users.map(u => u.id === finalUser.id ? finalUser : u);
     saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
       .then(() => console.warn('[AUTH] Atualização de usuário na nuvem concluída ✅'))
       .catch(e => console.error('[AUTH] Falha no salvamento imediato da atualização:', e));
@@ -2234,19 +2231,6 @@ const App: React.FC = () => {
               isFirebaseConnected={isFirebaseConnected}
             />
 
-            <GoogleMapsKeyModal
-              isOpen={isGoogleMapsModalOpen}
-              onClose={() => setIsGoogleMapsModalOpen(false)}
-              onConfirm={handleConfirmMapKey}
-              suggestedKey={SUGGESTED_MAP_KEY}
-            />
-
-            <CNPJaKeyModal
-              isOpen={isCNPJaModalOpen}
-              onClose={() => setIsCNPJaModalOpen(false)}
-              onConfirm={handleConfirmCNPJaKey}
-            />
-
             {isAddModalOpen && (
               <AddClientModal
                 isOpen={isAddModalOpen}
@@ -2267,7 +2251,7 @@ const App: React.FC = () => {
                 onSave={handleUpdateClient}
                 client={selectedClient}
 
-                users={users}
+                users={publicUsers}
                 allClients={masterClientList}
               />
             )}
@@ -2333,7 +2317,7 @@ const App: React.FC = () => {
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminUserManagement
                     currentUser={currentUser}
-                    users={users}
+                    users={currentUser?.role === 'admin_dev' ? users : publicUsers}
                     onAddUser={handleAddUser}
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
@@ -2368,7 +2352,7 @@ const App: React.FC = () => {
               <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Arquivos..." />}>
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminFileManager
-                    users={users}
+                    users={publicUsers}
                     uploadedFiles={uploadedFiles}
                     onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
                     onUploadProducts={handleProductFileUpload}
@@ -2404,7 +2388,7 @@ const App: React.FC = () => {
                   <AdminDashboard
                     clients={finalFilteredClients}
                     products={products}
-                    users={users}
+                    users={publicUsers}
                     onClose={() => setActiveView('map')}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
@@ -2775,7 +2759,7 @@ const App: React.FC = () => {
                             A chave do Google Maps expirou ou é inválida. Por favor, atualize as chaves nas configurações.
                           </p>
                           <button
-                            onClick={() => setIsGoogleMapsModalOpen(true)}
+                            onClick={() => setIsCloudConfigOpen(true)}
                             className="px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all font-bold shadow-md"
                           >
                             Configurar Chaves
@@ -3043,7 +3027,7 @@ const App: React.FC = () => {
                           users={users}
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
-                          onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
+                          onCNPJAuthError={() => { toast.error('Chave do CNPJa ausente ou inválida. Configure na Nuvem.'); setIsCloudConfigOpen(true); }}
                           searchTerm={searchQuery}
                           onSearchChange={setSearchQuery}
                           regionFilter={filterRegion}
@@ -3172,6 +3156,7 @@ const App: React.FC = () => {
         <AssistantRV
           isOpen={isAssistantOpen}
           setIsOpen={setIsAssistantOpen}
+          geminiApiKey={activeApiKey}
           context={{
             userName: currentUser.name || 'Usuário',
             userRole: currentUser.role || 'Geral',
