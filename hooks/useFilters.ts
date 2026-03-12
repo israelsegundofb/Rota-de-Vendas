@@ -149,9 +149,10 @@ export const useFilters = (
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // ⚡ BOLT OPTIMIZATION: Loop Fusion
-                    // Consolidated 5 separate .some() iterations over purchasedProducts into a single pass.
-                    // Tracks independent conditions and breaks early when all are met, turning O(5N) into O(N).
+                    // ⚡ Bolt Performance Optimization: Loop Fusion
+                    // Consolidate multiple sequential .some() calls into a single pass over purchasedProducts.
+                    // This eliminates redundant O(N) iterations and memory allocations by breaking early
+                    // when all independent conditions are met.
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
@@ -165,16 +166,18 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch && (
-                            (p.name || '').toLowerCase().includes(prodQuery) ||
-                            (p.sku || '').toLowerCase().includes(prodQuery) ||
-                            (p.brand || '').toLowerCase().includes(prodQuery) ||
-                            (p.category || '').toLowerCase().includes(prodQuery) ||
-                            (p.section || '').toLowerCase().includes(prodQuery) ||
-                            (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                            (p.price || 0).toString().includes(prodQuery)
-                        )) {
-                            hasMatch = true;
+                        if (!hasMatch) {
+                            if (
+                                (p.name || '').toLowerCase().includes(prodQuery) ||
+                                (p.sku || '').toLowerCase().includes(prodQuery) ||
+                                (p.brand || '').toLowerCase().includes(prodQuery) ||
+                                (p.category || '').toLowerCase().includes(prodQuery) ||
+                                (p.section || '').toLowerCase().includes(prodQuery) ||
+                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
+                                (p.price || 0).toString().includes(prodQuery)
+                            ) {
+                                hasMatch = true;
+                            }
                         }
 
                         if (!matchDate && p.purchaseDate) {
@@ -202,8 +205,9 @@ export const useFilters = (
                             }
                         }
 
-                        // Break early if all criteria are satisfied
-                        if (hasCat && hasSection && hasSku && hasMatch && matchDate) break;
+                        if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
+                            break;
+                        }
                     }
 
                     matchProduct = hasCat && hasSection && hasSku && hasMatch && matchDate;
