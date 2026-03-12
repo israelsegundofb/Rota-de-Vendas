@@ -149,23 +149,33 @@ export const useFilters = (
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // ⚡ Bolt Performance Optimization: Loop Fusion
-                    // Consolidate multiple sequential .some() calls into a single pass over purchasedProducts.
-                    // This eliminates redundant O(N) iterations and memory allocations by breaking early
-                    // when all independent conditions are met.
+                    // Initialize match flags based on whether the specific filter is active
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
                     let hasMatch = prodQuery === '';
                     let matchDate = !hasDateFilter;
 
+                    // Loop fusion: iterate purchasedProducts only once, tracking all conditions
                     for (let i = 0; i < c.purchasedProducts.length; i++) {
                         const p = c.purchasedProducts[i];
 
-                        if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
-                        if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
-                        if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
+                        // Evaluate category if not yet found
+                        if (!hasCat && (p.category || '') === filterProductCategory) {
+                            hasCat = true;
+                        }
 
+                        // Evaluate section if not yet found
+                        if (!hasSection && (p.section || '') === filterProductSection) {
+                            hasSection = true;
+                        }
+
+                        // Evaluate sku if not yet found
+                        if (!hasSku && (p.sku || '') === filterProductSku) {
+                            hasSku = true;
+                        }
+
+                        // Evaluate search query if not yet found
                         if (!hasMatch) {
                             if (
                                 (p.name || '').toLowerCase().includes(prodQuery) ||
@@ -180,14 +190,18 @@ export const useFilters = (
                             }
                         }
 
+                        // Evaluate date if not yet found
                         if (!matchDate && p.purchaseDate) {
+                            // Robust Date Parsing
                             let pDate = new Date(p.purchaseDate);
 
+                            // Fallback for DD/MM/YYYY
                             if (isNaN(pDate.getTime())) {
                                 const parts = p.purchaseDate.split('/');
                                 if (parts.length === 3) {
                                     pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
                                 } else {
+                                    // Try DD-MM-YYYY
                                     const partsHyphen = p.purchaseDate.split('-');
                                     if (partsHyphen.length === 3) {
                                         pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
@@ -196,15 +210,20 @@ export const useFilters = (
                             }
 
                             if (!isNaN(pDate.getTime())) {
+                                // Reset time for comparison
                                 pDate.setHours(0, 0, 0, 0);
-                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
-                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
-                                if (isAfterStart && isBeforeEnd) {
+
+                                let isValidDate = true;
+                                if (parsedStartDate && pDate < parsedStartDate) isValidDate = false;
+                                if (parsedEndDate && pDate > parsedEndDate) isValidDate = false;
+
+                                if (isValidDate) {
                                     matchDate = true;
                                 }
                             }
                         }
 
+                        // Early termination if all conditions are met
                         if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
                             break;
                         }
