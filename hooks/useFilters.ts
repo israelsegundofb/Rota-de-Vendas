@@ -149,48 +149,33 @@ export const useFilters = (
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // ⚡ Bolt: Loop fusion optimization
-                    // Combine multiple independent .some() conditions into a single pass over c.purchasedProducts
-                    // This changes O(5N) iterations into O(N), with early exit
+                    // Optimize: Evaluate all product conditions in a single loop while preserving
+                    // the independent "ANY product matches X" logic of the original code.
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
                     let hasMatch = prodQuery === '';
                     let matchDate = !hasDateFilter;
 
-                    for (const p of c.purchasedProducts) {
-                        // Check Category
-                        if (!hasCat && (p.category || '') === filterProductCategory) {
-                            hasCat = true;
-                        }
+                    for (let i = 0; i < c.purchasedProducts.length; i++) {
+                        const p = c.purchasedProducts[i];
 
-                        // Check Section
-                        if (!hasSection && (p.section || '') === filterProductSection) {
-                            hasSection = true;
-                        }
+                        if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
+                        if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
+                        if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        // Check Specific SKU
-                        if (!hasSku && (p.sku || '') === filterProductSku) {
-                            hasSku = true;
-                        }
-
-                        // Check Search Query
                         if (!hasMatch) {
-                            if ((p.name || '').toLowerCase().includes(prodQuery) ||
+                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
                                 (p.sku || '').toLowerCase().includes(prodQuery) ||
                                 (p.brand || '').toLowerCase().includes(prodQuery) ||
                                 (p.category || '').toLowerCase().includes(prodQuery) ||
                                 (p.section || '').toLowerCase().includes(prodQuery) ||
                                 (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery)) {
-                                hasMatch = true;
-                            }
+                                (p.price || 0).toString().includes(prodQuery);
                         }
 
-                        // Date Range Filter
                         if (!matchDate && p.purchaseDate) {
                             let pDate = new Date(p.purchaseDate);
-
                             if (isNaN(pDate.getTime())) {
                                 const parts = p.purchaseDate.split('/');
                                 if (parts.length === 3) {
@@ -202,7 +187,6 @@ export const useFilters = (
                                     }
                                 }
                             }
-
                             if (!isNaN(pDate.getTime())) {
                                 pDate.setHours(0, 0, 0, 0);
                                 const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
@@ -213,7 +197,7 @@ export const useFilters = (
                             }
                         }
 
-                        // Early break if all conditions are met
+                        // Early exit if all independent conditions are satisfied
                         if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
                             break;
                         }
