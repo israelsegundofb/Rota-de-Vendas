@@ -34,11 +34,15 @@ const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> 
     }, [client]);
 
     const filteredProducts = useMemo(() => {
+        // Optimization: Hoist searchTerm lowercase conversion outside the filter loop
+        // to avoid O(N) redundant string allocations and conversions.
+        const normalizedSearch = searchTerm.toLowerCase();
+
         return products.filter(product => {
             const matchesSearch =
-                (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (product.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
+                (product.name || '').toLowerCase().includes(normalizedSearch) ||
+                (product.sku || '').toLowerCase().includes(normalizedSearch) ||
+                (product.brand || '').toLowerCase().includes(normalizedSearch);
 
             const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
 
