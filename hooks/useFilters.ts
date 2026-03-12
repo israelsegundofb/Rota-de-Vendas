@@ -149,59 +149,53 @@ export const useFilters = (
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // Initialize match flags based on whether the specific filter is active
+                    // ⚡ Bolt: Loop fusion optimization
+                    // Combine multiple independent .some() conditions into a single pass over c.purchasedProducts
+                    // This changes O(5N) iterations into O(N), with early exit
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
                     let hasMatch = prodQuery === '';
                     let matchDate = !hasDateFilter;
 
-                    // Loop fusion: iterate purchasedProducts only once, tracking all conditions
-                    for (let i = 0; i < c.purchasedProducts.length; i++) {
-                        const p = c.purchasedProducts[i];
-
-                        // Evaluate category if not yet found
+                    for (const p of c.purchasedProducts) {
+                        // Check Category
                         if (!hasCat && (p.category || '') === filterProductCategory) {
                             hasCat = true;
                         }
 
-                        // Evaluate section if not yet found
+                        // Check Section
                         if (!hasSection && (p.section || '') === filterProductSection) {
                             hasSection = true;
                         }
 
-                        // Evaluate sku if not yet found
+                        // Check Specific SKU
                         if (!hasSku && (p.sku || '') === filterProductSku) {
                             hasSku = true;
                         }
 
-                        // Evaluate search query if not yet found
+                        // Check Search Query
                         if (!hasMatch) {
-                            if (
-                                (p.name || '').toLowerCase().includes(prodQuery) ||
+                            if ((p.name || '').toLowerCase().includes(prodQuery) ||
                                 (p.sku || '').toLowerCase().includes(prodQuery) ||
                                 (p.brand || '').toLowerCase().includes(prodQuery) ||
                                 (p.category || '').toLowerCase().includes(prodQuery) ||
                                 (p.section || '').toLowerCase().includes(prodQuery) ||
                                 (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery)
-                            ) {
+                                (p.price || 0).toString().includes(prodQuery)) {
                                 hasMatch = true;
                             }
                         }
 
-                        // Evaluate date if not yet found
+                        // Date Range Filter
                         if (!matchDate && p.purchaseDate) {
-                            // Robust Date Parsing
                             let pDate = new Date(p.purchaseDate);
 
-                            // Fallback for DD/MM/YYYY
                             if (isNaN(pDate.getTime())) {
                                 const parts = p.purchaseDate.split('/');
                                 if (parts.length === 3) {
                                     pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
                                 } else {
-                                    // Try DD-MM-YYYY
                                     const partsHyphen = p.purchaseDate.split('-');
                                     if (partsHyphen.length === 3) {
                                         pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
@@ -210,20 +204,16 @@ export const useFilters = (
                             }
 
                             if (!isNaN(pDate.getTime())) {
-                                // Reset time for comparison
                                 pDate.setHours(0, 0, 0, 0);
-
-                                let isValidDate = true;
-                                if (parsedStartDate && pDate < parsedStartDate) isValidDate = false;
-                                if (parsedEndDate && pDate > parsedEndDate) isValidDate = false;
-
-                                if (isValidDate) {
+                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
+                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                                if (isAfterStart && isBeforeEnd) {
                                     matchDate = true;
                                 }
                             }
                         }
 
-                        // Early termination if all conditions are met
+                        // Early break if all conditions are met
                         if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
                             break;
                         }
