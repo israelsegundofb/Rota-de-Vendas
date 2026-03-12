@@ -56,7 +56,7 @@ interface AdminDashboardProps {
 
 const COLORS = ['#0061A4', '#006A60', '#6B5778', '#BA1A1A', '#535F70', '#56605B', '#49454F', '#000000'];
 
-const KPICard: React.FC<{ title: string; value: string | number; icon: any; trend: number; color: string }> = ({ title, value, icon: Icon, trend, color }) => (
+const KPICard: React.FC<{ title: string; value: string | number; icon: React.ElementType; trend: number; color: string }> = ({ title, value, icon: Icon, trend, color }) => (
     <div className="bg-surface p-6 rounded-3xl shadow-elevation-1 border border-outline-variant/30 hover:shadow-elevation-2 transition-all group overflow-hidden relative">
         <div className={`absolute top-0 right-0 w-32 h-32 ${color} opacity-[0.03] -mr-16 -mt-16 rounded-full group-hover:scale-110 transition-transform`} />
         <div className="flex justify-between items-start relative z-10">
@@ -444,7 +444,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                                         formatter={(val: any) => [`R$ ${val.toLocaleString('pt-BR')}`, 'Venda']}
                                     />
-                                    <Area type="monotone" dataKey="value" stroke="#0061A4" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" {...({} as any)} />
+                                    <Area type="monotone" dataKey="value" stroke="#0061A4" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -589,9 +589,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     dataKey="revenue"
                                     fill="#D7E3F7"
                                     radius={[12, 12, 0, 0]}
-                                    activeBar={{ fill: '#0061A4' } as any}
+                                    activeBar={{ fill: '#0061A4' }}
                                     animationDuration={2000}
-                                    {...({} as any)}
                                 />
                             </BarChart>
                         </ResponsiveContainer>

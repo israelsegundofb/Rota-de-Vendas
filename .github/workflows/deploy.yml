@@ -35,7 +35,7 @@ jobs:
         run: npm run build
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -43,7 +43,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: "gen-lang-client-0586123917.firebasestorage.app"
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_BACKEND_URL: "https://rota-de-vendas-ga-n75lurd6yq-rj.a.run.app"
+          VITE_BACKEND_URL: "https://rota-vendas-api-66816750674.southamerica-east1.run.app"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -85,7 +85,7 @@ jobs:
         env:
           VITE_BASE_URL: /
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -93,7 +93,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: "gen-lang-client-0586123917.firebasestorage.app"
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_BACKEND_URL: "https://rota-de-vendas-ga-n75lurd6yq-rj.a.run.app"
+          VITE_BACKEND_URL: "https://rota-vendas-api-66816750674.southamerica-east1.run.app"
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -120,10 +120,10 @@ jobs:
 
       - name: 'Deploy Backend to Cloud Run from Source'
         run: |-
-          gcloud run deploy rota-de-vendas-ga \
+          gcloud run deploy rota-vendas-api \
             --source backend \
             --region southamerica-east1 \
             --project gen-lang-client-0586123917 \
             --quiet \
             --allow-unauthenticated \
-            --set-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
+            --update-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}",QDRANT_URL="https://1929b4d6-03dc-4acf-8da5-4a104b8a9608.us-east4-0.gcp.cloud.qdrant.io:6333",QDRANT_API_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.-YVCGa4U5tBKAeUDeCoz99ApakAbbzqRV6yjeeioAcY"

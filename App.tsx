@@ -7,17 +7,18 @@
   
   Developed with passion and technical excellence.
 */
+/* v6.5.2 — Cache Bust 2026-03-07 */
 import React, { useState, useEffect, useRef } from 'react';
 import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History, Download } from 'lucide-react';
-import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus } from './types';
-import { isAdmin, isSalesTeam, hasFullDataVisibility } from './utils/authUtils';
+import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus, RawClient } from './types';
+import { isAdmin, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
-import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV, detectCSVType } from './utils/csvParser';
+import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsWithAI } from './services/geminiService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, initializeFirebase, loadFromCloud, isFirebaseInitialized, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
+import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -35,29 +36,26 @@ const AdminCategoryManagement = React.lazy(() => import('./components/AdminCateg
 const AdminProductManagement = React.lazy(() => import('./components/AdminProductManagement'));
 const CloudConfigModal = React.lazy(() => import('./components/CloudConfigModal'));
 const AdminFileManager = React.lazy(() => import('./components/AdminFileManager'));
-const GoogleMapsKeyModal = React.lazy(() => import('./components/GoogleMapsKeyModal'));
-const CNPJaKeyModal = React.lazy(() => import('./components/CNPJaKeyModal'));
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
 const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
 const ChatPanel = React.lazy(() => import('./components/ChatPanel'));
 import { AssistantRV } from './components/AssistantRV';
-import { AssistantContext } from './services/geminiService';
 
 import DateRangePicker from './components/DateRangePicker';
 import CookieConsent from './components/CookieConsent';
 import LoadingScreen from './components/LoadingScreen';
-import { getStoredFirebaseConfig } from './firebaseConfig';
 import { useAuth } from './hooks/useAuth';
 import { useDataPersistence } from './hooks/useDataPersistence';
 import { useFilters } from './hooks/useFilters';
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import CustomDialog, { DialogType } from './components/CustomDialog';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom'; (Unused)
 import ErrorBoundary from './components/ErrorBoundary';
 import { useChat } from './hooks/useChat';
 import { usePageTracking } from './hooks/useAnalytics';
 import { useToast } from './contexts/ToastContext';
+import { subscribeToSystemSettings } from './services/settingsService';
 
 // Initial Mock Data
 interface ProcessingState {
@@ -74,7 +72,7 @@ interface ProcessingState {
 const App: React.FC = () => {
   // --- Custom Hooks ---
   const {
-    users, setUsers, currentUser, login, logout: authLogout,
+    users, publicUsers, setUsers, currentUser, login, logout: authLogout,
     addUser: baseAddUser, updateUser: baseUpdateUser, deleteUser: baseDeleteUser
   } = useAuth();
 
@@ -119,6 +117,10 @@ const App: React.FC = () => {
     isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
 
+  // Helper function to distribute products to clients (moved up to fix hoisting)
+  // REMOVED: distributeProductsToClients function
+
+
   const missingCoordinatesCount = React.useMemo(() => {
     return (visibleClients || []).filter((c: EnrichedClient) => !c.lat || !c.lng || Number(c.lat) === 0 || Number(c.lng) === 0).length;
   }, [visibleClients]);
@@ -137,7 +139,7 @@ const App: React.FC = () => {
     messages, conversations, activeConversationId, setActiveConversationId,
     sendMessage: handleChatSendMessage, markAsRead: handleChatMarkAsRead, totalUnread,
     deleteMessage: handleChatDeleteMessage, clearMessages: handleChatClearMessages
-  } = useChat(currentUser, users);
+  } = useChat(currentUser, publicUsers);
 
   // Background Processing State (Local to App as it handles UI feedback)
   const [procState, setProcState] = useState<ProcessingState>({
@@ -150,18 +152,34 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  const [activeApiKey, setActiveApiKey] = useState<string>(() => {
-    const key = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || getStoredFirebaseConfig()?.apiKey || '';
-    console.log('[APP] Gemini API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
-    return key;
-  });
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>(() => {
-    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || localStorage.getItem('google_maps_api_key') || import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('gemini_api_key') || '';
-    console.log('[APP] Maps API Key Source:', key ? 'FOUND' : 'MISSING', '(first 10 chars):', key?.substring(0, 10) + '...');
-    return key;
-  });
+  const [activeApiKey, setActiveApiKey] = useState<string>('');
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>('');
   const [keyVersion, setKeyVersion] = useState(0);
   const [isMapApiBroken, setIsMapApiBroken] = useState(false);
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+    if (isFirebaseConnected) {
+      unsubscribe = subscribeToSystemSettings((settings) => {
+        if (settings.geminiApiKey) {
+           console.log('[APP] Gemini API Key recebida:', settings.geminiApiKey.substring(0, 6) + '...');
+           setActiveApiKey(settings.geminiApiKey);
+        } else {
+           console.warn('[APP] Gemini API Key não encontrada no Firestore.');
+        }
+        if (settings.googleMapsApiKey) {
+           setGoogleMapsApiKey(settings.googleMapsApiKey);
+           console.log('[APP] Google Maps API Key injetada pelo Cloud.');
+           setIsMapApiBroken(false); // Reset error state if a valid key is found
+           setKeyVersion(v => v + 1); // Force map re-render when key arrives
+        }
+        if (settings.cnpjaApiKey) {
+           console.log('[APP] CNPJa API Key injetada pelo Cloud.');
+        }
+      });
+    }
+    return () => unsubscribe();
+  }, [isFirebaseConnected]);
 
   // Assistant State
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -183,9 +201,9 @@ const App: React.FC = () => {
   // --- Presence Effects ---
   useEffect(() => {
     // Global Google Maps Auth Failure Handler
-    (window as any).gm_authFailure = () => {
+    (window as Window & { gm_authFailure?: () => void }).gm_authFailure = () => {
       console.error("[APP] Google Maps authentication failed globally.");
-      (window as any).gm_authFailure_detected = true;
+      (window as Window & { gm_authFailure_detected?: boolean }).gm_authFailure_detected = true;
       setIsMapApiBroken(true);
       // Force a re-render
       setKeyVersion(v => v + 1);
@@ -217,10 +235,7 @@ const App: React.FC = () => {
   }, [currentUser, users]);
   // isFirebaseConnected handled by hook
   const [selectedClient] = useState<EnrichedClient | undefined>(undefined);
-  const [isGoogleMapsModalOpen, setIsGoogleMapsModalOpen] = useState(false);
-  const [isCNPJaModalOpen, setIsCNPJaModalOpen] = useState(false);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
-  const SUGGESTED_MAP_KEY = 'AIzaSyBXCBO0Kx9-2HvTzjcsHzoGmHZnIKXXvcw';
 
   // Custom Dialog State
   const [dialogConfig, setDialogConfig] = useState<{
@@ -238,17 +253,9 @@ const App: React.FC = () => {
     type: 'info'
   });
 
-  const showAlert = (title: string, message: string | string[], type: DialogType = 'info') => {
-    setDialogConfig({
-      isOpen: true,
-      title,
-      message,
-      type,
-      confirmLabel: 'Entendi'
-    });
-  };
 
-  const showConfirm = (title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
+
+  const showConfirm = React.useCallback((title: string, message: string | string[], onConfirm: () => void, labels?: { confirm?: string, cancel?: string }) => {
     setDialogConfig({
       isOpen: true,
       title,
@@ -258,30 +265,28 @@ const App: React.FC = () => {
       confirmLabel: labels?.confirm || 'Confirmar',
       cancelLabel: labels?.cancel || 'Cancelar'
     });
-  };
+  }, [setDialogConfig]);
 
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
 
   // Handle View Navigation with Confirmation
-  const handleViewNavigation = (newView: string) => {
+  const handleViewNavigation = (newView: 'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat') => {
     if (procState.isActive && procState.status === 'processing') {
       showConfirm(
         "Parar Envio?",
         ["Gostaria de parar de enviar o arquivo?", "O progresso atual será perdido."],
         () => {
           isUploadCancelled.current = true;
-          setActiveView(newView as any);
+          setActiveView(newView);
         },
         { confirm: 'Parar Envio', cancel: 'Continuar' }
       );
     } else {
-      setActiveView(newView as any);
+      setActiveView(newView);
     }
   };
 
-  // Admin Upload State
-  const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
 
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -293,7 +298,7 @@ const App: React.FC = () => {
   // User handlers are now imported from useAuth hook
 
 
-  const handleCleanupDuplicates = () => {
+  const handleCleanupDuplicates = React.useCallback(() => {
     showConfirm(
       'Remover Clientes Duplicados?',
       [
@@ -328,7 +333,7 @@ const App: React.FC = () => {
         );
       }
     );
-  };
+  }, [showConfirm, setMasterClientList, toast, masterClientList]);
 
   /**
    * UTILITÁRIO DE ATUALIZAÇÃO EM MASSA (ENRIQUECIMENTO)
@@ -344,12 +349,15 @@ const App: React.FC = () => {
       'Iniciar Atualização em Massa?',
       [
         'Este processo utilizará sua API CNPJa para:',
-        '• Buscar CNPJs faltantes via Razão Social',
+        '• Buscar CNPJs faltantes via Razão Social (limpando nomes)',
         '• Atualizar CNAEs (Atividade Econômica)',
-        '• Telefones, Endereços e Georreferenciamento',
+        '• Telefones, Endereços e Georreferenciamento de Fallback',
         `Total de clientes: ${masterClientList.length}`
       ],
       async () => {
+        // Ativar Lock de Sincronização para evitar sobrescrita por real-time sync
+        if (syncLockRef) syncLockRef.current = true;
+
         setProcState({
           isActive: true,
           current: 0,
@@ -362,14 +370,20 @@ const App: React.FC = () => {
         const limit = pLimit(3);
         let updatedCount = 0;
         let errorCount = 0;
+        let finalUpdatedList = [...masterClientList];
 
         const tasks = masterClientList.map((client, index) => limit(async () => {
           try {
             let activeCnpj = client.cnpj?.replace(/\D/g, '');
 
+            // 1. Limpar Nome para Busca (Remover prefixos de importação)
+            const searchName = client.companyName
+              .replace(/^(Novo - Importação|Novo|Importação)\s*(-|:)?\s*/i, '')
+              .trim();
+
             if (!activeCnpj || activeCnpj.length !== 14) {
               const searchResults = await pesquisarEmpresaPorEndereco({
-                filtros: client.companyName,
+                filtros: searchName,
                 uf: client.state
               });
               if (searchResults && searchResults.length > 0) {
@@ -380,41 +394,105 @@ const App: React.FC = () => {
             if (activeCnpj && activeCnpj.length === 14) {
               const fullData = await consultarCNPJ(activeCnpj);
               if (fullData) {
+                // 2. Antes de aplicar, verificar se já existe outro cliente com este CNPJ no sistema
+                const existingWithCnpj = finalUpdatedList.find(c =>
+                  c.id !== client.id &&
+                  c.cnpj?.replace(/\D/g, '') === activeCnpj
+                );
+
                 const hasNewAddress = fullData.logradouro && fullData.numero;
-                setMasterClientList(prev => prev.map(c => {
-                  if (c.id === client.id) {
-                    return {
-                      ...c,
-                      cnpj: fullData.cnpj,
-                      companyName: fullData.nome_fantasia || fullData.razao_social || c.companyName,
-                      contact: fullData.ddd_telefone_1 || c.contact,
-                      cleanAddress: hasNewAddress
-                        ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
-                        : c.cleanAddress,
-                      originalAddress: hasNewAddress
-                        ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
-                        : c.originalAddress,
-                      mainCnae: fullData.cnae_fiscal || c.mainCnae,
-                      secondaryCnaes: fullData.cnaes_secundarios?.map((s: any) => `${s.codigo} - ${s.texto}`) || c.secondaryCnaes || [],
-                      lat: fullData.latitude || c.lat,
-                      lng: fullData.longitude || c.lng,
-                      googleMapsUri: fullData.latitude ? `https://www.google.com/maps?q=${fullData.latitude},${fullData.longitude}` : c.googleMapsUri
-                    };
+                let lat = fullData.latitude || client.lat;
+                let lng = fullData.longitude || client.lng;
+
+                // Fallback de Geocodificação se CNPJa não retornou coordenadas
+                if ((!lat || lat === 0) && hasNewAddress) {
+                  try {
+                    const geo = await geocodeWithFallback([`${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`]);
+                    if (geo) { lat = geo.lat; lng = geo.lng; }
+                  } catch (e) { console.warn('Geo fallback failed for mass update:', e); }
+                }
+
+                let cleanAddress = hasNewAddress
+                  ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
+                  : client.cleanAddress;
+
+                // 2. Geocoding de Fallback se as coordenadas vierem zeradas ou ausentes
+                if ((!lat || !lng || lat === 0) && cleanAddress) {
+                  try {
+                    const geoRes = await geocodeWithFallback([
+                      cleanAddress,
+                      `${fullData.logradouro}, ${fullData.numero}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                    ]);
+                    if (geoRes) {
+                      lat = geoRes.lat;
+                      lng = geoRes.lng;
+                      if (geoRes.formattedAddress) cleanAddress = geoRes.formattedAddress;
+                    }
+                  } catch (e) {
+                    console.warn(`[ENRICH] Geocode fallback failed for ${searchName}:`, e);
                   }
-                  return c;
-                }));
+                }
+
+                const updatedClient: EnrichedClient = {
+                  ...client,
+                  cnpj: fullData.cnpj,
+                  companyName: fullData.razao_social || fullData.nome_fantasia || searchName,
+                  contact: fullData.ddd_telefone_1 || client.contact,
+                  cleanAddress,
+                  originalAddress: hasNewAddress
+                    ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                    : client.originalAddress,
+                  mainCnae: fullData.cnae_fiscal || client.mainCnae,
+                  secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${String(s.codigo)} - ${s.texto}`) || client.secondaryCnaes || [],
+                  lat,
+                  lng,
+                  googleMapsUri: lat ? `https://www.google.com/maps?q=${lat},${lng}` : client.googleMapsUri,
+                  lastUpdated: new Date().toISOString()
+                };
+
+                // DUPLICATE HANDLING: If we found another client with the same CNPJ, MERGE!
+                if (existingWithCnpj) {
+                  const mergedClient: EnrichedClient = {
+                    ...existingWithCnpj,
+                    ...updatedClient,
+                    id: existingWithCnpj.id, // Keep the one already in DB if it was fuller
+                    purchasedProducts: [...(existingWithCnpj.purchasedProducts || []), ...(client.purchasedProducts || [])]
+                      .filter((v, i, a) => a.findIndex(t => t.sku === v.sku && t.purchaseDate === v.purchaseDate) === i)
+                  };
+
+                  // Update final list: Remove the current 'indefinido' (client.id) and update the 'existing' (existingWithCnpj.id)
+                  finalUpdatedList = finalUpdatedList
+                    .filter(c => c.id !== client.id)
+                    .map(c => c.id === existingWithCnpj.id ? mergedClient : c);
+
+                  setMasterClientList(prev => prev
+                    .filter(c => c.id !== client.id)
+                    .map(c => c.id === existingWithCnpj.id ? mergedClient : c)
+                  );
+
+                  // Delete duplicate from cloud immediately
+                  if (isFirebaseConnected) {
+                    import('./services/firebaseService').then(m => m.deleteClientFromCloud(client.id)).catch(console.error);
+                  }
+                } else {
+                  // Normal update
+                  finalUpdatedList = finalUpdatedList.map(c => c.id === client.id ? updatedClient : c);
+                  setMasterClientList(prev => prev.map(c => c.id === client.id ? updatedClient : c));
+                }
+
                 updatedCount++;
               }
             }
-          } catch (err: any) {
+          } catch (err: unknown) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
             console.error(`Erro ao atualizar cliente ${client.companyName}:`, err);
             errorCount++;
 
-            // Check for 401 specifically to stop the whole process if the key is invalid
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('chave de api cnpja inválida'))) {
+            if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja inválida'))) {
               isUploadCancelled.current = true;
               setProcState(prev => ({ ...prev, status: 'error', errorMessage: 'Autenticação CNPJa falhou. Chave inválida ou expirada.' }));
-              setIsCNPJaModalOpen(true);
+              setIsCloudConfigOpen(true);
+              toast.error('Falha de Autenticação CNPJa. Configure a chave na aba Cloud.');
             }
           } finally {
             setProcState(prev => ({ ...prev, current: index + 1 }));
@@ -423,8 +501,23 @@ const App: React.FC = () => {
 
         await Promise.all(tasks);
 
-        setProcState(prev => ({ ...prev, status: 'completed' }));
+        // 3. Salvamento Final Explícito para garantir persistência total
+        if (isFirebaseConnected && updatedCount > 0) {
+          try {
+            const { saveToCloud: forceSave } = await import('./services/firebaseService');
+            await forceSave(finalUpdatedList, products, categories, users, uploadedFiles);
+            console.log(`[ENRICH] ✅ ${updatedCount} clientes salvos no Firebase.`);
 
+            // Refresh hash to prevent sync issues
+            lastClientsHash.current = JSON.stringify(finalUpdatedList, (key, value) =>
+              key === 'lastUpdated' ? undefined : value
+            );
+          } catch (e) {
+            console.error('[ENRICH] Erro no salvamento final:', e);
+          }
+        }
+
+        setProcState(prev => ({ ...prev, status: 'completed' }));
         toast.success(
           `Atualização: ${updatedCount} sucesso, ${errorCount} erros.`,
           'Enriquecimento Concluído'
@@ -432,6 +525,7 @@ const App: React.FC = () => {
 
         setTimeout(() => {
           setProcState(prev => ({ ...prev, isActive: false }));
+          if (syncLockRef) syncLockRef.current = false;
         }, 3000);
       }
     );
@@ -451,8 +545,7 @@ const App: React.FC = () => {
   const handleUploadProducts = (newProducts: Product[]) => {
     setProducts(prev => {
       const updated = [...prev, ...newProducts];
-      // Distribute products to clients immediately for demo purposes
-      distributeProductsToClients(masterClientList, updated);
+      // REMOVED: distributeProductsToClients(masterClientList, updated);
 
       if (currentUser) {
         logActivityToCloud({
@@ -471,15 +564,18 @@ const App: React.FC = () => {
 
   const handleSaveProducts = (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
-    // Optionally redistribute if products logic changes significantly, though strictly not needed for simple price updates
-    // distributeProductsToClients(masterClientList, updatedProducts);
   };
 
-  const handleClearProducts = () => {
-    setProducts([]);
-    // Remove purchase history from clients
-    setMasterClientList(prev => prev.map(c => ({ ...c, purchasedProducts: [] })));
-  };
+  const handleClearProducts = React.useCallback(() => {
+    showConfirm(
+      'Limpar Catálogo?',
+      'Isso removerá TODOS os produtos cadastrados. Confirmar?',
+      () => {
+        setProducts([]);
+        toast.success('Catálogo de produtos limpo.');
+      }
+    );
+  }, [showConfirm, setProducts, toast]);
 
   const handleClearAllClients = () => {
     showConfirm(
@@ -492,7 +588,7 @@ const App: React.FC = () => {
       async () => {
         if (syncLockRef.current !== undefined) syncLockRef.current = true;
         setMasterClientList([]);
-        setUploadedFiles(prev => prev.filter(f => f.type !== 'clients'));
+        setUploadedFiles([]);
         if (lastClientsHash.current !== undefined) lastClientsHash.current = '';
 
         // Clear LocalStorage to prevent auto-migration back to cloud
@@ -526,9 +622,51 @@ const App: React.FC = () => {
     );
   };
 
+  const handleClearPurchases = () => {
+    showConfirm(
+      "Deseja limpar todo o histórico de compras?",
+      [
+        "⚠️ Esta ação é IRREVERSÍVEL.",
+        "• Todos os registros de compras de TODOS os clientes serão removidos.",
+        "• Arquivos de planilhas de compras também serão excluídos da listagem.",
+        "• Os clientes em si NÃO serão removidos, apenas seu histórico."
+      ],
+      async () => {
+        syncLockRef.current = true;
+
+        // 1. Clear ALL purchases from clients (reais e mock/fake)
+        const newList = masterClientList.map(c => ({ ...c, purchasedProducts: [] }));
+        const newFiles = uploadedFiles.filter(f => f.type !== 'purchases');
+
+        setMasterClientList(newList);
+        setUploadedFiles(newFiles);
+
+        // 2. Clear LocalStorage for purchases metadata
+        localStorage.removeItem('vendas_ai_files');
+
+        // 3. Sync to cloud
+        if (isFirebaseConnected) {
+          try {
+            const { saveToCloud, syncUploadedFilesMetadata } = await import('./services/firebaseService');
+            await saveToCloud(newList, products, categories, users, newFiles);
+            await syncUploadedFilesMetadata(newFiles);
+            lastClientsHash.current = JSON.stringify(newList, (key, value) => key === 'lastUpdated' ? undefined : value);
+            console.log('[APP] ✅ Purchase history cleared and synced.');
+          } catch (e) {
+            console.error("Erro ao sincronizar limpeza de vendas:", e);
+            toast.error('Erro ao limpar dados na nuvem.');
+          }
+        }
+
+        syncLockRef.current = false;
+        toast.success('Histórico de vendas removido com sucesso!');
+      }
+    );
+  };
+
 
   // Helper for sequential geocoding attempts
-  const geocodeWithFallback = async (addresses: (string | undefined)[]) => {
+  const geocodeWithFallback = React.useCallback(async (addresses: (string | undefined)[]) => {
     for (const addr of addresses) {
       const candidate = addr?.trim();
       if (!candidate) continue;
@@ -540,9 +678,9 @@ const App: React.FC = () => {
       }
     }
     return null;
-  };
+  }, [googleMapsApiKey]);
 
-  const handleBulkGeneratePlusCodes = async () => {
+  const handleBulkGeneratePlusCodes = React.useCallback(async () => {
     const clientsMissingPlusCode = masterClientList.filter(c => !c.plusCode && c.lat && c.lng && c.lat !== 0);
 
     if (clientsMissingPlusCode.length === 0) {
@@ -598,38 +736,9 @@ const App: React.FC = () => {
         toast.success(`Processo concluído! ${updatedCount} Plus Codes gerados.`);
       }
     );
-  };
+  }, [masterClientList, toast, showConfirm, currentUser, googleMapsApiKey, setMasterClientList]);
 
   const handleUpdateClient = React.useCallback(async (updatedClient: EnrichedClient) => {
-    // Need to access current state inside callback or use functional updates where possible
-    // Since we need to find 'original' from 'masterClientList', we should ideally use a ref or include it in dependency
-    // However, masterClientList changes frequently. 
-    // A better approach for 'original' might be to pass it from the child if possible, but here we lookup.
-    // To avoid rebuilding this function on every list change, we can use a functional state update for the SET, 
-    // but the READ of 'original' is tricky. 
-    // Actually, 'original' is only used to check if address changed. 
-
-    // Let's rely on setMasterClientList functional update to be safe and inclusion of variables.
-    // If we include masterClientList in dependency, it defeats the purpose if list changes.
-    // OPTIMIZATION: We will trust the passed 'updatedClient' mostly, but for address comparison we need source.
-    // We can use a ref for masterClientList to read current value without re-binding.
-
-    setMasterClientList((prevList) => {
-      const original = prevList.find(c => c.id === updatedClient.id);
-
-      const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
-      const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
-      const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
-      const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
-
-      const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
-
-      // Handle async geocoding OUTSIDE the synchronous setState where possible.
-      // Since geocode is async, we return the list as-is below, 
-      // but if we successfully geocode outside, we will fire ANOTHER setState.
-      return prevList;
-    });
-
     const finalClient = { ...updatedClient };
 
     // Find original directly for comparison
@@ -638,43 +747,32 @@ const App: React.FC = () => {
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
     const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
     const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
-
     const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+    const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
 
-    if (!hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing)) {
-      const detailedAddress = [
-        updatedClient.cleanAddress,
-        updatedClient.district,
-        updatedClient.city,
-        updatedClient.state,
-        updatedClient.zip,
-        updatedClient.region,
-        updatedClient.country || 'Brasil'
-      ].filter(Boolean).join(', ');
-
-      const geoResult = await geocodeWithFallback([
-        updatedClient.plusCode,
-        detailedAddress,
-        updatedClient.cleanAddress,
-        updatedClient.originalAddress
-      ]);
-
-      if (geoResult) {
-        finalClient.lat = geoResult.lat;
-        finalClient.lng = geoResult.lng;
-        if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
-
-        if (!finalClient.plusCode) {
-          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-          if (plusCode) finalClient.plusCode = plusCode;
-        }
-      }
-    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
-      const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-      if (plusCode) finalClient.plusCode = plusCode;
-    }
-
+    // ---- SAVE IMMEDIATELY (surgical update) ----
     setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
+
+    // Persist to cloud surgicaly
+    if (isFirebaseConnected) {
+      (async () => {
+        try {
+          const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
+          await surgicalUpdate(finalClient);
+          console.log('[APP] ✅ Edit surgical-saved to Firebase.');
+
+          // Still update hash for local consistency check if needed
+          setMasterClientList(current => {
+            lastClientsHash.current = JSON.stringify(current, (key, value) =>
+              key === 'lastUpdated' ? undefined : value
+            );
+            return current;
+          });
+        } catch (saveErr) {
+          console.error('[APP] Failed to surgical-save edited client:', saveErr);
+        }
+      })();
+    }
 
     if (currentUser) {
       logActivityToCloud({
@@ -689,13 +787,190 @@ const App: React.FC = () => {
       });
     }
     toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
+
+    // ---- GEOCODE IN BACKGROUND (non-blocking) ----
+    if (needsGeocoding) {
+      (async () => {
+        try {
+          const detailedAddress = [
+            updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
+            updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
+          ].filter(Boolean).join(', ');
+
+          const geoResult = await geocodeWithFallback([
+            updatedClient.plusCode, detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress
+          ]);
+
+          if (geoResult) {
+            const geoUpdate = { ...finalClient, lat: geoResult.lat, lng: geoResult.lng };
+            if (geoResult.formattedAddress) geoUpdate.cleanAddress = geoResult.formattedAddress;
+
+            if (!geoUpdate.plusCode) {
+              try {
+                const pc = await reverseGeocodePlusCode(geoUpdate.lat, geoUpdate.lng, googleMapsApiKey || '');
+                if (pc) geoUpdate.plusCode = pc;
+              } catch { /* ignore */ }
+            }
+
+            // 4. Update state using functional update to ensure we use the LATEST Master List
+            setMasterClientList(prev => {
+              const newList = prev.map(c => c.id === geoUpdate.id ? geoUpdate : c);
+
+              // 5. Trigger an surgical background save for this specific geocoded record
+              if (isFirebaseConnected) {
+                (async () => {
+                  try {
+                    const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
+                    await surgicalUpdate(geoUpdate);
+
+                    setMasterClientList(current => {
+                      if (lastClientsHash) {
+                        lastClientsHash.current = JSON.stringify(current, (key, value) =>
+                          key === 'lastUpdated' ? undefined : value
+                        );
+                      }
+                      return current;
+                    });
+                    console.log('[APP] ✅ Background geocode persisted surgicaly.');
+                  } catch (e) {
+                    console.warn('[APP] Background geocode save deferred:', e);
+                  }
+                })();
+              }
+              return newList;
+            });
+          }
+        } catch (err) {
+          console.warn('[APP] Background geocoding failed:', err);
+        }
+      })();
+    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
+      // Background plus code generation
+      (async () => {
+        try {
+          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+          if (plusCode) {
+            const updated = { ...finalClient, plusCode };
+            setMasterClientList(prev => {
+              const newList = prev.map(c => c.id === updated.id ? updated : c);
+              if (lastClientsHash) {
+                lastClientsHash.current = JSON.stringify(newList, (key, value) =>
+                  key === 'lastUpdated' ? undefined : value
+                );
+              }
+              return newList;
+            });
+          }
+        } catch { /* ignore */ }
+      })();
+    }
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash, syncLockRef]);
+
+  // Merge enriched data into an existing client and remove the duplicate
+  const handleMergeClients = React.useCallback(async (
+    existingClientId: string,
+    duplicateClientId: string,
+    enrichedData: Partial<EnrichedClient>
+  ) => {
+    // 1. Find existing client in current state
+    const existingClient = masterClientList.find(c => c.id === existingClientId);
+    if (!existingClient) {
+      console.warn('[APP] Merge failed: Existing client not found in list.');
+      return;
+    }
+
+    // 2. Perform the Merge logic upfront (Sync/Deterministic)
+    const merged: EnrichedClient = {
+      ...existingClient,
+      // Identification
+      companyName: enrichedData.companyName || existingClient.companyName,
+      cnpj: enrichedData.cnpj || existingClient.cnpj,
+      ownerName: enrichedData.ownerName || existingClient.ownerName,
+      contact: enrichedData.contact || existingClient.contact,
+      whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
+
+      // Address
+      cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
+        ? enrichedData.cleanAddress : existingClient.cleanAddress,
+      originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
+      city: enrichedData.city || existingClient.city,
+      state: enrichedData.state || existingClient.state,
+      district: enrichedData.district || existingClient.district,
+      zip: enrichedData.zip || existingClient.zip,
+      region: enrichedData.region || existingClient.region,
+
+      // Classification
+      mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
+      secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
+        ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+      category: (enrichedData.category && enrichedData.category.length > 0)
+        ? enrichedData.category : existingClient.category,
+
+      // Geography
+      lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
+      lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
+      plusCode: enrichedData.plusCode || existingClient.plusCode,
+      googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
+
+      // Activity/Metadata
+      purchasedProducts: (enrichedData.purchasedProducts && enrichedData.purchasedProducts.length > 0)
+        ? enrichedData.purchasedProducts : existingClient.purchasedProducts,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // 3. Update Local State (Functional)
+    setMasterClientList(prev => {
+      return prev
+        .filter(c => c.id !== duplicateClientId)
+        .map(c => c.id === existingClientId ? merged : c);
+    });
+
+    // 4. Persist surgicaly to Cloud (Immediate)
+    if (isFirebaseConnected) {
+      try {
+        const { updateClientInCloud: surgicalUpdate, deleteClientFromCloud } = await import('./services/firebaseService');
+
+        // Parallel but awaited for result
+        await Promise.all([
+          surgicalUpdate(merged),
+          deleteClientFromCloud(duplicateClientId)
+        ]);
+
+        console.log('[APP] ✅ Merge saved surgicaly: duplicate removed, existing updated.');
+
+        // Update local hash after successful cloud sync
+        setMasterClientList(current => {
+          lastClientsHash.current = JSON.stringify(current, (key, value) =>
+            key === 'lastUpdated' ? undefined : value
+          );
+          return current;
+        });
+      } catch (err) {
+        console.error('[APP] Failed to surgical-save merge:', err);
+        toast.error('Erro ao salvar mesclagem na nuvem. Verifique conexão.');
+      }
+    }
+
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'CLIENTS',
+        details: `Mesclou cliente duplicado em cliente existente (${existingClientId})`,
+        metadata: { existingClientId, removedDuplicateId: duplicateClientId }
+      });
+    }
+    toast.success('Cliente duplicado mesclado com sucesso! Cadastro unificado.');
+  }, [currentUser, toast, setMasterClientList, masterClientList, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
     const finalClient: EnrichedClient = {
       ...newClient,
-      id: (newClient as any).id || crypto.randomUUID(),
+      id: newClient.id || crypto.randomUUID(),
       lat: newClient.lat || 0,
       lng: newClient.lng || 0,
       cleanAddress: newClient.cleanAddress || ''
@@ -753,100 +1028,14 @@ const App: React.FC = () => {
         listContainer.scrollTop = listContainer.scrollHeight;
       }
     }, 100);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, geocodeWithFallback]);
 
-  const handleClearClients = React.useCallback(() => {
-    let targetId: string | undefined;
-    let targetName = "TODOS";
 
-    // Determine context for granular clear
-    if (currentUser && isAdmin(currentUser.role)) {
-      if (filterSalespersonId !== 'Todos') {
-        targetId = filterSalespersonId;
-        const u = users.find(u => u.id === targetId);
-        targetName = u?.name || 'Desconhecido';
-      } else if (targetUploadUserId) {
-        targetId = targetUploadUserId;
-        const u = users.find(u => u.id === targetId);
-        targetName = u?.name || 'Desconhecido';
-      }
-    } else if (currentUser && isSalesTeam(currentUser.role)) {
-      // Salesperson can only clear their own? Or system policy?
-      // Let's assume for now they clear their own view, which is effectively "their" data if segmented.
-      // However, often local storage is shared. Let's ask confirmation.
-      targetId = currentUser.id;
-      targetName = currentUser.name;
-    }
-
-    const isPartial = !!targetId;
-
-    const message = isPartial
-      ? `Deseja remover APENAS os clientes de ${targetName}? (Os outros dados serão mantidos)`
-      : `Tem certeza que deseja DELETAR TODOS os clientes do sistema? Isso removerá todo o histórico.`;
-
-    showConfirm(
-      isPartial ? 'Limpeza Parcial' : 'AVISO CRÍTICO',
-      message,
-      () => {
-        if (isPartial && targetId) {
-          setMasterClientList(prev => prev.filter(c => c.salespersonId !== targetId));
-          toast.success(`Dados de ${targetName} removidos!`);
-        } else {
-          setMasterClientList([]);
-          localStorage.removeItem('vendas_ai_clients');
-          toast.success('Base de dados limpa com sucesso!');
-        }
-
-        setProcState({
-          isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'processing'
-        });
-      }
-    );
-  }, [currentUser, filterSalespersonId, targetUploadUserId, users, toast, setMasterClientList]);
-
-  // Simulate Sales Logic
-  const distributeProductsToClients = (clients: EnrichedClient[], allProducts: Product[]) => {
-    if (allProducts.length === 0) return;
-
-    const updatedClients = clients.map(client => {
-      // If client already has products, keep them unless we want to refresh
-      if (client.purchasedProducts && client.purchasedProducts.length > 0) return client;
-
-      // Find products matching client category
-      let eligibleProducts = allProducts.filter(p =>
-        (client.category || []).some(cat =>
-          (p.category || '').toLowerCase().includes((cat || '').toLowerCase()) ||
-          (cat || '').toLowerCase().includes((p.category || '').toLowerCase())
-        )
-      );
-
-      // Fallback if no category match
-      if (eligibleProducts.length === 0) {
-        eligibleProducts = allProducts;
-      }
-
-      // Randomly assign 1-5 products
-      const numProducts = Math.floor(Math.random() * 5) + 1;
-      const shuffled = [...eligibleProducts].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, numProducts);
-
-      return { ...client, purchasedProducts: selected.map(p => ({ ...p, purchaseDate: new Date().toISOString() })) };
-    });
-
-    setMasterClientList(updatedClients as EnrichedClient[]);
-  };
+  // View State (Replaced moved function with space)
 
   const handleInvalidKey = async () => {
-    setIsGoogleMapsModalOpen(true);
-  };
-
-  const handleConfirmMapKey = (newKey: string) => {
-    if (newKey && newKey.trim()) {
-      setGoogleMapsApiKey(newKey.trim());
-      localStorage.setItem('google_maps_api_key', newKey.trim());
-      setKeyVersion(v => v + 1);
-      setIsGoogleMapsModalOpen(false);
-    }
+    toast.error('Chave do Google Maps inválida ou ausente. Acesse Configurações da Nuvem para configurar.');
+    setIsMapApiBroken(true);
   };
 
   // --- Derived Data ---
@@ -871,16 +1060,6 @@ const App: React.FC = () => {
     resetFilters();
     handleViewNavigation('map');
     setIsMobileMenuOpen(false); // Close menu on login
-    if (isAdmin(user.role)) {
-      const firstSeller = users.find(u => isSalesTeam(u.role));
-      if (firstSeller) setTargetUploadUserId(firstSeller.id);
-    }
-  };
-
-  const handleConfirmCNPJaKey = (key: string) => {
-    localStorage.setItem('cnpja_api_key', key);
-    setIsCNPJaModalOpen(false);
-    showAlert("Sucesso", "Chave CNPJa atualizada! Tente realizar a consulta novamente.", "success");
   };
 
   const handleLogout = async () => {
@@ -961,7 +1140,7 @@ const App: React.FC = () => {
     isUploadCancelled.current = false;
 
     try {
-      let rawData: any[] = [];
+      let rawData: RawClient[] = [];
       const lowerName = file.name.toLowerCase();
 
       console.log(`Processing file: ${file.name}, Lower: ${lowerName}`); // DEBUG
@@ -1016,7 +1195,7 @@ const App: React.FC = () => {
         const storagePath = `uploads/clients/${ownerId}/${timestamp}_${file.name}`;
         const downloadUrl = await uploadFileToCloud(file, storagePath);
         if (downloadUrl) {
-          (newFileRecord as any).storageUrl = downloadUrl;
+          newFileRecord.storageUrl = downloadUrl;
           console.log(`[APP] CSV file uploaded to Storage: ${downloadUrl}`);
         }
       } catch (storageErr) {
@@ -1027,7 +1206,7 @@ const App: React.FC = () => {
 
       setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
 
-      const enrichedData = await processClientsWithAI(
+      await processClientsWithAI(
         rawData,
         ownerId,
         categories,
@@ -1090,18 +1269,19 @@ const App: React.FC = () => {
 
       // Update file status to completed
       setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed' } : f));
-
       setTimeout(() => {
         setProcState(prev => prev.status === 'completed' ? { ...prev, isActive: false } : prev);
       }, 5000);
 
-    } catch (err: any) {
-      console.error(err);
+    } catch (err: unknown) {
+      const errObj = err as { message?: string };
+      const isCancelled = errObj?.message === 'CANCELLED_BY_USER';
+      const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (errObj?.message || "Erro desconhecido");
+      console.error(errorMsg, err);
 
-      const isCancelled = err.message === 'CANCELLED_BY_USER';
-      const errorMsg = isCancelled ? 'Cancelado pelo usuário.' : (err.message || "Erro desconhecido");
+      // Update file status
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
 
-      // Update procState. If cancelled, we might want to hide it or show "Cancelled" state.
       // User said "para de processar na tela", implying the box should close or stop showing progress.
       // Setting isActive: false hides the toast.
       const shouldHide = isCancelled;
@@ -1112,63 +1292,6 @@ const App: React.FC = () => {
         errorMessage: errorMsg,
         isActive: !shouldHide
       }));
-
-      // Update file status
-      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
-    }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !currentUser) return;
-
-    await handleUnifiedFileUpload(file);
-    event.target.value = '';
-  };
-
-  const handleUnifiedFileUpload = async (file: File) => {
-    if (!currentUser) return;
-
-    // 1. Detect Type
-    // For Excel files, we temporarily assume 'clients' or handle specifically if needed, 
-    // but the request focuses on CSV for now.
-    let type: 'clients' | 'products' | 'purchases' = 'clients';
-
-    if (file.name.toLowerCase().endsWith('.csv')) {
-      // Need a quick peek at the headers
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        const firstLine = text.split('\n')[0];
-        const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
-        type = detectCSVType(headers);
-        console.log(`[APP] Auto-Detected File Type: ${type}`);
-
-        await routeFileUpload(file, type);
-      };
-      reader.readAsText(file.slice(0, 1000));
-    } else {
-      // Standard Excel routing
-      await routeFileUpload(file, 'clients');
-    }
-  };
-
-  const routeFileUpload = async (file: File, type: 'clients' | 'products' | 'purchases') => {
-    let ownerId = currentUser!.id;
-    if (isAdmin(currentUser!.role) && targetUploadUserId) {
-      ownerId = targetUploadUserId;
-    }
-
-    switch (type) {
-      case 'clients':
-        await handleClientFileDirect(file, ownerId);
-        break;
-      case 'products':
-        await handleProductFileUpload(file);
-        break;
-      case 'purchases':
-        await handlePurchaseUpdateUpload(file, ownerId);
-        break;
     }
   };
 
@@ -1176,62 +1299,76 @@ const App: React.FC = () => {
   const handleDeleteFile = async (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (!file) return;
-
     if (!window.confirm(`Tem certeza que deseja excluir o arquivo "${file.fileName}"?\n\nIsso removerá todos os ${file.itemCount} registros associados.`)) {
       return;
     }
 
+    // 1. Calculate new lists first
+    let newClients = [...masterClientList];
+    let newProducts = [...products];
+    const newFiles = uploadedFiles.filter(f => f.id !== fileId);
+
     if (file.type === 'clients') {
-      setMasterClientList(prev => prev.filter(c => c.sourceFileId !== fileId));
+      newClients = masterClientList.filter(c => c.sourceFileId !== fileId);
     } else if (file.type === 'products') {
-      setProducts(prev => prev.filter(p => p.sourceFileId !== fileId));
+      newProducts = products.filter(p => p.sourceFileId !== fileId);
     } else if (file.type === 'purchases') {
-      // Activate sync lock to prevent real-time sync from overwriting during cleanup
-      syncLockRef.current = true;
+      // Deep clean purchasedProducts
+      newClients = masterClientList.map(c => {
+        if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
 
-      let updatedClientList: typeof masterClientList = [];
-      setMasterClientList(prev => {
-        // 1. Keep all clients (even those auto-created from this file)
-        // 2. Remove purchase records from clients
-        const newList = prev.map(c => {
-          if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
-          const filteredPurchases = c.purchasedProducts.filter(p => p.sourceFileId !== fileId);
-          if (filteredPurchases.length === c.purchasedProducts.length) return c;
-          return { ...c, purchasedProducts: filteredPurchases };
-        });
+        // Remove items linked to this file OR items with no sourceFileId (legacy junk/mock data)
+        const filteredPurchases = c.purchasedProducts.filter(p =>
+          p.sourceFileId && // Must have an ID
+          p.sourceFileId !== fileId // ID must not be the one being deleted
+        );
 
-        updatedClientList = newList;
-        return newList;
+        if (filteredPurchases.length === c.purchasedProducts.length) return c;
+        return { ...c, purchasedProducts: filteredPurchases };
       });
-
-      // Force-save the cleaned client list to Firebase
-      if (isFirebaseConnected && updatedClientList.length > 0) {
-        try {
-          const newUploadedFilesForSave = uploadedFiles.filter(f => f.id !== fileId);
-          await saveToCloud(updatedClientList, products, categories, users, newUploadedFilesForSave);
-          lastClientsHash.current = JSON.stringify(updatedClientList, (key, value) => key === 'lastUpdated' ? undefined : value);
-          console.log('[APP] ✅ Purchase deletion force-saved to Firebase.');
-        } catch (e) {
-          console.error('[APP] Failed to force-save purchase deletion:', e);
-        }
-      }
-
-      syncLockRef.current = false;
     }
 
-    const newUploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
-    setUploadedFiles(newUploadedFiles);
+    // 2. Update states synchronously
+    setMasterClientList(newClients);
+    setProducts(newProducts);
+    setUploadedFiles(newFiles);
 
-    // Fix: Force sync the deleted file array immediately to bypass the 3s auto-save debounce
+    // 3. Perform Cloud Sync sequentially
     if (isFirebaseConnected) {
+      syncLockRef.current = true;
       try {
-        await syncUploadedFilesMetadata(newUploadedFiles);
+        // Force immediate sync to cloud
+        await saveToCloud(newClients, newProducts, categories, users, newFiles);
+
+        // Also sync files metadata specifically if needed
+        await syncUploadedFilesMetadata(newFiles);
+
+        // Update hash to prevent auto-save loop
+        lastClientsHash.current = JSON.stringify(newClients, (key, value) => key === 'lastUpdated' ? undefined : value);
+
+        console.log(`[APP] ✅ File "${file.fileName}" and associated data deleted and synced.`);
       } catch (e) {
-        console.error("Failed to sync file deletion immediately", e);
+        console.error("Failed to sync deletion to cloud:", e);
+        toast.error('Erro ao sincronizar exclusão com a nuvem.');
+      } finally {
+        syncLockRef.current = false;
       }
     }
 
-    // alert("Arquivo e dados associados foram removidos.");
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'DELETE',
+        category: 'SYSTEM',
+        details: `Excluiu o arquivo "${file.fileName}" (${file.type})`,
+        metadata: { fileId, type: file.type }
+      });
+    }
+
+    toast.success(`Arquivo "${file.fileName}" removido.`);
   };
 
   const handleReassignFile = (fileId: string, newSalespersonId: string) => {
@@ -1298,11 +1435,18 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = (updatedUser: AppUser) => {
+    // Security: If password is masked '***', preserve the original password from master state
+    const existingUser = users.find(u => u.id === updatedUser.id);
+    const finalUser = {
+      ...updatedUser,
+      password: updatedUser.password === '***' ? (existingUser?.password || updatedUser.password) : updatedUser.password
+    };
+
     // 1. Local update
-    baseUpdateUser(updatedUser);
+    baseUpdateUser(finalUser);
 
     // 2. Immediate Cloud Save
-    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    const updatedUsers = users.map(u => u.id === finalUser.id ? finalUser : u);
     saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
       .then(() => console.warn('[AUTH] Atualização de usuário na nuvem concluída ✅'))
       .catch(e => console.error('[AUTH] Falha no salvamento imediato da atualização:', e));
@@ -1353,56 +1497,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleReassignFileSalesperson = (fileId: string, newSalespersonId: string) => {
-    // Find the target user
-    const targetUser = users.find(u => u.id === newSalespersonId);
-    const newSalespersonName = targetUser?.name || 'None';
-
-    const file = uploadedFiles.find(f => f.id === fileId);
-    if (!file) return;
-
-    // Update the file record
-    setUploadedFiles(prev => prev.map(f =>
-      f.id === fileId
-        ? { ...f, salespersonId: newSalespersonId, salespersonName: newSalespersonName }
-        : f
-    ));
-
-    if (file.type === 'clients') {
-      // Update all clients from this file to the new salesperson
-      setMasterClientList(prev => prev.map(c =>
-        c.sourceFileId === fileId
-          ? { ...c, salespersonId: newSalespersonId }
-          : c
-      ));
-    } else if (file.type === 'purchases') {
-      // Update all clients that have purchase records from this file
-      setMasterClientList(prev => prev.map(c => {
-        const hasPurchaseFromFile = c.purchasedProducts?.some(p => p.sourceFileId === fileId);
-        if (hasPurchaseFromFile) {
-          return {
-            ...c,
-            salespersonId: newSalespersonId,
-            purchasedProducts: c.purchasedProducts?.map(p =>
-              p.sourceFileId === fileId ? { ...p, salespersonId: newSalespersonId } : p
-            )
-          };
-        }
-        return c;
-      }));
-    }
-
-    // Auto-navigate to map and apply filter
-    if (newSalespersonId) {
-      handleViewNavigation('map');
-      setFilterSalespersonId(newSalespersonId);
-      alert(`Arquivo e ${filteredClients.filter(c => c.sourceFileId === fileId).length} clientes reatribuídos para: ${newSalespersonName}\n\nMapa filtrado automaticamente.`);
-    } else {
-      // Unassigned - show all
-      setFilterSalespersonId('Todos');
-      alert('Arquivo desmarcado. Clientes ficaram sem vendedor até que outro seja atribuído.');
-    }
-  };
 
 
 
@@ -1504,7 +1598,7 @@ const App: React.FC = () => {
               newList.forEach((c, idx) => {
                 if (c.salespersonId !== targetUserId) return;
                 const score = getMatchScore(c.companyName || '');
-                if (score > bestScore && score >= 0.6) { // 60% word overlap threshold
+                if (score > bestScore && score >= 0.85) { // 85% word overlap threshold
                   bestScore = score;
                   bestIdx = idx;
                 }
@@ -1514,7 +1608,7 @@ const App: React.FC = () => {
               if (bestIdx === -1) {
                 newList.forEach((c, idx) => {
                   const score = getMatchScore(c.companyName || '');
-                  if (score > bestScore && score >= 0.6) {
+                  if (score > bestScore && score >= 0.85) {
                     bestScore = score;
                     bestIdx = idx;
                   }
@@ -1530,7 +1624,7 @@ const App: React.FC = () => {
             const clientPurchases = groupedByClient[key];
 
             // Map CSV records to PurchaseRecord objects
-            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map((rec: any) => {
+            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
               // Try to enrich with master catalog
               const masterProd = products.find(p =>
                 (rec.sku && p.sku === rec.sku) ||
@@ -1540,7 +1634,7 @@ const App: React.FC = () => {
               if (masterProd) {
                 return {
                   ...masterProd,
-                  purchaseDate: rec.purchaseDate,
+                  purchaseDate: rec.purchaseDate || new Date().toISOString(),
                   quantity: rec.quantity,
                   totalValue: rec.totalValue,
                   sourceFileId: fileId,
@@ -1555,7 +1649,7 @@ const App: React.FC = () => {
                   category: 'Manual',
                   price: rec.price || 0,
                   factoryCode: '',
-                  purchaseDate: rec.purchaseDate,
+                  purchaseDate: rec.purchaseDate || new Date().toISOString(),
                   quantity: rec.quantity,
                   totalValue: rec.totalValue,
                   sourceFileId: fileId,
@@ -1567,9 +1661,14 @@ const App: React.FC = () => {
             // UPDATE CLIENT: ACCUMULATE AND MERGE (With Duplicate Prevention)
             const existingHistory = newList[clientIdx].purchasedProducts || [];
 
-            // Filter out records that already exist (Same SKU and Same Date)
+            // Filter out records that already exist (Same SKU, Same Date AND Same Salesperson)
+            // This allows the same product sale to be recorded if made by a different person (e.g. split regions)
             const filteredNewProducts = newPurchasedProducts.filter(newP =>
-              !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate)
+              !existingHistory.some(oldP =>
+                oldP.sku === newP.sku &&
+                oldP.purchaseDate === newP.purchaseDate &&
+                oldP.salespersonId === newP.salespersonId
+              )
             );
 
             if (filteredNewProducts.length > 0) {
@@ -1602,18 +1701,18 @@ const App: React.FC = () => {
             ? `${rawCnpj.slice(0, 2)}.${rawCnpj.slice(2, 5)}.${rawCnpj.slice(5, 8)}/${rawCnpj.slice(8, 12)}-${rawCnpj.slice(12, 14)}`
             : rawCnpj;
 
-          const newPurchasedProducts: PurchaseRecord[] = group.purchases.map((rec: any) => {
+          const newPurchasedProducts: PurchaseRecord[] = group.purchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
             const masterProd = products.find(p =>
               (rec.sku && p.sku === rec.sku) ||
               (p.name && rec.name && (p.name || '').toLowerCase().trim() === (rec.name || '').toLowerCase().trim())
             );
             if (masterProd) {
-              return { ...masterProd, purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue, sourceFileId: fileId, salespersonId: targetUserId };
+              return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity, totalValue: rec.totalValue, sourceFileId: fileId, salespersonId: targetUserId };
             }
             return {
               sku: rec.sku || 'N/A', name: rec.name || 'Produto Desconhecido', brand: 'Desconhecido',
               category: 'Manual', price: rec.price || 0, factoryCode: '',
-              purchaseDate: rec.purchaseDate, quantity: rec.quantity, totalValue: rec.totalValue,
+              purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity, totalValue: rec.totalValue,
               sourceFileId: fileId, salespersonId: targetUserId
             };
           });
@@ -1683,7 +1782,7 @@ const App: React.FC = () => {
         const timestamp = new Date().getTime();
         const storagePath = `uploads/purchases/${timestamp}_${file.name}`;
         await uploadFileToCloud(file, storagePath).then(url => {
-          if (url) (newFileRecord as any).storageUrl = url;
+          if (url) newFileRecord.storageUrl = url;
         });
       } catch (storageErr) {
         console.error("[APP] Failed to upload purchase file to Storage:", storageErr);
@@ -1698,11 +1797,12 @@ const App: React.FC = () => {
 
       alert(`✅ Atualização de Compras concluída!\n\n🔗 ${updatedCount} clientes existentes atualizados.${createdMsg}\n\n📊 Total: ${updatedCount + unmatchedGroups.length} de ${clientKeysInFile.length} clientes da planilha processados.`);
 
-    } catch (e: any) {
+    } catch (err: unknown) {
       // Always release sync lock on error
       syncLockRef.current = false;
-      console.error(e);
-      setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
+      const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error(errorMsg, err);
+      setProcState(prev => ({ ...prev, status: 'error', errorMessage: errorMsg }));
       setUploadedFiles(prev => [...prev, {
         id: fileId,
         fileName: file.name,
@@ -1712,7 +1812,7 @@ const App: React.FC = () => {
         type: 'purchases',
         itemCount: 0,
         status: 'error',
-        errorMessage: e.message
+        errorMessage: errorMsg
       }]);
     }
   };
@@ -1760,7 +1860,7 @@ const App: React.FC = () => {
         const storagePath = `uploads/products/${timestamp}_${file.name}`;
         const downloadUrl = await uploadFileToCloud(file, storagePath);
         if (downloadUrl) {
-          (newFileRecord as any).storageUrl = downloadUrl;
+          newFileRecord.storageUrl = downloadUrl;
         }
       } catch (storageErr) {
         console.error("[APP] Failed to upload product file to Storage:", storageErr);
@@ -1776,11 +1876,12 @@ const App: React.FC = () => {
       setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
       alert(`${newProducts.length} produtos importados com sucesso.`);
 
-    } catch (e: any) {
-      console.error(e);
-      setProcState(prev => ({ ...prev, status: 'error', errorMessage: e.message }));
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error(errorMsg, err);
+      setProcState(prev => ({ ...prev, status: 'error', errorMessage: errorMsg }));
       // Update file status to error instead of removing
-      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: e.message } : f));
+      setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error', errorMessage: errorMsg } : f));
     }
   };
 
@@ -1901,6 +2002,7 @@ const App: React.FC = () => {
                 {/* Status Selector */}
                 <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/10">
                   <select
+                    title="Selecionar status de presença"
                     value={currentUser.status || 'Offline'}
                     onChange={async (e) => {
                       const newStatus = e.target.value as UserStatus;
@@ -2129,19 +2231,6 @@ const App: React.FC = () => {
               isFirebaseConnected={isFirebaseConnected}
             />
 
-            <GoogleMapsKeyModal
-              isOpen={isGoogleMapsModalOpen}
-              onClose={() => setIsGoogleMapsModalOpen(false)}
-              onConfirm={handleConfirmMapKey}
-              suggestedKey={SUGGESTED_MAP_KEY}
-            />
-
-            <CNPJaKeyModal
-              isOpen={isCNPJaModalOpen}
-              onClose={() => setIsCNPJaModalOpen(false)}
-              onConfirm={handleConfirmCNPJaKey}
-            />
-
             {isAddModalOpen && (
               <AddClientModal
                 isOpen={isAddModalOpen}
@@ -2162,7 +2251,8 @@ const App: React.FC = () => {
                 onSave={handleUpdateClient}
                 client={selectedClient}
 
-                users={users}
+                users={publicUsers}
+                allClients={masterClientList}
               />
             )}
           </React.Suspense>
@@ -2227,11 +2317,12 @@ const App: React.FC = () => {
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminUserManagement
                     currentUser={currentUser}
-                    users={users}
+                    users={currentUser?.role === 'admin_dev' ? users : publicUsers}
                     onAddUser={handleAddUser}
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
                     onCleanupDuplicates={handleCleanupDuplicates}
+                    onClearPurchases={handleClearPurchases}
                     totalClients={masterClientList.length}
                   />
                 </div>
@@ -2261,7 +2352,7 @@ const App: React.FC = () => {
               <React.Suspense fallback={<LoadingScreen progress={100} message="Carregando Arquivos..." />}>
                 <div className="flex-1 overflow-y-auto bg-gray-50">
                   <AdminFileManager
-                    users={users}
+                    users={publicUsers}
                     uploadedFiles={uploadedFiles}
                     onUploadClients={(file, targetId) => handleClientFileDirect(file, targetId)}
                     onUploadProducts={handleProductFileUpload}
@@ -2297,7 +2388,7 @@ const App: React.FC = () => {
                   <AdminDashboard
                     clients={finalFilteredClients}
                     products={products}
-                    users={users}
+                    users={publicUsers}
                     onClose={() => setActiveView('map')}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
@@ -2668,7 +2759,7 @@ const App: React.FC = () => {
                             A chave do Google Maps expirou ou é inválida. Por favor, atualize as chaves nas configurações.
                           </p>
                           <button
-                            onClick={() => setIsGoogleMapsModalOpen(true)}
+                            onClick={() => setIsCloudConfigOpen(true)}
                             className="px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all font-bold shadow-md"
                           >
                             Configurar Chaves
@@ -2688,10 +2779,11 @@ const App: React.FC = () => {
                               clients={finalFilteredClients}
                               apiKey={googleMapsApiKey}
                               onInvalidKey={handleInvalidKey}
-                              productFilterActive={isProductFilterActive}
-                              highlightProductTerm={searchProductQuery}
                               activeProductCategory={filterProductCategory}
-                              users={users} // Pass users for color coding
+                              users={users}
+                              filterSalespersonId={filterSalespersonId}
+                              startDate={startDate}
+                              endDate={endDate}
                               filterContent={
                                 <div className="bg-gray-100/95 backdrop-blur-sm px-3 py-2 flex flex-col gap-1.5">
                                   {/* Primary Filters Row */}
@@ -2935,14 +3027,18 @@ const App: React.FC = () => {
                           users={users}
                           uploadedFiles={uploadedFiles}
                           onGeneratePlusCodes={handleBulkGeneratePlusCodes}
-                          onCNPJAuthError={() => setIsCNPJaModalOpen(true)}
-
+                          onCNPJAuthError={() => { toast.error('Chave do CNPJa ausente ou inválida. Configure na Nuvem.'); setIsCloudConfigOpen(true); }}
                           searchTerm={searchQuery}
                           onSearchChange={setSearchQuery}
                           regionFilter={filterRegion}
                           onRegionFilterChange={setFilterRegion}
                           categoryFilter={filterCategory}
                           onCategoryFilterChange={setFilterCategory}
+                          allClients={masterClientList}
+                          onMergeClients={handleMergeClients}
+                          filterSalespersonId={filterSalespersonId}
+                          startDate={startDate}
+                          endDate={endDate}
                         />
                       ) : activeView === 'history' ? (
                         <SalesHistoryPanel
@@ -3060,6 +3156,7 @@ const App: React.FC = () => {
         <AssistantRV
           isOpen={isAssistantOpen}
           setIsOpen={setIsAssistantOpen}
+          geminiApiKey={activeApiKey}
           context={{
             userName: currentUser.name || 'Usuário',
             userRole: currentUser.role || 'Geral',
@@ -3068,38 +3165,58 @@ const App: React.FC = () => {
               totalProducts: products.length,
               activeClients: finalFilteredClients.length
             },
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 100).map((c: any) => ({
-              nome: c.companyName,
-              bairro: c.district,
-              cidade: c.city,
-              vendedor: c.salespersonName || c.ownerName
-            })))
+            users: users.map(u => ({ id: u.id, name: u.name, role: u.role })),
+            allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter((v): v is string => !!v))),
+            productCategories: Array.from(new Set(products.map(p => p.category).filter((v): v is string => !!v))),
+            productSections: Array.from(new Set(products.map(p => p.section).filter((v): v is string => !!v))),
+            filteredData: JSON.stringify(finalFilteredClients.slice(0, 2500).map((c: EnrichedClient) => {
+              const sellerUser = users.find(u => u.id === c.salespersonId);
+              const isRecent = c.lastUpdated ? (new Date().getTime() - new Date(c.lastUpdated).getTime()) < 300000 : false;
+              return {
+                nome: c.companyName,
+                cnpj: c.cnpj,
+                bairro: c.district,
+                cidade: c.city,
+                vendedor: sellerUser ? sellerUser.name : 'Vendedor Desconhecido',
+                vendedorId: c.salespersonId,
+                categorias: c.category,
+                cnae: c.mainCnae,
+                recent: isRecent,
+                historico: c.purchasedProducts?.slice(-10).map(p => ({
+                  item: p.name,
+                  depto: p.category,
+                  secao: p.section,
+                  marca: p.brand,
+                  data: p.purchaseDate,
+                  qtd: p.quantity,
+                  val: p.totalValue
+                }))
+              };
+            })),
+            aggregation: JSON.stringify({
+              topCities: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                const city = c.city || 'Indefinido';
+                acc[city] = (acc[city] || 0) + 1;
+                return acc;
+              }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10),
+              categoryDistribution: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                (c.category || []).forEach(cat => {
+                  acc[cat] = (acc[cat] || 0) + 1;
+                });
+                return acc;
+              }, {}),
+              sellerStats: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
+                const sellerUser = users.find(u => u.id === c.salespersonId);
+                const sellerName = sellerUser ? sellerUser.name : 'N/A';
+                acc[sellerName] = (acc[sellerName] || 0) + 1;
+                return acc;
+              }, {})
+            })
           }}
         />
-      )}
 
-      {currentUser && (
-        <AssistantRV
-          isOpen={isAssistantOpen}
-          setIsOpen={setIsAssistantOpen}
-          context={{
-            userName: currentUser.name || 'Usuário',
-            userRole: currentUser.role || 'Geral',
-            stats: {
-              totalClients: masterClientList.length,
-              totalProducts: products.length,
-              activeClients: finalFilteredClients.length
-            },
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 100).map(c => ({
-              nome: c.companyName,
-              bairro: c.district,
-              cidade: c.city,
-              vendedorID: c.salespersonId
-            })))
-          }}
-        />
       )}
-    </GoogleReCaptchaProvider >
+    </GoogleReCaptchaProvider>
   );
 };
 

@@ -12,6 +12,7 @@ interface AdminUserManagementProps {
   onUpdateUser: (user: AppUser) => void;
   onDeleteUser: (userId: string) => void;
   onCleanupDuplicates: () => void;
+  onClearPurchases: () => void;
   totalClients: number;
 }
 
@@ -22,6 +23,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
   onUpdateUser,
   onDeleteUser,
   onCleanupDuplicates,
+  onClearPurchases,
   totalClients
 }) => {
   // Form State
@@ -256,11 +258,11 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
           <div>
             <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-1">Senha</label>
             <input
-              type="text"
+              type={currentUser.role === 'admin_dev' ? "text" : "password"}
               value={password}
               onChange={e => setPassword(e.target.value)}
               className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors"
-              placeholder="Senha de acesso"
+              placeholder="••••••"
             />
           </div>
 
@@ -357,13 +359,23 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onCleanupDuplicates}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-full text-sm font-medium hover:bg-yellow-700 transition-colors flex items-center gap-2 whitespace-nowrap"
-            >
-              <AlertCircle className="w-4 h-4" />
-              Limpar Duplicatas
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={onCleanupDuplicates}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-full text-sm font-medium hover:bg-yellow-700 transition-colors flex items-center gap-2 whitespace-nowrap"
+              >
+                <AlertCircle className="w-4 h-4" />
+                Limpar Duplicatas
+              </button>
+              <button
+                onClick={onClearPurchases}
+                className="px-4 py-2 bg-rose-600 text-white rounded-full text-sm font-medium hover:bg-rose-700 transition-colors flex items-center gap-2 whitespace-nowrap"
+                title="Remove apenas os produtos comprados de todos os clientes"
+              >
+                <Trash2 className="w-4 h-4" />
+                Limpar Vendas
+              </button>
+            </div>
           </div>
 
           {/* Category Filters */}
@@ -511,7 +523,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-1">
                   <span>Senha:</span>
-                  <span className="font-mono">{user.password || '***'}</span>
+                  <span className="font-mono">********</span>
                 </div>
               </div>
 

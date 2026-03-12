@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Bot, X, Send, Loader2, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { askAssistantRV, AssistantContext } from '../services/geminiService';
@@ -10,14 +10,14 @@ interface Message {
     role: 'user' | 'assistant' | 'system';
     content: string;
 }
-
 interface AssistantRVProps {
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
     context: AssistantContext;
+    geminiApiKey?: string;
 }
 
-export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) => {
+export const AssistantRV = ({ isOpen, setIsOpen, context, geminiApiKey }: AssistantRVProps) => {
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
@@ -27,6 +27,7 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
     ]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [sessionId, setSessionId] = useState<string | undefined>();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom of chat
@@ -65,21 +66,24 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
         setIsLoading(true);
 
         try {
-            const responseText = await askAssistantRV(userMsg, context);
+            console.log('[ASSISTANT] Enviando pergunta. Chave presente:', !!geminiApiKey);
+            const result = await askAssistantRV(userMsg, context, sessionId, geminiApiKey);
+            if (result.sessionId) setSessionId(result.sessionId);
 
             const assistantMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: responseText
+                content: result.text
             };
 
             setMessages(prev => [...prev, assistantMsg]);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
             toast.error("Erro ao contactar a IA.");
+            const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro ao processar sua solicitação. Tente enviar de novo.";
             setMessages(prev => [
                 ...prev,
-                { id: (Date.now() + 1).toString(), role: 'system', content: err.message || "Ocorreu um erro ao processar sua solicitação. Tente enviar de novo." }
+                { id: (Date.now() + 1).toString(), role: 'system', content: errorMessage }
             ]);
         } finally {
             setIsLoading(false);
@@ -103,12 +107,13 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
                     </div>
                     <div>
                         <h3 className="font-bold text-sm">Assistente RV ✨</h3>
-                        <p className="text-[10px] opacity-80 mt-0.5">Visão parcial: {context.stats.totalClients} clientes</p>
+                        <p className="text-[10px] opacity-80 mt-0.5">Visão Macro: {context.stats.totalClients} clientes</p>
                     </div>
                 </div>
                 <button
                     onClick={() => setIsOpen(false)}
                     className="p-2 hover:bg-on-primary/10 rounded-full transition-colors"
+                    title="Fechar Assistente"
                 >
                     <X className="w-4 h-4" />
                 </button>
@@ -116,9 +121,9 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
 
             {/* Warning banner on strict mode */}
             {context.filteredData && context.filteredData.length > 30000 && (
-                <div className="bg-warning-container text-on-warning-container p-2 text-[10px] flex items-center gap-2 border-b border-warning/20">
-                    <AlertCircle className="w-3 h-3 shrink-0" />
-                    Muitos dados na tela. O assistente analisará apenas uma amostra resumida.
+                <div className="bg-primary/10 text-primary p-2 text-[10px] flex items-center gap-2 border-b border-primary/20">
+                    <Sparkles className="w-3 h-3 shrink-0" />
+                    Inteligência Macro ativada para toda a sua base de dados.
                 </div>
             )}
 
@@ -131,10 +136,10 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
                     >
                         <div
                             className={`p-3 rounded-2xl text-sm ${msg.role === 'user'
-                                    ? 'bg-primary-container text-on-primary-container rounded-tr-sm'
-                                    : msg.role === 'system'
-                                        ? 'bg-error-container text-on-error-container rounded-tl-sm text-xs italic'
-                                        : 'bg-surface-variant text-on-surface-variant rounded-tl-sm border border-outline-variant/30'
+                                ? 'bg-primary-container text-on-primary-container rounded-tr-sm'
+                                : msg.role === 'system'
+                                    ? 'bg-error-container text-on-error-container rounded-tl-sm text-xs italic'
+                                    : 'bg-surface-variant text-on-surface-variant rounded-tl-sm border border-outline-variant/30'
                                 }`}
                         >
                             {msg.role === 'user' || msg.role === 'system' ? (
@@ -180,6 +185,7 @@ export const AssistantRV = ({ isOpen, setIsOpen, context }: AssistantRVProps) =>
                         onClick={handleSend}
                         disabled={!inputValue.trim() || isLoading}
                         className="p-2.5 bg-primary text-on-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                        title="Enviar mensagem"
                     >
                         <Send className="w-4 h-4" />
                     </button>

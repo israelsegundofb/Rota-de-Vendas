@@ -17,6 +17,13 @@ export interface RawClient {
   longitude?: number;
   salespersonName?: string; // Optional: Extracted from CSV/Excel
   salespersonId?: string;   // Optional: Matched with system users
+  // Common Raw Input fields across different imports
+  name?: string;
+  sku?: string;
+  purchaseDate?: string;
+  quantity?: number;
+  totalValue?: number;
+  price?: number;
 }
 
 export interface Product {
@@ -65,6 +72,7 @@ export interface EnrichedClient {
   purchasedProducts?: PurchaseRecord[]; // History of products bought by this client
   sourceFileId?: string; // ID of the file this client was imported from
   plusCode?: string; // Google Plus Code for precise location
+  lastUpdated?: string; // ISO String for last modification
 }
 
 // Roles com hierarquia (1 = maior poder)
@@ -107,6 +115,7 @@ export interface UploadedFile {
   itemCount: number;
   status: 'processing' | 'completed' | 'error';
   errorMessage?: string;
+  storageUrl?: string;
 }
 
 export interface ChatMessage {
@@ -137,6 +146,6 @@ export interface SystemLog {
     duration?: number; // Duration in seconds
     elementId?: string; // ID for clicks
     path?: string; // Path for navigation
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }

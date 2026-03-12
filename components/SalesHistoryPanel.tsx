@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { EnrichedClient, PurchaseRecord, AppUser } from '../types';
 import { ShoppingBag, Calendar, User, TrendingUp, DollarSign } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
+import { isValidPurchase } from '../utils/purchaseUtils';
 interface SalesHistoryPanelProps {
     clients: EnrichedClient[];
     startDate: string;
@@ -21,10 +22,8 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
         clients.forEach(client => {
             if (client.purchasedProducts) {
                 client.purchasedProducts.forEach(purchase => {
-                    // Filtro temporal
-                    const pDate = purchase.purchaseDate;
-                    if (startDate && pDate < startDate) return;
-                    if (endDate && pDate > endDate) return;
+                    // Filtro de validade e temporal
+                    if (!isValidPurchase(purchase, 'Todos', startDate, endDate)) return;
 
                     records.push({
                         ...purchase,

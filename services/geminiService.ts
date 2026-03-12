@@ -10,8 +10,35 @@ export interface AssistantContext {
     totalProducts: number;
     activeClients: number; // e.g. clients with purchases
   };
+  users?: any[]; // Full system users list with roles
+  allCnaes?: string[]; // List of all existing CNAEs in the system
+  productCategories?: string[]; // All product departments
+  productSections?: string[]; // All sections (sub-categories)
   filteredData?: string; // Serialized short version of current view
+  aggregation?: string;  // Serialized aggregation (macro view)
 }
+
+/**
+ * Sincroniza a base de dados massiva (>1GB) com o backend.
+ * Chamado periodicamente ou após carregamento de arquivos.
+ */
+export const syncDataToAI = async (clients: EnrichedClient[], products: Product[]) => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  try {
+    console.log(`[AI SYNC] Enviando snapshot de ${clients.length} clientes e ${products.length} produtos...`);
+    const response = await fetch(`${backendUrl}/api/ai/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clients, products })
+    });
+    if (!response.ok) throw new Error("Falha na sincronização com o backend");
+    console.log("[AI SYNC] Base de dados sincronizada com sucesso!");
+    return true;
+  } catch (error) {
+    console.error("[AI SYNC ERROR]", error);
+    return false;
+  }
+};
 
 // Use batch size 1 to ensure accurate association of Maps Grounding metadata (URIs) to specific clients.
 const BATCH_SIZE = 1;
@@ -211,8 +238,9 @@ export const processClientsWithAI = async (
     let aiData: any = {};
     let googleMapsUri = "";
 
-    // 1. ATTEMPT AI ENRICHMENT (with Proxy)
+    // 1. ATTEMPT AI ENRICHMENT (with Proxy) — Cache Bust v6.5.2
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    console.log('[AI ENRICHMENT] Using backend:', backendUrl);
 
     while (!success && retries <= MAX_RETRIES) {
       if ((globalThis as any).isUploadCancelled?.current) throw new Error("CANCELLED_BY_USER");
@@ -449,7 +477,7 @@ export const categorizeProductsWithAI = async (
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.0-flash',
           prompt: prompt
         }),
         signal: controller.signal
@@ -503,8 +531,10 @@ export const categorizeProductsWithAI = async (
  */
 export const askAssistantRV = async (
   prompt: string,
-  context: AssistantContext
-): Promise<string> => {
+  context: AssistantContext,
+  sessionId?: string,
+  geminiApiKey?: string
+): Promise<{ text: string, sessionId: string }> => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   // Build the super-prompt with context
@@ -519,14 +549,36 @@ export const askAssistantRV = async (
     - Total de Produtos no Catálogo: ${context.stats.totalProducts}
     - Clientes Ativos (Positivados): ${context.stats.activeClients}
 
-    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual)]
+    [DADOS DE REFERÊNCIA (Parte da Carteira ou Filtro Atual - Até 1000 itens)]
     ${context.filteredData ? context.filteredData : 'Nenhum filtro específico aplicado no momento ou dados muito extensos para leitura individual.'}
 
+    [USUÁRIOS E HIERARQUIA DO SISTEMA]
+    ${context.users && context.users.length > 0
+      ? `Lista de Usuários Cadastrados:\n${context.users.map(u => `- ${u.name} (Função: ${u.role})`).join('\n')}`
+      : 'Informação de usuários não disponível.'}
+
+    Regras de Hierarquia (do maior para o menor poder):
+    1. Admin DEV (Controle total)
+    2. Admin Geral / Admin (Gestão do sistema)
+    3. Gerente Geral (Visão de toda a operação)
+    4. Gerente de Vendas (Foco em performance de equipe)
+    5. Supervisor (Gestão de vendedores)
+    6. Visualizador Geral (Apenas leitura)
+    7. Vendedor Interno / Vendedor Externo (Atendimento direto a clientes)
+
+    [VISÃO MACRO (Base Total - Estatísticas Agregadas)]
+    ${context.aggregation ? context.aggregation : 'Estatísticas agregadas não disponíveis no momento.'}
+
+    [INSTRUÇÕES DE FERRAMENTAS (CRÍTICO)]
+    Você possui ferramentas poderosas de busca vetorial no Qdrant. Use-as PROATIVAMENTE sempre que a informação não estiver listada nos dados acima:
+    1. **search_company_rules**: Use SEMPRE para perguntas sobre quem é a Graves & Agudos, sua história, horários de funcionamento, regras da empresa, manuais ou a marca VO6. Se o usuário perguntar "O que você sabe sobre nós?", esta é a ferramenta certa.
+    2. **search_clients_knowledge**: Use para buscar clientes por características subjetivas (ex: "quem foca em suspensão?") ou para encontrar clientes não listados no resumo.
+    3. **search_products_knowledge**: Use para buscar no catálogo de produtos por descrição.
+    
     [INSTRUÇÕES GERAIS]
-    1. Responda em Português (PT-BR) de forma amigável, proativa e direta.
-    2. Use formatação Markdown (negrito para destacar números, listas para organizar, tabelas se comparar muitos itens).
-    3. Quando o usuário fizer uma pergunta, use a lógica para cruzar os DADOS DE REFERÊNCIA quando os nomes dos clientes ou produtos forem citados.
-    4. Se a reposta demandar algo que não está no contexto, informe polidamente que como "Assistente Lite" você visualiza no momento o recorte primário da tela.
+    1. Responda em Português (PT-BR) de forma amigável e profissional.
+    2. Use Markdown para clareza (tabelas, negrito, listas).
+    3. Se houver dúvida institucional, use a ferramenta **search_company_rules** antes de dizer que não sabe.
     
     Pergunta do Usuário:
     "${prompt}"
@@ -534,31 +586,37 @@ export const askAssistantRV = async (
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
     const response = await fetch(`${backendUrl}/api/ai/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gemini-2.0-flash',
-        prompt: fullPrompt
-      }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Gemini-Key': geminiApiKey || ''
+        },
+        body: JSON.stringify({
+          model: 'gemini-2.0-flash',
+          prompt: fullPrompt,
+          sessionId: sessionId
+        }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`AI Request failed with status: ${response.status}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Erro ${response.status}`);
     }
 
     const data = await response.json();
-    return data.text || data.response || "Desculpe, não consegui gerar uma resposta. Tente novamente.";
+    return {
+      text: data.text || data.response || "Ocorreu um erro ao processar. Tente novamente.",
+      sessionId: data.sessionId
+    };
   } catch (error: any) {
     console.error("AssistantRV Error:", error);
-    if (error.name === 'AbortError') {
-      throw new Error("A requisição ao motor de IA expirou (timeout). Tente novamente.");
-    }
-    throw new Error("Não foi possível conectar ao motor de IA no momento. Tente novamente em instantes.");
+    if (error.name === 'AbortError') throw new Error("Tempo limite excedido.");
+    throw new Error(error.message || "Erro de conexão com o Assistente RV.");
   }
 };

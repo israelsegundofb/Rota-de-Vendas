@@ -182,6 +182,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                             className="w-full bg-surface-container border border-outline rounded-lg p-3 pr-10 text-sm text-on-surface focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
                                             value={targetUploadUserId}
                                             onChange={(e) => setTargetUploadUserId(e.target.value)}
+                                            title="Selecionar vendedor para importação"
                                         >
                                             <option value="" disabled>Selecione um vendedor...</option>
                                             <option value="smart">🌟 Automático (Via Planilha)</option>
@@ -219,6 +220,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                         value={pf.targetUserId}
                                                         onChange={(e) => updatePendingFileUser(idx, e.target.value)}
                                                         className={`bg-transparent border rounded px-1 py-0.5 outline-none w-24 ${!pf.targetUserId ? 'border-error text-error' : 'border-outline-variant text-on-surface'}`}
+                                                        title="Atribuir vendedor a este arquivo"
                                                     >
                                                         <option value="" disabled>Vendedor...</option>
                                                         <option value="smart">Automático</option>
@@ -229,7 +231,8 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
 
                                                     <button
                                                         onClick={() => removePendingFile(idx)}
-                                                        className="text-on-surface-variant hover:text-error p-1"
+                                                        className="p-1 text-on-surface-variant hover:text-error rounded-full transition-colors"
+                                                        title="Remover arquivo da fila"
                                                     >
                                                         <X className="w-3 h-3" />
                                                     </button>

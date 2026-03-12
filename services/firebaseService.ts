@@ -249,6 +249,40 @@ export const saveToCloud = async (
 };
 
 /**
+ * Atualiza um único cliente no Firestore de forma cirúrgica (V5.1).
+ * Evita o overhead de salvar toda a lista (1300+ documentos).
+ */
+export const updateClientInCloud = async (client: EnrichedClient) => {
+    if (!db) return;
+    try {
+        const clientRef = doc(db, 'rota-vendas-data', 'clients', 'list', client.id);
+        await setDoc(clientRef, {
+            ...removeUndefined(client),
+            lastUpdated: new Date().toISOString()
+        }, { merge: true });
+        console.log(`✅ [FIREBASE] Cliente ${client.id} atualizado cirurgicamente.`);
+    } catch (e) {
+        console.error(`[FIREBASE] Erro ao atualizar cliente ${client.id}:`, e);
+        throw e;
+    }
+};
+
+/**
+ * Remove um único cliente do Firestore de forma cirúrgica (V5.1).
+ */
+export const deleteClientFromCloud = async (clientId: string) => {
+    if (!db) return;
+    try {
+        const clientRef = doc(db, 'rota-vendas-data', 'clients', 'list', clientId);
+        await deleteDoc(clientRef);
+        console.log(`✅ [FIREBASE] Cliente ${clientId} removido.`);
+    } catch (e) {
+        console.error(`[FIREBASE] Erro ao remover cliente ${clientId}:`, e);
+        throw e;
+    }
+};
+
+/**
  * Força a sincronização imediata do array de UploadedFiles no Metadata.
  * Usado primariamente durante deleções manuais para impedir que o debounce
  * de auto-save atrase a remoção e cause arquivos zumbis no reload.
@@ -342,6 +376,7 @@ export const loadFromCloud = async (): Promise<any | null> => {
     if (!db) return null;
 
     try {
+        console.warn('[FIREBASE] Iniciando carregamento total (V5 + Fallback V4)...');
         // Load Collections in Parallel
         const [usersSnap, clientsSnap, productsSnap, metaSnap] = await Promise.all([
             getDocs(collection(db, 'rota-vendas-data', 'users', 'list')),
@@ -350,9 +385,19 @@ export const loadFromCloud = async (): Promise<any | null> => {
             getDoc(doc(db, 'rota-vendas-data', 'metadata'))
         ]);
 
-        // Fallback check: If new collection structure is empty, try V4 architecture
-        if (usersSnap.empty && clientsSnap.empty) {
-            console.warn('[FIREBASE] V5 collections empty, falling back to V4 document structure');
+        console.log(`[FIREBASE] V5 Encontrado: ${usersSnap.size} usuários, ${clientsSnap.size} clientes.`);
+
+        let users = usersSnap.docs.map(d => d.data() as AppUser);
+        let clients = clientsSnap.docs.map(d => d.data() as EnrichedClient);
+        let products = productsSnap.docs.map(d => d.data() as Product);
+        const metadata: any = metaSnap.exists() ? metaSnap.data() : {};
+
+        // --- RECOVERY LOGIC: Check Legacy V4 if V5 users look suspicious (only mock users) ---
+        const defaultIds = ['admin_dev', '1', '2'];
+        const onlyHasDefaults = users.length > 0 && users.every(u => defaultIds.includes(u.id));
+
+        if (usersSnap.empty || onlyHasDefaults) {
+            console.warn('[FIREBASE] V5 usuários suspeitos ou vazios. Buscando backup em V4...');
             const [u4, c4, m4] = await Promise.all([
                 getDoc(doc(db, 'rota-vendas', 'users-data')),
                 getDoc(doc(db, 'rota-vendas', 'clients-data')),
@@ -360,35 +405,45 @@ export const loadFromCloud = async (): Promise<any | null> => {
             ]);
 
             if (u4.exists() || c4.exists() || m4.exists()) {
-                const legacy: any = {};
-                if (u4.exists()) legacy.users = u4.data().users;
-                if (c4.exists()) legacy.clients = c4.data().clients;
+                console.log('[FIREBASE] Dados V4 encontrados! Mesclando para recuperação...');
+                const legacyUsers = u4.exists() ? u4.data().users as AppUser[] : [];
+                const legacyClients = c4.exists() ? c4.data().clients as EnrichedClient[] : [];
+
+                // Merge users: keep legacy ones that aren't the defaults or merge all
+                if (legacyUsers && legacyUsers.length > users.length) {
+                    console.warn(`[FIREBASE] Recuperando ${legacyUsers.length} usuários do backup V4.`);
+                    users = legacyUsers;
+                }
+
+                // Merge clients if V5 is significantly smaller
+                if (legacyClients && legacyClients.length > clients.length) {
+                    console.warn(`[FIREBASE] Recuperando ${legacyClients.length} clientes do backup V4.`);
+                    clients = legacyClients;
+                }
+
                 if (m4.exists()) {
                     const d = m4.data();
-                    legacy.products = d.products;
-                    legacy.categories = d.categories;
-                    legacy.uploadedFiles = d.uploadedFiles;
+                    if (!products.length && d.products) products = d.products;
+                    if (!metadata.categories && d.categories) metadata.categories = d.categories;
+                    if (!metadata.uploadedFiles && d.uploadedFiles) metadata.uploadedFiles = d.uploadedFiles;
                 }
-                return legacy;
             }
+        }
+
+        if (users.length === 0 && clients.length === 0) {
+            console.error('[FIREBASE] Nenhum dado encontrado em V5 nem em V4.');
             return null;
         }
 
-        const result: any = {
-            users: usersSnap.docs.map(d => d.data()),
-            clients: clientsSnap.docs.map(d => d.data()),
-            products: productsSnap.docs.map(d => d.data())
+        return {
+            users,
+            clients,
+            products,
+            categories: metadata.categories,
+            uploadedFiles: metadata.uploadedFiles
         };
-
-        if (metaSnap.exists()) {
-            const meta = metaSnap.data();
-            result.categories = meta.categories;
-            result.uploadedFiles = meta.uploadedFiles;
-        }
-
-        return result;
     } catch (e) {
-        console.error("Error loading from cloud (V5.0):", e);
+        console.error("Error loading from cloud (V5.1):", e);
         return null;
     }
 };

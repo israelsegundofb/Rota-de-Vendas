@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { EnrichedClient, AppUser, Product } from '../types';
 import { isAdmin, hasFullDataVisibility } from '../utils/authUtils';
+import { isValidPurchase } from '../utils/purchaseUtils';
 import useDebounce from './useDebounce';
 import { useUrlParams } from './useUrlParams';
 
@@ -73,34 +74,26 @@ export const useFilters = (
     const currentUserId = currentUser?.id;
     const currentUserRole = currentUser?.role;
 
-    // 1. Visible Clients (Permissions)
+    // 1. Visible Clients (Permissions & Contextual Assignment)
     const visibleClients = useMemo(() => {
         if (!currentUserId || !currentUserRole) return [];
-        let baseList = [];
-        if (hasFullDataVisibility(currentUserRole)) {
-            if (filterSalespersonId !== 'Todos') {
-                // Include clients assigned to this salesperson
-                baseList = masterClientList.filter(c => c.salespersonId === filterSalespersonId);
 
-                // When filtering purchases: ALSO include clients from other salespersons
-                // that have purchases sold by the selected salesperson
-                if (filterOnlyWithPurchases) {
-                    const assignedIds = new Set(baseList.map(c => c.id));
-                    const crossSalespersonClients = masterClientList.filter(c =>
-                        !assignedIds.has(c.id) && // Not already included
-                        c.purchasedProducts && c.purchasedProducts.length > 0 &&
-                        c.purchasedProducts.some(p => p.salespersonId === filterSalespersonId)
-                    );
-                    baseList = [...baseList, ...crossSalespersonClients];
-                }
-            } else {
-                baseList = masterClientList;
-            }
-        } else {
-            baseList = masterClientList.filter(c => c.salespersonId === currentUserId);
+        const isAdminUser = hasFullDataVisibility(currentUserRole);
+        const targetSalespersonId = isAdminUser ? filterSalespersonId : currentUserId;
+
+        if (targetSalespersonId !== 'Todos') {
+            // Logic: A client is "visible" for a salesperson if:
+            // a) The client is assigned to them (c.salespersonId === targetSalespersonId)
+            // b) The salesperson has at least one purchase record for that client
+            return masterClientList.filter(c =>
+                c.salespersonId === targetSalespersonId ||
+                (c.purchasedProducts && c.purchasedProducts.some(p => p.salespersonId === targetSalespersonId))
+            );
         }
-        return baseList;
-    }, [currentUserId, currentUserRole, masterClientList, filterSalespersonId, filterOnlyWithPurchases]);
+
+        // 'Todos' (Admin only)
+        return masterClientList;
+    }, [masterClientList, filterSalespersonId, currentUserId, currentUserRole]);
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
@@ -156,68 +149,74 @@ export const useFilters = (
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // Check Category (Brand often used as category in this context) -> Now acts as Department
-                    const hasCat = filterProductCategory === 'Todos' || c.purchasedProducts.some(p => (p.category || '') === filterProductCategory);
+                    // Optimize: Evaluate all product conditions in a single loop while preserving
+                    // the independent "ANY product matches X" logic of the original code.
+                    let hasCat = filterProductCategory === 'Todos';
+                    let hasSection = filterProductSection === 'Todas';
+                    let hasSku = filterProductSku === 'Todos';
+                    let hasMatch = prodQuery === '';
+                    let matchDate = !hasDateFilter;
 
-                    // Check Section
-                    const hasSection = filterProductSection === 'Todas' || c.purchasedProducts.some(p => (p.section || '') === filterProductSection);
+                    for (let i = 0; i < c.purchasedProducts.length; i++) {
+                        const p = c.purchasedProducts[i];
 
-                    // Check Specific SKU
-                    const hasSku = filterProductSku === 'Todos' || c.purchasedProducts.some(p => (p.sku || '') === filterProductSku);
+                        if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
+                        if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
+                        if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                    // Check Search Query (Includes Brand and Category/Department)
-                    const hasMatch = prodQuery === '' || c.purchasedProducts.some(p =>
-                        (p.name || '').toLowerCase().includes(prodQuery) ||
-                        (p.sku || '').toLowerCase().includes(prodQuery) ||
-                        (p.brand || '').toLowerCase().includes(prodQuery) ||
-                        (p.category || '').toLowerCase().includes(prodQuery) ||
-                        (p.section || '').toLowerCase().includes(prodQuery) ||
-                        (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                        (p.price || 0).toString().includes(prodQuery)
-                    );
+                        if (!hasMatch) {
+                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
+                                (p.sku || '').toLowerCase().includes(prodQuery) ||
+                                (p.brand || '').toLowerCase().includes(prodQuery) ||
+                                (p.category || '').toLowerCase().includes(prodQuery) ||
+                                (p.section || '').toLowerCase().includes(prodQuery) ||
+                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
+                                (p.price || 0).toString().includes(prodQuery);
+                        }
 
-                    // Date Range Filter
-                    const matchDate = (!hasDateFilter) || c.purchasedProducts.some(p => {
-                        if (!p.purchaseDate) return false;
-
-                        // Robust Date Parsing
-                        let pDate = new Date(p.purchaseDate);
-
-                        // Fallback for DD/MM/YYYY
-                        if (isNaN(pDate.getTime())) {
-                            const parts = p.purchaseDate.split('/');
-                            if (parts.length === 3) {
-                                pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                            } else {
-                                // Try DD-MM-YYYY
-                                const partsHyphen = p.purchaseDate.split('-');
-                                if (partsHyphen.length === 3) {
-                                    pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                        if (!matchDate && p.purchaseDate) {
+                            let pDate = new Date(p.purchaseDate);
+                            if (isNaN(pDate.getTime())) {
+                                const parts = p.purchaseDate.split('/');
+                                if (parts.length === 3) {
+                                    pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                } else {
+                                    const partsHyphen = p.purchaseDate.split('-');
+                                    if (partsHyphen.length === 3) {
+                                        pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                                    }
+                                }
+                            }
+                            if (!isNaN(pDate.getTime())) {
+                                pDate.setHours(0, 0, 0, 0);
+                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
+                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                                if (isAfterStart && isBeforeEnd) {
+                                    matchDate = true;
                                 }
                             }
                         }
 
-                        if (isNaN(pDate.getTime())) return false; // Invalid date in data
-
-                        // Reset time for comparison
-                        pDate.setHours(0, 0, 0, 0);
-
-                        if (parsedStartDate && pDate < parsedStartDate) return false;
-                        if (parsedEndDate && pDate > parsedEndDate) return false;
-
-                        return true;
-                    });
+                        // Early exit if all independent conditions are satisfied
+                        if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
+                            break;
+                        }
+                    }
 
                     matchProduct = hasCat && hasSection && hasSku && hasMatch && matchDate;
                 }
             }
 
-            // Only with Purchases Filter
-            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (c.purchasedProducts && c.purchasedProducts.length > 0);
+            // Only with Purchases Filter: Context-aware and robust
+            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (
+                c.purchasedProducts && c.purchasedProducts.some(p =>
+                    isValidPurchase(p, filterSalespersonId, startDate, endDate)
+                )
+            );
 
             return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
         });
-    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, debouncedSearchQuery, filterProductCategory, filterProductSection, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
+    }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, filterSalespersonId, debouncedSearchQuery, filterProductCategory, filterProductSection, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
