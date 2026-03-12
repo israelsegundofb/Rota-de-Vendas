@@ -19,7 +19,7 @@ const port = process.env.PORT || '3001';
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Gemini-Key'],
     optionsSuccessStatus: 200
 }));
 
@@ -73,12 +73,17 @@ app.post('/api/logs', (req: Request, res: Response) => {
 
 app.post('/api/ai/generate', async (req: Request, res: Response) => {
     try {
-        const { model, prompt, useMaps } = req.body;
+        const { model, prompt, useMaps, sessionId } = req.body;
         if (!prompt) return res.status(400).json({ error: 'Prompt é obrigatório' });
 
         // Force stable gemini-2.0-flash for best compatibility and speed
         const aiModel = model || 'gemini-2.0-flash';
-        const response: any = await generateAIContent(aiModel, prompt, useMaps);
+        const apiKeyHeader = req.headers['x-gemini-key'] as string;
+        console.log(`[BACKEND] Request received. Header X-Gemini-Key present: ${!!apiKeyHeader} (${apiKeyHeader ? apiKeyHeader.substring(0,6) : 'N/A'})`);
+        
+        const aiResult: any = await generateAIContent(aiModel, prompt, useMaps, sessionId, apiKeyHeader);
+        const response = aiResult.response;
+        const returnedSessionId = aiResult.sessionId;
 
         if (!response) {
             throw new Error("Resposta da IA está vazia ou malformada.");
@@ -107,7 +112,8 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
 
         res.status(200).json({
             text: responseText,
-            mapsUri: mapsUri
+            mapsUri: mapsUri,
+            sessionId: returnedSessionId
         });
     } catch (error: any) {
         console.error('[AI PROXY ERROR]:', error);
