@@ -165,13 +165,13 @@ export const useFilters = (
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
                         if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                            hasMatch = (p.name && p.name.toLowerCase().includes(prodQuery)) ||
+                                (p.sku && p.sku.toLowerCase().includes(prodQuery)) ||
+                                (p.brand && p.brand.toLowerCase().includes(prodQuery)) ||
+                                (p.category && p.category.toLowerCase().includes(prodQuery)) ||
+                                (p.section && p.section.toLowerCase().includes(prodQuery)) ||
+                                (p.factoryCode && p.factoryCode.toLowerCase().includes(prodQuery)) ||
+                                (p.price != null && p.price.toString().includes(prodQuery)) || false;
                         }
 
                         if (!matchDate && p.purchaseDate) {
@@ -218,52 +218,77 @@ export const useFilters = (
         });
     }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, filterSalespersonId, debouncedSearchQuery, filterProductCategory, filterProductSection, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
 
-    // 3. Dropdown Options
+// 3. Dropdown Options
+    // Optimize: Replace chained array operations (.filter().map().filter()) with single-pass loops
+    // to prevent intermediate array allocations and reduce GC overhead when processing large client/product lists.
     const availableStates = useMemo(() => {
-        let base = visibleClients;
-        if (filterRegion !== 'Todas') {
-            base = base.filter(c => c.region === filterRegion);
+        const states = new Set<string>();
+        const len = visibleClients.length;
+        for (let i = 0; i < len; i++) {
+            const c = visibleClients[i];
+            if (filterRegion === 'Todas' || c.region === filterRegion) {
+                if (c.state) {
+                    states.add(c.state);
+                }
+            }
         }
-        const states = new Set(base.map(c => c.state).filter(Boolean));
         return Array.from(states).sort();
     }, [visibleClients, filterRegion]);
 
     const availableCities = useMemo(() => {
-        let base = visibleClients;
-        if (filterRegion !== 'Todas') {
-            base = base.filter(c => c.region === filterRegion);
+        if (filterState === 'Todos') return [];
+        const cities = new Set<string>();
+        const len = visibleClients.length;
+        for (let i = 0; i < len; i++) {
+            const c = visibleClients[i];
+            if (c.state === filterState && (filterRegion === 'Todas' || c.region === filterRegion)) {
+                if (c.city) {
+                    cities.add(c.city);
+                }
+            }
         }
-        if (filterState !== 'Todos') {
-            base = base.filter(c => c.state === filterState);
-        } else {
-            return [];
-        }
-        const cities = new Set(base.map(c => c.city).filter(Boolean));
         return Array.from(cities).sort();
     }, [visibleClients, filterRegion, filterState]);
 
     const productCategories = useMemo(() => {
-        const cats = new Set(products.map(p => p.category).filter(Boolean));
+        const cats = new Set<string>();
+        const len = products.length;
+        for (let i = 0; i < len; i++) {
+            const p = products[i];
+            if (p.category) {
+                cats.add(p.category);
+            }
+        }
         return Array.from(cats).sort();
     }, [products]);
 
     const productSections = useMemo(() => {
-        let base = products;
-        if (filterProductCategory !== 'Todos') {
-            base = base.filter(p => p.category === filterProductCategory);
+        const secs = new Set<string>();
+        const len = products.length;
+        for (let i = 0; i < len; i++) {
+            const p = products[i];
+            if (filterProductCategory === 'Todos' || p.category === filterProductCategory) {
+                if (p.section) {
+                    secs.add(p.section);
+                }
+            }
         }
-        const secs = new Set(base.map(p => p.section).filter(Boolean));
         return Array.from(secs).sort();
     }, [products, filterProductCategory]);
 
     const availableCnaes = useMemo(() => {
         const cnaes = new Set<string>();
-        visibleClients.forEach(c => {
+        const len = visibleClients.length;
+        for (let i = 0; i < len; i++) {
+            const c = visibleClients[i];
             if (c.mainCnae) cnaes.add(c.mainCnae);
             if (c.secondaryCnaes) {
-                c.secondaryCnaes.forEach(s => cnaes.add(s));
+                const slen = c.secondaryCnaes.length;
+                for (let j = 0; j < slen; j++) {
+                    cnaes.add(c.secondaryCnaes[j]);
+                }
             }
-        });
+        }
         return Array.from(cnaes).sort();
     }, [visibleClients]);
 

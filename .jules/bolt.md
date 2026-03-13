@@ -5,3 +5,7 @@
 ## 2025-02-14 - [Hoist String allocations outside filter loops]
 **Learning:** Calling `.toLowerCase()` on variables like `searchTerm` *inside* an `Array.prototype.filter` loop causes $O(N)$ string allocations and runtime overhead, especially when checking multiple properties (e.g., `name`, `sku`, `brand`).
 **Action:** Pre-compute and hoist the normalized search terms (e.g., `const normalizedSearch = searchTerm.toLowerCase();`) outside of iteration blocks to reduce memory pressure and cpu usage.
+
+## 2025-02-14 - [Optimize array chaining to single-pass loops]
+**Learning:** Chaining array methods like `.filter(c => ...).map(c => ...).filter(Boolean)` creates a new intermediate array at every step. In functions like `availableStates` running over 5,000+ items inside a `useMemo`, this creates massive memory allocations and garbage collection (GC) overhead.
+**Action:** Replace chained array operations used to derive unique sets with single-pass `for` loops directly populating a `Set`.
