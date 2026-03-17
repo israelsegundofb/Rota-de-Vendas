@@ -2,9 +2,13 @@ import Papa from 'papaparse';
 import { EnrichedClient, AppUser } from '../types';
 
 export const exportClientsToCSV = (clients: EnrichedClient[], users: AppUser[]) => {
+    // Optimization: Create a Map of users to avoid O(N*M) lookup inside the mapping loop.
+    // This reduces the time complexity to O(N + M) and prevents blocking the main thread for large datasets.
+    const userMap = new Map<string, AppUser>(users.map(u => [u.id, u]));
+
     // Map clients to the desired CSV format
     const exportData = clients.map(client => {
-        const seller = users.find(u => u.id === client.salespersonId);
+        const seller = userMap.get(client.salespersonId || '');
 
         return {
             'CNPJ / CPF': client.cnpj || '',
