@@ -100,10 +100,6 @@ const ClientList: React.FC<ClientListProps> = ({
     setIsProductModalOpen(true);
   }, []);
 
-  if (isLoading) {
-    return <ClientListSkeleton />;
-  }
-
   const filteredClients = clients;
 
   const handleExportCSV = () => {
