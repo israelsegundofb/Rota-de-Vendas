@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useCallback } from 'react';
+import React, { useState, useEffect, forwardRef, useCallback, useMemo } from 'react';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
 import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
 import { REGIONS, CATEGORIES } from '../utils/constants';
@@ -165,6 +165,44 @@ const ClientList: React.FC<ClientListProps> = ({
     }
   };
 
+  // ⚡ Bolt: Memoize VirtuosoGrid components to prevent recreation on every render,
+  // which causes the entire grid to unmount and remount, destroying performance.
+  const gridComponents = useMemo(() => ({
+    List: forwardRef<HTMLDivElement, any>((props, ref) => (
+      <div
+        {...props}
+        ref={ref}
+        className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
+      />
+    )),
+    Item: (props: any) => <div {...props} className="h-full" />
+  }), []);
+
+  // ⚡ Bolt: Memoize itemContent functions. react-virtuoso relies heavily on
+  // referential equality of itemContent to avoid unnecessary re-renders of list items.
+  const renderClientCard = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client}
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+      filterSalespersonId={filterSalespersonId}
+      startDate={startDate}
+      endDate={endDate}
+    />
+  ), [openEditModal, openProductAssignmentModal, filterSalespersonId, startDate, endDate]);
+
+  const renderClientCardGrid = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client}
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+      style={{ height: '100%' }}
+      filterSalespersonId={filterSalespersonId}
+      startDate={startDate}
+      endDate={endDate}
+    />
+  ), [openEditModal, openProductAssignmentModal, filterSalespersonId, startDate, endDate]);
+
   return (
     <div className="flex flex-col h-full bg-white relative">
       <div className="px-3 py-2.5 border-b border-gray-200 flex flex-col md:flex-row gap-3 items-center justify-between bg-white z-10 sticky top-0 md:relative shadow-sm md:shadow-none">
@@ -267,43 +305,15 @@ const ClientList: React.FC<ClientListProps> = ({
           <Virtuoso
             style={{ height: '100%' }}
             data={filteredClients}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client}
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-                filterSalespersonId={filterSalespersonId}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            )}
+            itemContent={renderClientCard}
             className="custom-scrollbar"
           />
         ) : (
           <VirtuosoGrid
             style={{ height: '100%' }}
             data={filteredClients}
-            components={{
-              List: forwardRef((props, ref) => (
-                <div
-                  {...props}
-                  ref={ref}
-                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
-                />
-              )),
-              Item: (props) => <div {...props} className="h-full" />
-            }}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client}
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
-                filterSalespersonId={filterSalespersonId}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            )}
+            components={gridComponents}
+            itemContent={renderClientCardGrid}
             className="custom-scrollbar"
           />
         )}
