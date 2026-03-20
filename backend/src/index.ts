@@ -26,7 +26,7 @@ app.use(express.json({ limit: '100mb' }));
 
 // 3. Roteamento
 app.get('/', (req: Request, res: Response) => {
-    res.send('🚀 Backend Rota de Vendas está ONLINE! (v6.5.0-AI-SCALABLE)');
+    res.send('🚀 Backend Rota de Vendas está ONLINE! (v6.5.0)');
 });
 
 app.get('/health', (req: Request, res: Response) => {
