@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { REGIONS } from '../utils/constants';
-import { isDateInRange } from '../utils/dateUtils';
+import { isDateWithinBounds, parseDateSafe } from '../utils/dateUtils';
 
 interface AdminDashboardProps {
     clients: EnrichedClient[];
@@ -113,10 +113,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         // DEBUG: Log initial clients count
         console.log('[DASHBOARD] Calculating stats for', clients.length, 'clients');
 
+        // Optimize: Pre-parse filter dates outside the loop to avoid O(N) Date instantiations
+        let parsedStartDate: Date | null = null;
+        if (startDate) {
+            parsedStartDate = parseDateSafe(startDate);
+            if (parsedStartDate) parsedStartDate.setHours(0, 0, 0, 0);
+        }
+
+        let parsedEndDate: Date | null = null;
+        if (endDate) {
+            parsedEndDate = parseDateSafe(endDate);
+            if (parsedEndDate) parsedEndDate.setHours(23, 59, 59, 999);
+        }
+
         clients.forEach(client => {
-            // Filtrar as compras pelo range de data atual usando helper seguro
+            // Filtrar as compras pelo range de data atual usando helper otimizado
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
-                return isDateInRange(p.purchaseDate, startDate, endDate);
+                if (!startDate && !endDate) return true;
+                const pDate = parseDateSafe(p.purchaseDate);
+                if (!pDate) return false;
+                pDate.setHours(0, 0, 0, 0);
+                return isDateWithinBounds(pDate, parsedStartDate, parsedEndDate);
             });
 
             const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);

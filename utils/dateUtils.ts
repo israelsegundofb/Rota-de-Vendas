@@ -28,6 +28,20 @@ export const parseDateSafe = (dateString: string | undefined | null): Date | nul
     return null;
 };
 
+/**
+ * High-performance helper to check if a parsed target date falls within pre-parsed boundaries.
+ * Useful when iterating over large datasets to avoid parsing start/end dates repeatedly.
+ */
+export const isDateWithinBounds = (
+    tDate: Date,
+    parsedStartDate: Date | null,
+    parsedEndDate: Date | null
+): boolean => {
+    if (parsedStartDate && tDate < parsedStartDate) return false;
+    if (parsedEndDate && tDate > parsedEndDate) return false;
+    return true;
+};
+
 export const isDateInRange = (
     targetDate: string | undefined | null,
     startDate: string | undefined | null,
