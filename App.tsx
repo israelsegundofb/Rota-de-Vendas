@@ -2766,7 +2766,7 @@ const App: React.FC = () => {
                         }>
                           <ErrorBoundary componentName="Mapa de Clientes">
                             <ClientMap
-                              key={`${activeApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
+                              key={`${googleMapsApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
                               clients={finalFilteredClients}
                               apiKey={googleMapsApiKey}
                               onInvalidKey={handleInvalidKey}
