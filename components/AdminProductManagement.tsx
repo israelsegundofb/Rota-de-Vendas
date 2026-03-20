@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Upload, Trash2, Search, Save, ArrowUp, ArrowDown, FileSpreadsheet, Sparkles, X } from 'lucide-react';
+import { Package, Upload, Trash2, Search, Save, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react';
 import { Product } from '../types';
 import { parseProductCSV } from '../utils/csvParser';
 import { parseProductExcel } from '../utils/excelParser';
-import { categorizeProductsWithAI } from '../services/geminiService';
 
 interface AdminProductManagementProps {
   products: Product[];
@@ -27,8 +26,6 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState('');
-  const [isCategorizingAI, setIsCategorizingAI] = useState(false);
-  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 });
 
   // Local state for editing and sorting
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
@@ -75,40 +72,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
     }
   };
 
-  const handleAICategorize = async () => {
-    if (localProducts.length === 0) {
-      alert('Nenhum produto para categorizar.');
-      return;
-    }
 
-    if (!window.confirm(`Deseja usar a IA para categorizar ${localProducts.length} produtos?\n\nIsso pode consumir créditos da API e levar alguns minutos.`)) {
-      return;
-    }
-
-    setIsCategorizingAI(true);
-    setAiProgress({ current: 0, total: localProducts.length });
-
-    try {
-      const categorized = await categorizeProductsWithAI(
-        localProducts,
-        (current, total) => {
-          setAiProgress({ current, total });
-        }
-      );
-
-      setLocalProducts(categorized);
-      setHasChanges(true);
-      alert(`✓ ${categorized.length} produtos foram categorizados pela IA!`);
-    } catch (error: any) {
-      console.error('AI Categorization failed', error);
-      alert(`Erro ao categorizar produtos: ${error.message || 'Erro desconhecido'}`);
-    } finally {
-      setIsCategorizingAI(false);
-      setAiProgress({ current: 0, total: 0 });
-    }
-  };
-
-  const handleProductChange = (index: number, field: keyof Product, value: any) => {
+  const handleProductChange = (index: number, field: keyof Product, value: string | number) => {
     const updated = [...localProducts];
     updated[index] = { ...updated[index], [field]: value };
     setLocalProducts(updated);
@@ -189,20 +154,6 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
               </button>
             )}
 
-            {products.length > 0 && (
-              <button
-                onClick={handleAICategorize}
-                disabled={isCategorizingAI}
-                className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 rounded-full text-sm font-medium flex items-center gap-2 transition-all shadow-elevation-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCategorizingAI ? (
-                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {isCategorizingAI ? 'Processando...' : 'IA Classificar'}
-              </button>
-            )}
 
             {products.length > 0 && (
               <button
@@ -296,7 +247,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                 </thead>
                 <tbody className="divide-y divide-outline-variant/30 bg-surface">
                   {displayedProducts.map((p) => (
-                    <tr key={`${p.sku}-${(p as any).originalIndex}`} className="hover:bg-surface-container-highest/30 transition-colors group">
+                    <tr key={`${p.sku}-${(p as Product & { originalIndex: number }).originalIndex}`} className="hover:bg-surface-container-highest/30 transition-colors group">
                       <td className="px-4 py-2 font-mono text-on-surface-variant text-xs">{p.sku}</td>
                       <td className="px-4 py-2 font-bold text-primary text-xs uppercase">
                         {p.brand}
@@ -309,7 +260,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           type="text"
                           className="w-full text-xs text-on-surface border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.category}
-                          onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
+                          onChange={(e) => handleProductChange((p as Product & { originalIndex: number }).originalIndex, 'category', e.target.value)}
                           title="Editar Departamento"
                           placeholder="Departamento"
                         />
@@ -321,7 +272,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           type="text"
                           className="w-full text-xs text-on-surface border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.section || ''}
-                          onChange={(e) => handleProductChange((p as any).originalIndex, 'section', e.target.value)}
+                          onChange={(e) => handleProductChange((p as Product & { originalIndex: number }).originalIndex, 'section', e.target.value)}
                           title="Editar Seção"
                           placeholder="Seção"
                         />
@@ -334,7 +285,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           step="0.01"
                           className="w-full text-xs text-right font-bold text-primary border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-primary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.price}
-                          onChange={(e) => handleProductChange((p as any).originalIndex, 'price', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleProductChange((p as Product & { originalIndex: number }).originalIndex, 'price', parseFloat(e.target.value) || 0)}
                           title="Editar Preço"
                           placeholder="0,00"
                         />
@@ -349,7 +300,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                           max="100"
                           className="w-full text-xs text-right text-tertiary border-transparent bg-transparent hover:bg-surface-container-highest/50 focus:bg-surface-container-highest focus:border-tertiary focus:ring-0 border-b focus:border-b-2 rounded-t transition-all px-2 py-1 outline-none"
                           value={p.discount || 0}
-                          onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleProductChange((p as Product & { originalIndex: number }).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
                           title="Editar Desconto"
                           placeholder="0.0"
                         />
@@ -362,8 +313,8 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
 
             {/* Mobile Card Layout */}
             <div className="md:hidden space-y-4 pb-4">
-              {displayedProducts.map((p) => (
-                <div key={`${p.sku}-${(p as any).originalIndex}`} className="bg-surface-container-highest/30 p-4 rounded-xl border border-outline-variant/30 space-y-3">
+              {displayedProducts.map((p: Product & { originalIndex: number }) => (
+                <div key={`${p.sku}-${p.originalIndex}`} className="bg-surface-container-highest/30 p-4 rounded-xl border border-outline-variant/30 space-y-3">
 
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -385,7 +336,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                         type="text"
                         className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-primary outline-none"
                         value={p.category}
-                        onChange={(e) => handleProductChange((p as any).originalIndex, 'category', e.target.value)}
+                        onChange={(e) => handleProductChange(p.originalIndex, 'category', e.target.value)}
                         title="Editar Departamento"
                         placeholder="Departamento"
                       />
@@ -396,7 +347,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                         type="text"
                         className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-primary outline-none"
                         value={p.section || ''}
-                        onChange={(e) => handleProductChange((p as any).originalIndex, 'section', e.target.value)}
+                        onChange={(e) => handleProductChange(p.originalIndex, 'section', e.target.value)}
                         title="Editar Seção"
                         placeholder="Seção"
                       />
@@ -410,7 +361,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                         type="number"
                         className="w-full text-xs bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-1.5 focus:border-tertiary outline-none text-tertiary font-bold"
                         value={p.discount || 0}
-                        onChange={(e) => handleProductChange((p as any).originalIndex, 'discount', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleProductChange(p.originalIndex, 'discount', parseFloat(e.target.value) || 0)}
                         title="Editar Desconto"
                         placeholder="0"
                       />
@@ -423,7 +374,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
                       type="number"
                       className="w-full text-sm bg-surface-container-highest/50 border-b border-outline-variant rounded-t px-2 py-2 focus:border-primary outline-none text-primary font-bold"
                       value={p.price}
-                      onChange={(e) => handleProductChange((p as any).originalIndex, 'price', parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleProductChange(p.originalIndex, 'price', parseFloat(e.target.value) || 0)}
                       title="Editar Preço"
                       placeholder="0,00"
                     />
@@ -444,50 +395,6 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
         )}
       </div>
 
-      {/* AI Categorization Progress Modal */}
-      {isCategorizingAI && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface rounded-[24px] shadow-elevation-5 p-6 max-w-md w-full animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-500" />
-                Categorizando com IA
-              </h3>
-              <button
-                onClick={() => {
-                  if (window.confirm('Deseja realmente cancelar a categorização?')) {
-                    setIsCategorizingAI(false);
-                  }
-                }}
-                className="text-on-surface-variant hover:text-on-surface"
-                title="Cancelar categorização IA"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm text-on-surface-variant">
-                <span>Processando produtos...</span>
-                <span className="font-mono font-bold text-primary">
-                  {aiProgress.current} / {aiProgress.total}
-                </span>
-              </div>
-
-              <div className="h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
-                  style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%` }}
-                />
-              </div>
-
-              <p className="text-xs text-on-surface-variant">
-                A IA está analisando cada produto e atribuindo categorias automaticamente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div >
   );
 };
