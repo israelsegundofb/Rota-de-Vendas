@@ -16,7 +16,7 @@ import { REGIONS } from './utils/constants';
 import { parseCSV, parseProductCSV, parsePurchaseHistoryCSV } from './utils/csvParser';
 import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
-import { processClientsWithAI } from './services/geminiService';
+import { processClientsSimple } from './services/clientEnrichmentService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
 import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
@@ -40,7 +40,6 @@ const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
 const LogPanel = React.lazy(() => import('./components/LogPanel'));
 const SalesHistoryPanel = React.lazy(() => import('./components/SalesHistoryPanel'));
 const ChatPanel = React.lazy(() => import('./components/ChatPanel'));
-import { AssistantRV } from './components/AssistantRV';
 
 import DateRangePicker from './components/DateRangePicker';
 import CookieConsent from './components/CookieConsent';
@@ -152,29 +151,22 @@ const App: React.FC = () => {
   });
 
   // API Key State
-  const [activeApiKey, setActiveApiKey] = useState<string>('');
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string>('');
   const [keyVersion, setKeyVersion] = useState(0);
   const [isMapApiBroken, setIsMapApiBroken] = useState(false);
 
   useEffect(() => {
-    let unsubscribe = () => {};
+    let unsubscribe = () => { };
     if (isFirebaseConnected) {
       unsubscribe = subscribeToSystemSettings((settings) => {
-        if (settings.geminiApiKey) {
-           console.log('[APP] Gemini API Key recebida:', settings.geminiApiKey.substring(0, 6) + '...');
-           setActiveApiKey(settings.geminiApiKey);
-        } else {
-           console.warn('[APP] Gemini API Key não encontrada no Firestore.');
-        }
         if (settings.googleMapsApiKey) {
-           setGoogleMapsApiKey(settings.googleMapsApiKey);
-           console.log('[APP] Google Maps API Key injetada pelo Cloud.');
-           setIsMapApiBroken(false); // Reset error state if a valid key is found
-           setKeyVersion(v => v + 1); // Force map re-render when key arrives
+          setGoogleMapsApiKey(settings.googleMapsApiKey);
+          console.log('[APP] Google Maps API Key injetada pelo Cloud.');
+          setIsMapApiBroken(false); // Reset error state if a valid key is found
+          setKeyVersion(v => v + 1); // Force map re-render when key arrives
         }
         if (settings.cnpjaApiKey) {
-           console.log('[APP] CNPJa API Key injetada pelo Cloud.');
+          console.log('[APP] CNPJa API Key injetada pelo Cloud.');
         }
       });
     }
@@ -182,7 +174,6 @@ const App: React.FC = () => {
   }, [isFirebaseConnected]);
 
   // Assistant State
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   // View State
   const [activeView, setActiveView] = useState<'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat'>('map');
@@ -1206,7 +1197,7 @@ const App: React.FC = () => {
 
       setProcState(prev => ({ ...prev, total: rawData.length, status: 'processing' }));
 
-      await processClientsWithAI(
+      await processClientsSimple(
         rawData,
         ownerId,
         categories,
@@ -3152,70 +3143,6 @@ const App: React.FC = () => {
         cancelLabel={dialogConfig.cancelLabel}
       />
 
-      {currentUser && (
-        <AssistantRV
-          isOpen={isAssistantOpen}
-          setIsOpen={setIsAssistantOpen}
-          geminiApiKey={activeApiKey}
-          context={{
-            userName: currentUser.name || 'Usuário',
-            userRole: currentUser.role || 'Geral',
-            stats: {
-              totalClients: masterClientList.length,
-              totalProducts: products.length,
-              activeClients: finalFilteredClients.length
-            },
-            users: users.map(u => ({ id: u.id, name: u.name, role: u.role })),
-            allCnaes: Array.from(new Set(masterClientList.flatMap(c => [c.mainCnae, ...(c.secondaryCnaes || [])]).filter((v): v is string => !!v))),
-            productCategories: Array.from(new Set(products.map(p => p.category).filter((v): v is string => !!v))),
-            productSections: Array.from(new Set(products.map(p => p.section).filter((v): v is string => !!v))),
-            filteredData: JSON.stringify(finalFilteredClients.slice(0, 2500).map((c: EnrichedClient) => {
-              const sellerUser = users.find(u => u.id === c.salespersonId);
-              const isRecent = c.lastUpdated ? (new Date().getTime() - new Date(c.lastUpdated).getTime()) < 300000 : false;
-              return {
-                nome: c.companyName,
-                cnpj: c.cnpj,
-                bairro: c.district,
-                cidade: c.city,
-                vendedor: sellerUser ? sellerUser.name : 'Vendedor Desconhecido',
-                vendedorId: c.salespersonId,
-                categorias: c.category,
-                cnae: c.mainCnae,
-                recent: isRecent,
-                historico: c.purchasedProducts?.slice(-10).map(p => ({
-                  item: p.name,
-                  depto: p.category,
-                  secao: p.section,
-                  marca: p.brand,
-                  data: p.purchaseDate,
-                  qtd: p.quantity,
-                  val: p.totalValue
-                }))
-              };
-            })),
-            aggregation: JSON.stringify({
-              topCities: Object.entries((masterClientList || []).reduce((acc: Record<string, number>, c) => {
-                const city = c.city || 'Indefinido';
-                acc[city] = (acc[city] || 0) + 1;
-                return acc;
-              }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10),
-              categoryDistribution: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
-                (c.category || []).forEach(cat => {
-                  acc[cat] = (acc[cat] || 0) + 1;
-                });
-                return acc;
-              }, {}),
-              sellerStats: (masterClientList || []).reduce((acc: Record<string, number>, c) => {
-                const sellerUser = users.find(u => u.id === c.salespersonId);
-                const sellerName = sellerUser ? sellerUser.name : 'N/A';
-                acc[sellerName] = (acc[sellerName] || 0) + 1;
-                return acc;
-              }, {})
-            })
-          }}
-        />
-
-      )}
     </GoogleReCaptchaProvider>
   );
 };

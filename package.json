@@ -21,7 +21,6 @@
     "validate": "npm run lint && npm run typecheck"
   },
   "dependencies": {
-    "@google/genai": "^1.40.0",
     "@googlemaps/markerclusterer": "2.5.3",
     "@types/react-window": "^1.8.8",
     "@vis.gl/react-google-maps": "1.1.0",
@@ -34,13 +33,11 @@
     "react-dom": "^19.2.4",
     "react-google-recaptcha-v3": "^1.11.0",
     "react-hot-toast": "^2.6.0",
-    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.1",
     "react-virtualized-auto-sizer": "^2.0.2",
     "react-virtuoso": "^4.18.1",
     "react-window": "^2.2.6",
     "recharts": "^3.7.0",
-    "remark-gfm": "^4.0.1",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
