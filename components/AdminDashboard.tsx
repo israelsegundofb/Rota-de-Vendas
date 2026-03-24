@@ -126,6 +126,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             if (parsedEndDate) parsedEndDate.setHours(23, 59, 59, 999);
         }
 
+        // Optimize: O(1) seller lookup instead of O(N) users.find in inner loop
+        const userMap = new Map(users.map(u => [u.id, u.name]));
+
         clients.forEach(client => {
             // Filtrar as compras pelo range de data atual usando helper otimizado
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
@@ -147,8 +150,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
 
                 // Seller
-                const sellerObj = users.find(u => u.id === client.salespersonId);
-                const sellerName = sellerObj?.name || 'Não Atribuído';
+                const sellerName = userMap.get(client.salespersonId) || 'Não Atribuído';
                 if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
                 sellerSales[sellerName].revenue += clientTotal;
             }
@@ -168,11 +170,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 // Daily trend
                 if (p.purchaseDate) {
-                    let dateKey = p.purchaseDate.split('T')[0];
-                    // Handle DD/MM/YYYY for trend key
-                    if (p.purchaseDate.includes('/')) {
+                    let dateKey;
+                    // Optimize: avoiding .split('T')[0] array allocation
+                    const tIndex = p.purchaseDate.indexOf('T');
+                    if (tIndex !== -1) {
+                        dateKey = p.purchaseDate.substring(0, tIndex);
+                    } else if (p.purchaseDate.indexOf('/') !== -1) {
                         const parts = p.purchaseDate.split('/');
-                        if (parts.length === 3) dateKey = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        if (parts.length === 3) {
+                            dateKey = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        } else {
+                            dateKey = p.purchaseDate;
+                        }
+                    } else {
+                        dateKey = p.purchaseDate;
                     }
                     dailySales[dateKey] = (dailySales[dateKey] || 0) + pVal;
                 }
