@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2, Sparkles, MapPin, Building2 } from 'lucide-react';
+import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2, Sparkles, MapPin, Building2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { consultarCNPJ } from '../services/cnpjService';
-import { consultarCPF } from '../services/cpfService';
+import { consultarCPF, buscarSocios, SocioInfo } from '../services/cpfService';
 import { searchClientByName, enrichFromResult, SearchResult } from '../services/clientSearchService';
 import { EnrichedClient, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
@@ -31,6 +31,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
 
     const [isRefreshingByCNPJ, setIsRefreshingByCNPJ] = useState(false);
     const [refreshStatus, setRefreshStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [dataIsMasked, setDataIsMasked] = useState(false);
+    const [socios, setSocios] = useState<SocioInfo[]>([]);
+    const [isSearchingSocios, setIsSearchingSocios] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     // Auto-enrichment search state
@@ -164,6 +167,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         newOriginalAddress = [streetPart, distPart, cityStatePart].filter(Boolean).join(', ');
                     }
 
+                    setDataIsMasked(!!cpfData.isMasked);
                     setFormData(prev => ({
                         ...prev,
                         companyName: cpfData.nome_da_pf || prev.companyName,
@@ -200,6 +204,24 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             }
         } finally {
             setIsRefreshingByCNPJ(false);
+        }
+    };
+
+    const handleFetchSocios = async () => {
+        const cleanDocument = formData.cnpj?.replace(/\D/g, '');
+        if (!cleanDocument || cleanDocument.length !== 11) return;
+
+        setIsSearchingSocios(true);
+        try {
+            const result = await buscarSocios(cleanDocument);
+            setSocios(result);
+            if (result.length === 0) {
+                alert('Nenhuma empresa vinculada encontrada para este CPF no momento.');
+            }
+        } catch (err) {
+            console.error('Erro ao buscar sócios:', err);
+        } finally {
+            setIsSearchingSocios(false);
         }
     };
 
@@ -431,6 +453,19 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                             {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                             Buscar Dados
                         </button>
+                    </div>
+                )}
+
+                {/* Masked Data Warning */}
+                {dataIsMasked && (
+                    <div className="mx-6 mb-2 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-red-800">Atenção: Dados Mascarados pela API</p>
+                            <p className="text-[10px] text-red-700 leading-tight">
+                                Alguns campos vieram com asteriscos (`*`). Isso geralmente ocorre devido ao seu **Plano** ou **Limite de Créditos** no Hub do Desenvolvedor. Verifique suas configurações de conta.
+                            </p>
+                        </div>
                     </div>
                 )}
 
@@ -764,7 +799,68 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 {isRefreshingByCNPJ ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                                 {refreshStatus === 'success' ? 'Dados Atualizados!' : 'Atualizar Dados'}
                             </button>
+
+                            {formData.cnpj?.replace(/\D/g, '').length === 11 && (
+                                <button
+                                    type="button"
+                                    onClick={handleFetchSocios}
+                                    disabled={isSearchingSocios}
+                                    className="px-4 flex items-center gap-2 rounded-xl text-xs font-bold transition-all shadow-sm bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+                                    title="Buscar empresas vinculadas a este CPF"
+                                >
+                                    {isSearchingSocios ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building2 className="w-4 h-4" />}
+                                    Ver Empresas
+                                </button>
+                            )}
                         </div>
+
+                        {/* Socios/Linked Companies List */}
+                        {socios.length > 0 && (
+                            <div className="mt-3 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-top-4 duration-300">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Building2 className="w-4 h-4 text-indigo-600" />
+                                    <h4 className="text-[10px] font-bold text-indigo-900 uppercase tracking-widest leading-none">Empresas Vinculadas ao CPF</h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSocios([])}
+                                        className="ml-auto text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase"
+                                    >
+                                        Ocultar
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {socios.map((socio) => (
+                                        <div
+                                            key={socio.cnpj}
+                                            className="flex flex-wrap items-center justify-between p-3 bg-white border border-indigo-100/50 rounded-xl hover:border-indigo-200 transition-all shadow-sm"
+                                        >
+                                            <div className="flex-1 min-w-[200px]">
+                                                <p className="text-xs font-bold text-on-surface">{socio.razao_social}</p>
+                                                <p className="text-[10px] font-mono text-on-surface-variant">CNPJ: {socio.cnpj} • {socio.situacao_cadastral}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const cleanCnpj = socio.cnpj.replace(/\D/g, '');
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        cnpj: cleanCnpj,
+                                                        companyName: socio.razao_social
+                                                    }));
+                                                    setSocios([]);
+                                                    // Trigger enrichment for the new CNPJ
+                                                    setTimeout(() => handleRefreshByCNPJ(), 200);
+                                                }}
+                                                className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+                                            >
+                                                <RefreshCw className="w-3 h-3" />
+                                                Mais Detalhes / Migrar
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* CNAE Info */}

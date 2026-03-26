@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { EnrichedClient, AppUser } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
-import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase } from 'lucide-react';
+import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase, Building2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { consultarCNPJ } from '../services/cnpjService';
-import { consultarCPF } from '../services/cpfService';
+import { consultarCPF, buscarSocios, SocioInfo } from '../services/cpfService';
 
 interface AddClientModalProps {
     isOpen: boolean;
@@ -44,6 +44,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
     });
 
     const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
+    const [dataIsMasked, setDataIsMasked] = useState(false);
+    const [socios, setSocios] = useState<SocioInfo[]>([]);
+    const [isSearchingSocios, setIsSearchingSocios] = useState(false);
 
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -156,6 +159,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 const data = await consultarCPF(cleanDoc);
                 if (data) {
                     const hasNewAddress = data.logradouro && data.numero;
+                    setDataIsMasked(!!data.isMasked);
                     setFormData(prev => ({
                         ...prev,
                         companyName: data.nome_da_pf || prev.companyName,
@@ -193,6 +197,26 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             }
         } finally {
             setIsSearchingCNPJ(false);
+        }
+    };
+
+    const handleFetchSocios = async () => {
+        const cleanDoc = formData.cnpj?.replace(/\D/g, '');
+        if (!cleanDoc || cleanDoc.length !== 11) return;
+
+        setIsSearchingSocios(true);
+        setError('');
+        try {
+            const result = await buscarSocios(cleanDoc);
+            setSocios(result);
+            if (result.length === 0) {
+                setError('Nenhuma empresa vinculada encontrada para este CPF.');
+            }
+        } catch (err) {
+            console.error('Erro ao buscar sócios:', err);
+            setError('Erro ao buscar empresas vinculadas.');
+        } finally {
+            setIsSearchingSocios(false);
         }
     };
 
@@ -259,6 +283,18 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
 
                 {/* Body */}
                 <div className="px-6 py-4 overflow-y-auto custom-scrollbar flex-1">
+                    {dataIsMasked && (
+                        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-red-800">Atenção: Dados Mascarados pela API</p>
+                                <p className="text-[10px] text-red-700 leading-tight">
+                                    Alguns campos vieram com asteriscos (`*`). Verifique seu plano no Hub do Desenvolvedor.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <form id="add-client-form" onSubmit={handleSubmit} className="space-y-6">
 
                         {/* CNPJ Lookup Section */}
@@ -290,7 +326,68 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                                     )}
                                     <span className="hidden sm:inline">{formData.lat !== 0 ? 'Dados Atualizados' : 'Atualizar Dados'}</span>
                                 </button>
+                                
+                                {formData.cnpj?.replace(/\D/g, '').length === 11 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleFetchSocios}
+                                        disabled={isSearchingSocios}
+                                        className="px-4 py-2 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100"
+                                        title="Buscar empresas vinculadas a este CPF"
+                                    >
+                                        {isSearchingSocios ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building2 className="w-4 h-4" />}
+                                        <span className="hidden sm:inline">Ver Empresas</span>
+                                    </button>
+                                )}
                             </div>
+
+                            {/* Socios/Linked Companies List */}
+                            {socios.length > 0 && (
+                                <div className="mt-3 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Building2 className="w-4 h-4 text-indigo-600" />
+                                        <h4 className="text-[10px] font-bold text-indigo-900 uppercase tracking-widest leading-none">Empresas Vinculadas ao CPF</h4>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setSocios([])} 
+                                            className="ml-auto text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase"
+                                        >
+                                            Ocultar
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {socios.map((socio) => (
+                                            <div 
+                                                key={socio.cnpj} 
+                                                className="flex flex-wrap items-center justify-between p-3 bg-white border border-indigo-100/50 rounded-xl hover:border-indigo-200 transition-all shadow-sm"
+                                            >
+                                                <div className="flex-1 min-w-[200px]">
+                                                    <p className="text-xs font-bold text-on-surface">{socio.razao_social}</p>
+                                                    <p className="text-[10px] font-mono text-on-surface-variant">CNPJ: {socio.cnpj} • {socio.situacao_cadastral}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const cleanCnpj = socio.cnpj.replace(/\D/g, '');
+                                                        setFormData(prev => ({ 
+                                                            ...prev, 
+                                                            cnpj: cleanCnpj, 
+                                                            companyName: socio.razao_social 
+                                                        }));
+                                                        setSocios([]);
+                                                        // Trigger enrichment for the new CNPJ
+                                                        setTimeout(() => handleCNPJLookup(), 200);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+                                                >
+                                                    <RefreshCw className="w-3 h-3" />
+                                                    Selecionar esta Empresa
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             {/* CNAE Info */}
                             {(formData.cnpj.replace(/\D/g, '').length === 14) && (
                                 <div className="bg-surface-container-highest/50 p-4 rounded-2xl border border-outline-variant space-y-4 mb-6">

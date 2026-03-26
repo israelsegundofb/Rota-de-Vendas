@@ -10,6 +10,13 @@ export interface CPFResponse {
     municipio?: string;
     uf?: string;
     telefone?: string;
+    isMasked?: boolean;
+}
+
+export interface SocioInfo {
+    cnpj: string;
+    razao_social: string;
+    situacao_cadastral: string;
 }
 
 import { getSystemSettings } from './settingsService';
@@ -35,6 +42,14 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutM
         clearTimeout(id);
         throw error;
     }
+};
+
+/**
+ * Detecta se uma string contém asteriscos de mascaramento
+ */
+const detectMask = (text?: string): boolean => {
+    if (!text) return false;
+    return text.includes('*') || text.includes('***');
 };
 
 /**
@@ -81,6 +96,11 @@ export const consultarCPF = async (cpf: string): Promise<CPFResponse | null> => 
             situacao_cadastral: res.statusCadastral || res.situacao_cadastral
         };
 
+        // Detecta mascaramento nos campos principais
+        if (detectMask(cpfResult.nome_da_pf)) {
+            cpfResult.isMasked = true;
+        }
+
         // Extrai endereço da lista se disponível
         if (res.listaEnderecos && res.listaEnderecos.length > 0) {
             const addr = res.listaEnderecos[0];
@@ -90,6 +110,10 @@ export const consultarCPF = async (cpf: string): Promise<CPFResponse | null> => 
             cpfResult.municipio = addr.cidade;
             cpfResult.uf = addr.uf;
             cpfResult.cep = addr.cep;
+            
+            if (detectMask(addr.logradouro) || detectMask(addr.cidade)) {
+                cpfResult.isMasked = true;
+            }
         }
 
         // Extrai telefone da lista se disponível
@@ -104,3 +128,41 @@ export const consultarCPF = async (cpf: string): Promise<CPFResponse | null> => 
         throw error;
     }
 };
+
+/**
+ * Busca CNPJs vinculados a um CPF (Sócios)
+ */
+export const buscarSocios = async (cpf: string): Promise<SocioInfo[]> => {
+    const cleanCPF = cpf.replace(/[^\d]/g, '');
+    const token = await getApiKey();
+    
+    if (!token || cleanCPF.length !== 11) return [];
+
+    try {
+        const response = await fetchWithTimeout(`${BASE_URL}/socio/?cpf=${cleanCPF}&token=${token}`);
+        if (!response.ok) return [];
+        
+        const data = await response.json();
+        if (!data.status || !data.result) return [];
+
+        // O retorno do Hub geralmente traz uma lista de empresas vinculadas
+        const vinculos = data.result.vinculos || data.result.empresas || [];
+        
+        return vinculos.map((v: { 
+            cnpj: string; 
+            razao_social?: string; 
+            nome_fantasia?: string; 
+            empresa?: string; 
+            situacao_cadastral?: string; 
+            status?: string 
+        }) => ({
+            cnpj: v.cnpj,
+            razao_social: v.razao_social || v.nome_fantasia || v.empresa,
+            situacao_cadastral: v.situacao_cadastral || v.status
+        }));
+    } catch (error) {
+        console.error('[CPF_SERVICE] Erro ao buscar sócios:', error);
+        return [];
+    }
+};
+
