@@ -1615,227 +1615,96 @@ const App: React.FC = () => {
       }, {} as Record<string, typeof records>);
 
       const clientKeysInFile = Object.keys(groupedByClient);
-
       setProcState(prev => ({ ...prev, total: clientKeysInFile.length, status: 'processing' }));
 
+      // 1. Prepare updates for existing clients and identify unmatched ones
+      const existingUpdatedList = [...masterClientList];
+      const unmatchedRawClients: RawClient[] = [];
+      const unmatchedPurchasesMap: Record<string, PurchaseRecord[]> = {};
       let updatedCount = 0;
       let capturedNewList: typeof masterClientList = [];
-      const unmatchedGroups: { companyName: string; cnpj: string; purchases: typeof records }[] = [];
-      setMasterClientList(prevList => {
-        const newList = [...prevList];
-        clientKeysInFile.forEach((key, index) => {
-          setProcState(prev => ({ ...prev, current: index + 1 }));
 
-          const clientPurchases = groupedByClient[key];
-          const firstRec = clientPurchases[0];
+      clientKeysInFile.forEach((key, index) => {
+        setProcState(prev => ({ ...prev, current: index + 1 }));
+        const clientPurchases = groupedByClient[key];
+        const firstRec = clientPurchases[0];
 
-          // Find client index: Prioritize CNPJ match, fallback to Name match
-          let clientIdx = -1;
-
-          if (firstRec.cnpj) {
-            // First: try within the target salesperson
-            clientIdx = newList.findIndex(c => {
-              const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-/\s]/g, "");
-              return cleanSystemCnpj === firstRec.cnpj && c.salespersonId === targetUserId;
-            });
-
-            // Second: if no match found, try across ALL clients in the system
-            if (clientIdx === -1) {
-              clientIdx = newList.findIndex(c => {
-                const cleanSystemCnpj = (c.cnpj || '').replace(/[.\-/\s]/g, "");
-                return cleanSystemCnpj === firstRec.cnpj;
-              });
-            }
-          }
-
-          if (clientIdx === -1) {
-            // Fallback Matching: By Company Name (Razão Social)
-            const LEGAL_SUFFIXES = /\b(ltda|me|epp|eireli|s\/?a|sa|ss|eirelis?|micro empresa|empresa individual|sociedade limitada|comercio|com[eé]rcio|servi[cç]os?|distribuidora|ind[uú]stria|loja|filial|matriz|de|do|da|dos|das|e)\b/gi;
-
-            const normalizeName = (name: string) => {
-              return name
-                .toLowerCase()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                .replace(LEGAL_SUFFIXES, "")
-                .replace(/[^a-z0-9\s]/g, "")
-                .replace(/\s+/g, " ")
-                .trim();
-            };
-
-            const cleanCSVName = normalizeName(firstRec.companyName || '');
-
-            if (cleanCSVName) {
-              // Word-based fuzzy matching function
-              const getMatchScore = (sysName: string): number => {
-                const cleanSys = normalizeName(sysName);
-                if (!cleanSys) return 0;
-                if (cleanSys === cleanCSVName) return 1.0; // Exact match
-
-                const csvWords = cleanCSVName.split(" ").filter(w => w.length > 1);
-                const sysWords = cleanSys.split(" ").filter(w => w.length > 1);
-                if (csvWords.length === 0 || sysWords.length === 0) return 0;
-
-                // Count matching words (bidirectional)
-                const matchingWords = csvWords.filter(cw => sysWords.some(sw => sw === cw || sw.includes(cw) || cw.includes(sw)));
-                const maxWords = Math.max(csvWords.length, sysWords.length);
-                return matchingWords.length / maxWords;
-              };
-
-              // First: try within the target salesperson
-              let bestScore = 0;
-              let bestIdx = -1;
-              newList.forEach((c, idx) => {
-                if (c.salespersonId !== targetUserId) return;
-                const score = getMatchScore(c.companyName || '');
-                if (score > bestScore && score >= 0.85) { // 85% word overlap threshold
-                  bestScore = score;
-                  bestIdx = idx;
-                }
-              });
-
-              // Second: if no match found, try across ALL clients in the system
-              if (bestIdx === -1) {
-                newList.forEach((c, idx) => {
-                  const score = getMatchScore(c.companyName || '');
-                  if (score > bestScore && score >= 0.85) {
-                    bestScore = score;
-                    bestIdx = idx;
-                  }
-                });
-              }
-
-              clientIdx = bestIdx;
-            }
-          }
-
-          if (clientIdx !== -1) {
-            updatedCount++;
-            const clientPurchases = groupedByClient[key];
-
-            // Map CSV records to PurchaseRecord objects
-            const newPurchasedProducts: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
-              // Try to enrich with master catalog
-              const masterProd = products.find(p =>
-                (rec.sku && p.sku === rec.sku) ||
-                (p.name && rec.name && (p.name || '').toLowerCase().trim() === (rec.name || '').toLowerCase().trim())
-              );
-
-              if (masterProd) {
-                return {
-                  ...masterProd,
-                  purchaseDate: rec.purchaseDate || new Date().toISOString(),
-                  quantity: rec.quantity,
-                  totalValue: rec.totalValue,
-                  sourceFileId: fileId,
-                  salespersonId: targetUserId
-                };
-              } else {
-                // Fallback for missing product in catalog
-                return {
-                  sku: rec.sku || 'N/A',
-                  name: rec.name || 'Produto Desconhecido',
-                  brand: 'Desconhecido',
-                  category: 'Manual',
-                  price: rec.price || 0,
-                  factoryCode: '',
-                  purchaseDate: rec.purchaseDate || new Date().toISOString(),
-                  quantity: rec.quantity,
-                  totalValue: rec.totalValue,
-                  sourceFileId: fileId,
-                  salespersonId: targetUserId
-                };
-              }
-            });
-
-            // UPDATE CLIENT: ACCUMULATE AND MERGE (With Duplicate Prevention)
-            const existingHistory = newList[clientIdx].purchasedProducts || [];
-
-            // Filter out records that already exist (Same SKU, Same Date AND Same Salesperson)
-            // This allows the same product sale to be recorded if made by a different person (e.g. split regions)
-            const filteredNewProducts = newPurchasedProducts.filter(newP =>
-              !existingHistory.some(oldP =>
-                oldP.sku === newP.sku &&
-                oldP.purchaseDate === newP.purchaseDate &&
-                oldP.salespersonId === newP.salespersonId
-              )
-            );
-
-            if (filteredNewProducts.length > 0) {
-              newList[clientIdx] = {
-                ...newList[clientIdx],
-                purchasedProducts: [
-                  ...existingHistory,
-                  ...filteredNewProducts
-                ]
-              };
-            }
-          } else {
-            // Track unmatched for auto-creation
-            unmatchedGroups.push({
-              companyName: firstRec.companyName || 'Desconhecido',
-              cnpj: firstRec.cnpj || '',
-              purchases: clientPurchases
-            });
-          }
-        });
-
-        // --- AUTO-CREATE new clients from unmatched CNPJs/names ---
-        let createdCount = 0;
-        unmatchedGroups.forEach(group => {
-          if (!group.companyName && !group.cnpj) return;
-
-          const newClientId = `purchase-import-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-          const rawCnpj = group.cnpj;
-          const formattedCnpj = rawCnpj.length === 14
-            ? `${rawCnpj.slice(0, 2)}.${rawCnpj.slice(2, 5)}.${rawCnpj.slice(5, 8)}/${rawCnpj.slice(8, 12)}-${rawCnpj.slice(12, 14)}`
-            : rawCnpj;
-
-          const newPurchasedProducts: PurchaseRecord[] = group.purchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
-            const masterProd = products.find(p =>
-              (rec.sku && p.sku === rec.sku) ||
-              (p.name && rec.name && (p.name || '').toLowerCase().trim() === (rec.name || '').toLowerCase().trim())
-            );
-            if (masterProd) {
-              return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity, totalValue: rec.totalValue, sourceFileId: fileId, salespersonId: targetUserId };
-            }
-            return {
-              sku: rec.sku || 'N/A', name: rec.name || 'Produto Desconhecido', brand: 'Desconhecido',
-              category: 'Manual', price: rec.price || 0, factoryCode: '',
-              purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity, totalValue: rec.totalValue,
-              sourceFileId: fileId, salespersonId: targetUserId
-            };
-          });
-
-          const newClient: EnrichedClient = {
-            id: newClientId,
-            salespersonId: targetUserId,
-            companyName: group.companyName,
-            ownerName: '',
-            contact: '',
-            originalAddress: 'Endereço não cadastrado',
-            cleanAddress: 'Endereço não cadastrado',
-            cnpj: formattedCnpj || undefined,
-            category: ['Novo - Importação Compras'],
-            region: 'Indefinido',
-            state: '',
-            city: '',
-            lat: 0,
-            lng: 0,
-            purchasedProducts: newPurchasedProducts,
-            sourceFileId: fileId,
-          };
-
-          newList.push(newClient);
-          createdCount++;
-        });
-
-        if (createdCount > 0) {
-          console.log(`[APP] ✅ Auto-created ${createdCount} new clients from unmatched purchase records.`);
+        // Find client index
+        let clientIdx = -1;
+        if (firstRec.cnpj) {
+          const cleanSearchCnpj = String(firstRec.cnpj).replace(/\D/g, '');
+          clientIdx = existingUpdatedList.findIndex(c => (c.cnpj || '').replace(/\D/g, '') === cleanSearchCnpj);
         }
 
-        capturedNewList = newList;
-        return newList;
+        if (clientIdx === -1) {
+          // Name Matching Fallback
+          const normalizeName = (name: string | undefined) => (name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+          const cleanCSVName = normalizeName(firstRec.companyName || '');
+          if (cleanCSVName) {
+            clientIdx = existingUpdatedList.findIndex(c => normalizeName(c.companyName || '') === cleanCSVName);
+          }
+        }
+
+        const mappedPurchases: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
+          const masterProd = products.find(p => (rec.sku && p.sku === rec.sku) || (p.name && rec.name && p.name.toLowerCase().trim() === rec.name.toLowerCase().trim()));
+          if (masterProd) {
+            return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId };
+          }
+          return {
+            sku: rec.sku || 'N/A', name: rec.name || 'Produto Desconhecido', brand: 'Desconhecido', category: 'Manual', price: rec.price || 0, factoryCode: '',
+            purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId
+          };
+        });
+
+        if (clientIdx !== -1) {
+          updatedCount++;
+          const existingHistory = existingUpdatedList[clientIdx].purchasedProducts || [];
+          const filteredNewProducts = mappedPurchases.filter(newP =>
+            !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate && oldP.salespersonId === newP.salespersonId)
+          );
+          if (filteredNewProducts.length > 0) {
+            existingUpdatedList[clientIdx] = {
+              ...existingUpdatedList[clientIdx],
+              purchasedProducts: [...existingHistory, ...filteredNewProducts]
+            };
+          }
+        } else {
+          // Prepare for auto-creation with enrichment
+          unmatchedRawClients.push({
+            companyName: firstRec.companyName || 'Desconhecido',
+            cnpj: firstRec.cnpj || '',
+            salespersonId: targetUserId,
+            ownerName: '',
+            phone: '',
+            address: ''
+          });
+          const rawKey = firstRec.cnpj ? String(firstRec.cnpj).replace(/\D/g, '') : (firstRec.companyName || '');
+          unmatchedPurchasesMap[rawKey] = mappedPurchases;
+        }
       });
+
+      // 2. Enrich and Create New Clients
+      let createdCount = 0;
+      let finalNewList = existingUpdatedList;
+
+      if (unmatchedRawClients.length > 0) {
+        setProcState(prev => ({ ...prev, status: 'processing', fileName: `Enriquecendo ${unmatchedRawClients.length} novos clientes...` }));
+        const enrichedNewClients = await processClientsSimple(unmatchedRawClients, targetUserId, categories);
+        
+        // Attach the purchases to enriched clients
+        const enrichedWithPurchases = enrichedNewClients.map(c => {
+          const cleanCnpj = (c.cnpj || '').replace(/\D/g, '');
+          // Try to find by CNPJ first, then name
+          const purchases = unmatchedPurchasesMap[cleanCnpj] || unmatchedPurchasesMap[c.companyName || ''] || [];
+          return { ...c, purchasedProducts: purchases };
+        });
+
+        finalNewList = [...existingUpdatedList, ...enrichedWithPurchases];
+        createdCount = enrichedWithPurchases.length;
+      }
+
+      setMasterClientList(finalNewList);
+      capturedNewList = finalNewList;
 
       // Force-save to Firebase immediately to prevent real-time sync from overwriting
       if (isFirebaseConnected && capturedNewList.length > 0) {
@@ -1844,7 +1713,10 @@ const App: React.FC = () => {
           await saveToCloud(capturedNewList, products, categories, users, uploadedFiles);
           console.log('[APP] ✅ Purchase upload force-saved to Firebase.');
           // Update hash ref so real-time subscription won't overwrite after unlock
-          lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) => key === 'lastUpdated' ? undefined : value);
+          lastClientsHash.current = JSON.stringify(capturedNewList, (key, value) => {
+            if (key === 'lastUpdated') return undefined;
+            return value;
+          });
         } catch (saveErr) {
           console.error('[APP] Failed to force-save purchase data:', saveErr);
         }
@@ -1880,11 +1752,7 @@ const App: React.FC = () => {
       setUploadedFiles(prev => [newFileRecord, ...prev]);
       setProcState({ isActive: false, total: 0, current: 0, fileName: '', ownerName: '', status: 'completed' });
 
-      const createdMsg = unmatchedGroups.length > 0
-        ? `\n\n📋 ${unmatchedGroups.length} clientes NOVOS foram cadastrados automaticamente (não encontrados na base):\n${unmatchedGroups.slice(0, 15).map(g => `  • ${g.companyName}${g.cnpj ? ` (CNPJ: ${g.cnpj.length === 14 ? g.cnpj.slice(0, 2) + '.' + g.cnpj.slice(2, 5) + '.' + g.cnpj.slice(5, 8) + '/' + g.cnpj.slice(8, 12) + '-' + g.cnpj.slice(12, 14) : g.cnpj})` : ''}`).join('\n')}${unmatchedGroups.length > 15 ? `\n  ... e mais ${unmatchedGroups.length - 15} clientes` : ''}`
-        : '';
-
-      alert(`✅ Atualização de Compras concluída!\n\n🔗 ${updatedCount} clientes existentes atualizados.${createdMsg}\n\n📊 Total: ${updatedCount + unmatchedGroups.length} de ${clientKeysInFile.length} clientes da planilha processados.`);
+      alert(`✅ Atualização de Compras concluída!\n\n🔗 ${updatedCount} clientes existentes atualizados.\n📋 ${createdCount} novos clientes cadastrados e enriquecidos.\n\n📊 Total: ${updatedCount + createdCount} de ${clientKeysInFile.length} clientes da planilha processados.`);
 
     } catch (err: unknown) {
       // Always release sync lock on error
@@ -2407,22 +2275,37 @@ const App: React.FC = () => {
             <div className="flex items-center gap-6">
               <div className="text-right">
                 <p className="text-xs text-gray-400">
-                  {isAdminUser ? 'Clientes Visualizados' : 'Meus Clientes'}
+                  {isAdminUser ? 'Total na Carteira' : 'Minha Carteira'}
                 </p>
-                <p className="text-lg font-bold leading-none">{finalFilteredClients.length}</p>
+                <div className="flex items-baseline justify-end gap-1.5">
+                  <p className="text-lg font-black leading-none text-blue-700">
+                    {finalFilteredClients.length + (!filterMissingCoords ? missingCoordinatesCount : 0)}
+                  </p>
+                  {filterMissingCoords && (
+                    <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase">Filtrado</p>
+                  )}
+                </div>
               </div>
+
+              <div className="h-8 w-[1px] bg-gray-200 hidden sm:block"></div>
+
+              <div className="text-right hidden sm:block">
+                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Localizados</p>
+                <p className="text-sm font-bold leading-none text-emerald-600">{finalFilteredClients.length - (filterMissingCoords ? 0 : missingCoordinatesCount)}</p>
+              </div>
+
               {missingCoordinatesCount > 0 && (
                 <button
                   onClick={() => {
                     setFilterMissingCoords(!filterMissingCoords);
                     if (activeView !== 'table') setActiveView('table');
                   }}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${filterMissingCoords ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-inner' : 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${filterMissingCoords ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-inner' : 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'}`}
                   title={`${missingCoordinatesCount} clientes sem localização no mapa. Clique para filtrar.`}
                 >
                   <AlertTriangle className={`w-4 h-4 ${filterMissingCoords ? 'animate-pulse' : ''}`} />
                   <div className="text-left hidden sm:block">
-                    <p className="text-[10px] font-bold uppercase leading-none">Sem Mapa</p>
+                    <p className="text-[10px] font-bold uppercase leading-none">Pendentes</p>
                     <p className="text-xs font-black leading-none">{missingCoordinatesCount}</p>
                   </div>
                 </button>
