@@ -283,6 +283,43 @@ export const deleteClientFromCloud = async (clientId: string) => {
 };
 
 /**
+ * Remove múltiplos clientes do Firestore usando lotes (Batches) (V5.1).
+ * Evita bloqueios de rede do navegador e erros de quota.
+ */
+export const deleteClientsBatchFromCloud = async (clientIds: string[]) => {
+    if (!db || clientIds.length === 0) return;
+    try {
+        console.warn(`[FIREBASE] Iniciando exclusão em lote de ${clientIds.length} clientes...`);
+
+        let batch = writeBatch(db);
+        let count = 0;
+
+        for (const clientId of clientIds) {
+            const clientRef = doc(db, 'rota-vendas-data', 'clients', 'list', clientId);
+            batch.delete(clientRef);
+            count++;
+
+            // Commit every 450 documents (Firestore limit is 500 operations per batch)
+            if (count % 450 === 0) {
+                await batch.commit();
+                batch = writeBatch(db);
+                await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit pause
+            }
+        }
+
+        // Commit remaining
+        if (count % 450 !== 0) {
+            await batch.commit();
+        }
+
+        console.log(`✅ [FIREBASE] Todos os ${clientIds.length} clientes foram removidos em lote.`);
+    } catch (e) {
+        console.error(`[FIREBASE] Erro ao remover clientes em lote:`, e);
+        throw e;
+    }
+};
+
+/**
  * Força a sincronização imediata do array de UploadedFiles no Metadata.
  * Usado primariamente durante deleções manuais para impedir que o debounce
  * de auto-save atrase a remoção e cause arquivos zumbis no reload.

@@ -1342,10 +1342,8 @@ const App: React.FC = () => {
         await saveToCloud(newClients, newProducts, categories, users, newFiles);
 
         if (clientsToDelete.length > 0) {
-            import('./services/firebaseService').then(async ({ deleteClientFromCloud }) => {
-                for (const id of clientsToDelete) {
-                    await deleteClientFromCloud(id).catch(console.error);
-                }
+            import('./services/firebaseService').then(async ({ deleteClientsBatchFromCloud }) => {
+                await deleteClientsBatchFromCloud(clientsToDelete).catch(console.error);
             });
         }
 
@@ -2078,11 +2076,11 @@ const App: React.FC = () => {
                       if(window.confirm(`Excluir ${orphans.length} clientes gerados indevidamente pela importação?`)) {
                           const remaining = masterClientList.filter(c => !orphans.includes(c));
                           setMasterClientList(remaining);
-                          import('./services/firebaseService').then(async ({ saveToCloud, deleteClientFromCloud }) => {
+                          import('./services/firebaseService').then(async ({ saveToCloud, deleteClientsBatchFromCloud }) => {
                               try {
                                   await saveToCloud(remaining, products, categories, users, uploadedFiles);
-                                  await Promise.all(orphans.map(o => deleteClientFromCloud(o.id).catch(e => console.error(e))));
-                                  alert("Limpeza concluída com sucesso! Os clientes órfãos foram removidos permanentemente.");
+                                  await deleteClientsBatchFromCloud(orphans.map(o => o.id));
+                                  alert("Limpeza concluída com sucesso no banco de dados! Os clientes órfãos foram removidos permanentemente.");
                               } catch(e) {
                                   alert("Erro na limpeza da nuvem, mas removidos localmente.");
                                   console.error(e);
