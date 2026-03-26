@@ -211,6 +211,19 @@ const ClientMapContent: React.FC<{
       clustererRef.current = null;
     }
 
+    // Pre-calculate exact overlaps to apply a visual "spider" scatter
+    const coordCounts: Record<string, number> = {};
+    const coordSeen: Record<string, number> = {};
+    
+    clients.forEach(client => {
+      const lat = Number(client.lat);
+      const lng = Number(client.lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        coordCounts[key] = (coordCounts[key] || 0) + 1;
+      }
+    });
+
     let isActive = true;
     let index = 0;
     const BATCH_SIZE = 200;
@@ -229,6 +242,24 @@ const ClientMapContent: React.FC<{
           return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
         })
         .map(client => {
+          let renderLat = Number(client.lat);
+          let renderLng = Number(client.lng);
+          
+          const key = `${renderLat.toFixed(5)},${renderLng.toFixed(5)}`;
+          if (coordCounts[key] > 1) {
+            const offsetIndex = coordSeen[key] || 0;
+            coordSeen[key] = offsetIndex + 1;
+            
+            if (offsetIndex > 0) {
+              const totalInCluster = coordCounts[key];
+              const spiralLevel = Math.floor((offsetIndex - 1) / 8) + 1;
+              const angle = (offsetIndex * Math.PI * 2) / Math.min(8, totalInCluster);
+              const radius = 0.0003 * spiralLevel; // approx 30 meters per level
+              renderLat += Math.cos(angle) * radius;
+              renderLng += Math.sin(angle) * radius;
+            }
+          }
+
           let colors = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
           if (productFilterActive) {
             colors = { bg: '#F43F5E', border: '#BE123C', glyph: '#fff' };
@@ -285,7 +316,7 @@ const ClientMapContent: React.FC<{
             }
 
             const marker = new google.maps.marker.AdvancedMarkerElement({
-              position: { lat: Number(client.lat), lng: Number(client.lng) },
+              position: { lat: renderLat, lng: renderLng },
               content: finalContent,
               map: isClusteringEnabled ? null : map,
               title: client.companyName
