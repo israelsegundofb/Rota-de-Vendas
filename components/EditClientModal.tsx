@@ -341,7 +341,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => {
-            const updates: Partial<EnrichedClient> = { [name]: value } as any; // Cast as any still needed for dynamic key property matching in some TS versions, but using Partial is better.
+            const updates: Partial<EnrichedClient> = { [name]: value };
             if (name === 'state') {
                 updates.region = getRegionByUF(value);
             }

@@ -17,7 +17,7 @@ interface AddClientModalProps {
 }
 
 const AddClientModal: React.FC<AddClientModalProps> = ({
-    isOpen, onClose, onAdd, salespersonId, ownerName, users = [], isFirebaseConnected = false, onCNPJAuthError
+    isOpen, onClose, onAdd, salespersonId, ownerName, users = [], onCNPJAuthError
 }) => {
     const [selectedSalespersonId, setSelectedSalespersonId] = useState(salespersonId);
     // State for form
@@ -55,7 +55,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             setFormData({
                 companyName: '',
                 cnpj: '',
-                ownerName: '',
+                ownerName: ownerName || '',
                 contact: '',
                 whatsapp: '',
                 category: ['Outros'],
@@ -79,9 +79,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             // Try to get current location
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
-                    async (position) => {
+                    async () => {
                         // We could reverse geocode here, but for now we just log
-                        // console.log("User location:", position.coords);
                     },
                     (error) => {
                         console.warn("Location access denied or error:", error);
@@ -89,15 +88,15 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 );
             }
         }
-    }, [isOpen]);
+    }, [isOpen, salespersonId, ownerName]);
 
     if (!isOpen) return null;
 
-    const handleChange = (field: string, value: any) => {
+    const handleChange = (field: string, value: string | string[] | number) => {
         setFormData(prev => {
             const updates: Partial<typeof prev> = { [field]: value };
             if (field === 'state') {
-                updates.region = getRegionByUF(value);
+                updates.region = getRegionByUF(value as string);
             }
             return { ...prev, ...updates };
         });
