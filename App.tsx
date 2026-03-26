@@ -2050,16 +2050,17 @@ const App: React.FC = () => {
                   <button
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 bg-error-container text-on-error-container hover:bg-error hover:text-on-error shadow-sm mt-2"
                     onClick={() => {
-                      const orphans = masterClientList.filter(c => 
-                          c.originalAddress === 'Endereço não cadastrado' && 
-                          c.category && c.category.includes('Novo - Importação Compras') &&
-                          (!c.purchasedProducts || c.purchasedProducts.length === 0)
-                      );
+                      const orphans = masterClientList.filter(c => {
+                          const hasNoAddress = c.originalAddress === 'Endereço não cadastrado' || !c.originalAddress;
+                          const hasIndefinidoRegion = c.region === 'Indefinido';
+                          const hasNovoCategory = Array.isArray(c.category) ? c.category.join(',').includes('Novo - Importação') : String(c.category || '').includes('Novo - Importação');
+                          return hasNoAddress && (hasIndefinidoRegion || hasNovoCategory);
+                      });
                       if(orphans.length === 0) {
                           alert("Nenhum cliente órfão encontrado!");
                           return;
                       }
-                      if(window.confirm(`Excluir ${orphans.length} clientes órfãos criados pela importação de compras mal-sucedida?`)) {
+                      if(window.confirm(`Excluir ${orphans.length} clientes gerados indevidamente pela importação?`)) {
                           const remaining = masterClientList.filter(c => !orphans.includes(c));
                           setMasterClientList(remaining);
                           import('./services/firebaseService').then(({ saveToCloud }) => {
@@ -2072,7 +2073,7 @@ const App: React.FC = () => {
                     title="Remove clientes criados acidentalmente por importações de compras sem endereço"
                   >
                     <Trash2 className="w-5 h-5 text-error" />
-                    Limpar Órfãos ({masterClientList.filter(c => c.originalAddress === 'Endereço não cadastrado' && c.category && c.category.includes('Novo - Importação Compras') && (!c.purchasedProducts || c.purchasedProducts.length === 0)).length})
+                    Limpar Órfãos ({masterClientList.filter(c => (c.originalAddress === 'Endereço não cadastrado' || !c.originalAddress) && (c.region === 'Indefinido' || (Array.isArray(c.category) ? c.category.join(',').includes('Novo - Importação') : String(c.category || '').includes('Novo - Importação')))).length})
                   </button>
                 </>
               )}
