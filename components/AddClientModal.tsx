@@ -3,6 +3,7 @@ import { EnrichedClient, AppUser } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase } from 'lucide-react';
 import { consultarCNPJ } from '../services/cnpjService';
+import { consultarCPF } from '../services/cpfService';
 
 interface AddClientModalProps {
     isOpen: boolean;
@@ -117,8 +118,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
     };
 
     const handleCNPJLookup = async () => {
-        if (!formData.cnpj || formData.cnpj.replace(/\D/g, '').length !== 14) {
-            setError('Por favor, informe um CNPJ válido com 14 dígitos.');
+        const cleanDoc = formData.cnpj?.replace(/\D/g, '');
+        if (!cleanDoc || (cleanDoc.length !== 14 && cleanDoc.length !== 11)) {
+            setError('Por favor, informe um CNPJ (14 dígitos) ou CPF (11 dígitos) válido.');
             return;
         }
 
@@ -126,43 +128,69 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
         setError('');
 
         try {
-            const data = await consultarCNPJ(formData.cnpj);
-            if (data) {
-                const hasNewAddress = data.logradouro && data.numero;
-                setFormData(prev => ({
-                    ...prev,
-                    companyName: data.nome_fantasia || data.razao_social,
-                    originalAddress: hasNewAddress
-                        ? `${data.logradouro}, ${data.numero}${data.complemento ? ` - ${data.complemento}` : ''}, ${data.bairro}`
-                        : prev.originalAddress,
-                    city: data.municipio || prev.city,
-                    state: data.uf || prev.state,
-                    district: data.bairro || prev.district,
-                    region: data.uf ? getRegionByUF(data.uf) : prev.region,
-                    contact: data.ddd_telefone_1 || prev.contact,
-                    whatsapp: data.ddd_telefone_1 || prev.whatsapp, // Fallback to phone as whatsapp if found
-                    lat: data.latitude || 0,
-                    lng: data.longitude || 0,
-                    cleanAddress: hasNewAddress
-                        ? `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`
-                        : prev.cleanAddress,
-                    mainCnae: data.cnae_fiscal || prev.mainCnae,
-                    secondaryCnaes: data.cnaes_secundarios?.map((s: { codigo: number | string; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
-                }));
+            if (cleanDoc.length === 14) {
+                const data = await consultarCNPJ(cleanDoc);
+                if (data) {
+                    const hasNewAddress = data.logradouro && data.numero;
+                    setFormData(prev => ({
+                        ...prev,
+                        companyName: data.nome_fantasia || data.razao_social,
+                        originalAddress: hasNewAddress
+                            ? `${data.logradouro}, ${data.numero}${data.complemento ? ` - ${data.complemento}` : ''}, ${data.bairro}`
+                            : prev.originalAddress,
+                        city: data.municipio || prev.city,
+                        state: data.uf || prev.state,
+                        district: data.bairro || prev.district,
+                        region: data.uf ? getRegionByUF(data.uf) : prev.region,
+                        contact: data.ddd_telefone_1 || prev.contact,
+                        whatsapp: data.ddd_telefone_1 || prev.whatsapp, // Fallback to phone as whatsapp if found
+                        lat: data.latitude || 0,
+                        lng: data.longitude || 0,
+                        cleanAddress: hasNewAddress
+                            ? `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`
+                            : prev.cleanAddress,
+                        mainCnae: data.cnae_fiscal || prev.mainCnae,
+                        secondaryCnaes: data.cnaes_secundarios?.map((s: { codigo: number | string; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
+                    }));
+                }
+            } else if (cleanDoc.length === 11) {
+                const data = await consultarCPF(cleanDoc);
+                if (data) {
+                    const hasNewAddress = data.logradouro && data.numero;
+                    setFormData(prev => ({
+                        ...prev,
+                        companyName: data.nome_da_pf || prev.companyName,
+                        ownerName: data.nome_da_pf || prev.ownerName,
+                        originalAddress: hasNewAddress
+                            ? `${data.logradouro}, ${data.numero}, ${data.bairro}`
+                            : prev.originalAddress,
+                        city: data.municipio || prev.city,
+                        state: data.uf || prev.state,
+                        district: data.bairro || prev.district,
+                        region: data.uf ? getRegionByUF(data.uf) : prev.region,
+                        contact: data.telefone || prev.contact,
+                        whatsapp: data.telefone || prev.whatsapp,
+                        lat: 0,
+                        lng: 0,
+                        cleanAddress: hasNewAddress
+                            ? `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`
+                            : prev.cleanAddress,
+                    }));
+                }
             }
         } catch (err: unknown) {
             console.error(err);
             const errorMsg = err instanceof Error ? err.message : String(err);
-            if (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja')) {
-                // Since we now have fallbacks, a 401 from CNPJa shouldn't block us entirely if fallbacks work.
-                // However, if we reach this catch block, it means ALL fallbacks might have failed or there was a structural error.
+            if (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api')) {
+                // Since we now have fallbacks, a 401 shouldn't block us entirely if fallbacks work.
+                // However, if we reach this catch block, it means ALL APIs failed or had an auth error.
                 if (onCNPJAuthError) {
                     onCNPJAuthError();
                 } else {
-                    setError('Não foi possível buscar os dados nas APIs (Comercial ou Gratuitas). Verifique sua conexão ou a Chave CNPJa.');
+                    setError('Não foi possível buscar os dados nas APIs. Verifique sua conexão ou as Chaves de API.');
                 }
             } else {
-                setError(errorMsg || 'Erro ao consultar CNPJ. Verifique se o número está correto.');
+                setError(errorMsg || 'Erro ao consultar documento. Verifique se o número está correto.');
             }
         } finally {
             setIsSearchingCNPJ(false);

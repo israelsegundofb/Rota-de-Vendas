@@ -34,6 +34,7 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
         googleMapsApiKey: '',
         geminiApiKey: '',
         cnpjaApiKey: '',
+        hubDevToken: '',
     });
     
     const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -212,6 +213,19 @@ const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
                                     placeholder="CNPJa API Key"
                                     value={settingsData.cnpjaApiKey || ''}
                                     onChange={(e) => setSettingsData({ ...settingsData, cnpjaApiKey: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-700 placeholder:text-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-mono mb-3"
+                                />
+                            </div>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/30 group-focus-within:bg-blue-500 transition-colors"></div>
+                                </div>
+                                <input
+                                    type="password"
+                                    name="hubDevToken"
+                                    placeholder="Hub do Desenvolvedor Token (CPF)"
+                                    value={settingsData.hubDevToken || ''}
+                                    onChange={(e) => setSettingsData({ ...settingsData, hubDevToken: e.target.value })}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-700 placeholder:text-gray-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-mono"
                                 />
                             </div>

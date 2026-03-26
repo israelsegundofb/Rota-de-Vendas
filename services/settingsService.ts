@@ -5,6 +5,7 @@ export interface SystemSettings {
     googleMapsApiKey?: string;
     geminiApiKey?: string;
     cnpjaApiKey?: string;
+    hubDevToken?: string;
     lastUpdated?: string;
 }
 

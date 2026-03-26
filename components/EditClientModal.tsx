@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2, Sparkles, MapPin, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { consultarCNPJ } from '../services/cnpjService';
+import { consultarCPF } from '../services/cpfService';
 import { searchClientByName, enrichFromResult, SearchResult } from '../services/clientSearchService';
 import { EnrichedClient, AppUser, UploadedFile } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
@@ -92,9 +93,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
     };
 
     const handleRefreshByCNPJ = async () => {
-        const cleanCNPJ = formData.cnpj?.replace(/\D/g, '');
-        if (!cleanCNPJ || cleanCNPJ.length !== 14) {
-            alert('Por favor, informe um CNPJ válido com 14 dígitos para atualizar.');
+        const cleanDocument = formData.cnpj?.replace(/\D/g, '');
+        if (!cleanDocument || (cleanDocument.length !== 14 && cleanDocument.length !== 11)) {
+            alert('Por favor, informe um CNPJ (14 digitos) ou CPF (11 digitos) válido para atualizar.');
             return;
         }
 
@@ -102,49 +103,90 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
         setRefreshStatus('idle');
 
         try {
-            const fullData = await consultarCNPJ(cleanCNPJ);
+            if (cleanDocument.length === 14) {
+                const fullData = await consultarCNPJ(cleanDocument);
 
-            if (fullData) {
-                const hasNewAddress = !!fullData.logradouro || !!fullData.municipio;
-                const addrNum = fullData.numero || 'S/N';
-                
-                let newCleanAddress = formData.cleanAddress;
-                let newOriginalAddress = formData.originalAddress;
-                
-                if (hasNewAddress) {
-                    const streetPart = fullData.logradouro ? `${fullData.logradouro}, ${addrNum}` : '';
-                    const compPart = fullData.complemento ? ` - ${fullData.complemento}` : '';
-                    const distPart = fullData.bairro ? `${fullData.bairro}` : (fullData.logradouro ? 'Sem Bairro' : '');
-                    const cityStatePart = `${fullData.municipio || formData.city} - ${fullData.uf || formData.state}`;
+                if (fullData) {
+                    const hasNewAddress = !!fullData.logradouro || !!fullData.municipio;
+                    const addrNum = fullData.numero || 'S/N';
                     
-                    newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
-                    newOriginalAddress = [streetPart + compPart, distPart, cityStatePart].filter(Boolean).join(', ');
-                }
+                    let newCleanAddress = formData.cleanAddress;
+                    let newOriginalAddress = formData.originalAddress;
+                    
+                    if (hasNewAddress) {
+                        const streetPart = fullData.logradouro ? `${fullData.logradouro}, ${addrNum}` : '';
+                        const compPart = fullData.complemento ? ` - ${fullData.complemento}` : '';
+                        const distPart = fullData.bairro ? `${fullData.bairro}` : (fullData.logradouro ? 'Sem Bairro' : '');
+                        const cityStatePart = `${fullData.municipio || formData.city} - ${fullData.uf || formData.state}`;
+                        
+                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
+                        newOriginalAddress = [streetPart + compPart, distPart, cityStatePart].filter(Boolean).join(', ');
+                    }
 
-                setFormData(prev => ({
-                    ...prev,
-                    companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
-                    originalAddress: newOriginalAddress,
-                    cleanAddress: newCleanAddress,
-                    city: fullData.municipio || prev.city,
-                    state: fullData.uf || prev.state,
-                    district: fullData.bairro || prev.district,
-                    region: fullData.uf ? getRegionByUF(fullData.uf) : prev.region,
-                    lastname: prev.companyName, // Force update trigger
-                    lat: fullData.latitude || 0, // Reset to 0 if not found to force re-geocoding
-                    lng: fullData.longitude || 0, // Reset to 0 if not found to force re-geocoding
-                    contact: fullData.ddd_telefone_1 || prev.contact,
-                    mainCnae: fullData.cnae_fiscal || prev.mainCnae,
-                    secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
-                }));
-                setRefreshStatus('success');
-                setTimeout(() => setRefreshStatus('idle'), 3000);
-            } else {
-                setRefreshStatus('error');
-                alert('CNPJ não encontrado na base de dados.');
+                    setFormData(prev => ({
+                        ...prev,
+                        companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
+                        originalAddress: newOriginalAddress,
+                        cleanAddress: newCleanAddress,
+                        city: fullData.municipio || prev.city,
+                        state: fullData.uf || prev.state,
+                        district: fullData.bairro || prev.district,
+                        region: fullData.uf ? getRegionByUF(fullData.uf) : prev.region,
+                        lastname: prev.companyName, // Force update trigger
+                        lat: fullData.latitude || 0, // Reset to 0 if not found to force re-geocoding
+                        lng: fullData.longitude || 0, // Reset to 0 if not found to force re-geocoding
+                        contact: fullData.ddd_telefone_1 || prev.contact,
+                        mainCnae: fullData.cnae_fiscal || prev.mainCnae,
+                        secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
+                    }));
+                    setRefreshStatus('success');
+                    setTimeout(() => setRefreshStatus('idle'), 3000);
+                } else {
+                    setRefreshStatus('error');
+                    alert('CNPJ não encontrado na base de dados.');
+                }
+            } else if (cleanDocument.length === 11) {
+                const cpfData = await consultarCPF(cleanDocument);
+                
+                if (cpfData) {
+                    const hasNewAddress = !!cpfData.logradouro || !!cpfData.municipio;
+                    const addrNum = cpfData.numero || 'S/N';
+                    
+                    let newCleanAddress = formData.cleanAddress;
+                    let newOriginalAddress = formData.originalAddress;
+                    
+                    if (hasNewAddress) {
+                        const streetPart = cpfData.logradouro ? `${cpfData.logradouro}, ${addrNum}` : '';
+                        const distPart = cpfData.bairro ? `${cpfData.bairro}` : (cpfData.logradouro ? 'Sem Bairro' : '');
+                        const cityStatePart = `${cpfData.municipio || formData.city} - ${cpfData.uf || formData.state}`;
+                        
+                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
+                        newOriginalAddress = [streetPart, distPart, cityStatePart].filter(Boolean).join(', ');
+                    }
+
+                    setFormData(prev => ({
+                        ...prev,
+                        companyName: cpfData.nome_da_pf || prev.companyName,
+                        ownerName: cpfData.nome_da_pf || prev.ownerName, // Set owner name as well for CPF
+                        originalAddress: newOriginalAddress,
+                        cleanAddress: newCleanAddress,
+                        city: cpfData.municipio || prev.city,
+                        state: cpfData.uf || prev.state,
+                        district: cpfData.bairro || prev.district,
+                        region: cpfData.uf ? getRegionByUF(cpfData.uf) : prev.region,
+                        lat: 0, 
+                        lng: 0, 
+                        contact: cpfData.telefone || prev.contact,
+                    }));
+                    setRefreshStatus('success');
+                    setTimeout(() => setRefreshStatus('idle'), 3000);
+                } else {
+                    setRefreshStatus('error');
+                    alert('CPF não encontrado.');
+                }
             }
         } catch (err: unknown) {
-            console.error(err);
+            console.error('Erro ao atualizar dados:', err);
             setRefreshStatus('error');
             const errorMsg = err instanceof Error ? err.message : String(err);
             if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja'))) {
