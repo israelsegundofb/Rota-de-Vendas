@@ -2789,7 +2789,6 @@ const App: React.FC = () => {
                               clients={filteredClients}
                               apiKey={googleMapsApiKey}
                               onInvalidKey={handleInvalidKey}
-                              activeProductCategory={filterProductCategory}
                               users={users}
                               filterSalespersonId={filterSalespersonId}
                               startDate={startDate}
