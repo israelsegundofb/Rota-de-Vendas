@@ -2036,7 +2036,7 @@ const App: React.FC = () => {
                             await deleteClientsBatchFromCloud(orphans.map(o => o.id));
                             
                             // Atualiza o hash local para que o auto-save não tente reenviar o que já definimos como "remaining"
-                            const hashDataList = (list) => JSON.stringify(list, (key, value) => key === "lastUpdated" ? undefined : value);
+                            const hashDataList = (list: any[]) => JSON.stringify(list, (key, value) => key === "lastUpdated" ? undefined : value);
                             lastClientsHash.current = hashDataList(remaining);
                             
                             alert("Limpeza concluída com sucesso no banco de dados! Os clientes órfãos foram removidos permanentemente.");
