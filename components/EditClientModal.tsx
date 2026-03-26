@@ -111,19 +111,23 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
 
                 if (fullData) {
                     const hasNewAddress = !!fullData.logradouro || !!fullData.municipio;
-                    const addrNum = fullData.numero || 'S/N';
                     
                     let newCleanAddress = formData.cleanAddress;
                     let newOriginalAddress = formData.originalAddress;
                     
                     if (hasNewAddress) {
-                        const streetPart = fullData.logradouro ? `${fullData.logradouro}, ${addrNum}` : '';
-                        const compPart = fullData.complemento ? ` - ${fullData.complemento}` : '';
-                        const distPart = fullData.bairro ? `${fullData.bairro}` : (fullData.logradouro ? 'Sem Bairro' : '');
-                        const cityStatePart = `${fullData.municipio || formData.city} - ${fullData.uf || formData.state}`;
-                        
-                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
-                        newOriginalAddress = [streetPart + compPart, distPart, cityStatePart].filter(Boolean).join(', ');
+                        const street = fullData.logradouro || '';
+                        const number = fullData.numero || 'S/N';
+                        const district = fullData.bairro || formData.district || '';
+                        const city = fullData.municipio || formData.city || '';
+                        const state = fullData.uf || formData.state || '';
+                        const complement = fullData.complemento ? ` - ${fullData.complemento}` : '';
+
+                        const streetPart = street ? `${street}, ${number}` : '';
+                        const cityStatePart = city && state ? `${city} - ${state}` : (city || state || '');
+
+                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ').trim();
+                        newOriginalAddress = [streetPart + complement, district, cityStatePart].filter(Boolean).join(', ').trim();
                     }
 
                     setFormData(prev => ({
@@ -135,6 +139,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         state: fullData.uf || prev.state,
                         district: fullData.bairro || prev.district,
                         region: fullData.uf ? getRegionByUF(fullData.uf) : prev.region,
+                        zip: fullData.cep || prev.zip,
                         lastname: prev.companyName, // Force update trigger
                         lat: fullData.latitude || 0, // Reset to 0 if not found to force re-geocoding
                         lng: fullData.longitude || 0, // Reset to 0 if not found to force re-geocoding
@@ -159,12 +164,16 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                     let newOriginalAddress = formData.originalAddress;
                     
                     if (hasNewAddress) {
-                        const streetPart = cpfData.logradouro ? `${cpfData.logradouro}, ${addrNum}` : '';
-                        const distPart = cpfData.bairro ? `${cpfData.bairro}` : (cpfData.logradouro ? 'Sem Bairro' : '');
-                        const cityStatePart = `${cpfData.municipio || formData.city} - ${cpfData.uf || formData.state}`;
-                        
-                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
-                        newOriginalAddress = [streetPart, distPart, cityStatePart].filter(Boolean).join(', ');
+                        const street = cpfData.logradouro || '';
+                        const district = cpfData.bairro || formData.district || '';
+                        const city = cpfData.municipio || formData.city || '';
+                        const state = cpfData.uf || formData.state || '';
+
+                        const streetPart = street ? `${street}, ${addrNum}` : '';
+                        const cityStatePart = city && state ? `${city} - ${state}` : (city || state || '');
+
+                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ').trim();
+                        newOriginalAddress = [streetPart, district, cityStatePart].filter(Boolean).join(', ').trim();
                     }
 
                     setDataIsMasked(!!cpfData.isMasked);
@@ -178,6 +187,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         state: cpfData.uf || prev.state,
                         district: cpfData.bairro || prev.district,
                         region: cpfData.uf ? getRegionByUF(cpfData.uf) : prev.region,
+                        zip: cpfData.cep || prev.zip,
                         lat: 0, 
                         lng: 0, 
                         contact: cpfData.telefone || prev.contact,

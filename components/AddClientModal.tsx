@@ -133,24 +133,34 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             if (cleanDoc.length === 14) {
                 const data = await consultarCNPJ(cleanDoc);
                 if (data) {
-                    const hasNewAddress = data.logradouro && data.numero;
+                    const hasNewAddress = !!data.logradouro || !!data.municipio;
+                    const street = data.logradouro || '';
+                    const number = data.numero || 'S/N';
+                    const district = data.bairro || formData.district || '';
+                    const city = data.municipio || formData.city || '';
+                    const state = data.uf || formData.state || '';
+                    const complement = data.complemento ? ` - ${data.complemento}` : '';
+
+                    const streetPart = street ? `${street}, ${number}` : '';
+                    const cityStatePart = city && state ? `${city} - ${state}` : (city || state || '');
+
+                    const newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ').trim();
+                    const newOriginalAddress = [streetPart + complement, district, cityStatePart].filter(Boolean).join(', ').trim();
+
                     setFormData(prev => ({
                         ...prev,
                         companyName: data.nome_fantasia || data.razao_social,
-                        originalAddress: hasNewAddress
-                            ? `${data.logradouro}, ${data.numero}${data.complemento ? ` - ${data.complemento}` : ''}, ${data.bairro}`
-                            : prev.originalAddress,
+                        originalAddress: hasNewAddress ? newOriginalAddress : prev.originalAddress,
+                        cleanAddress: hasNewAddress ? newCleanAddress : prev.cleanAddress,
                         city: data.municipio || prev.city,
                         state: data.uf || prev.state,
                         district: data.bairro || prev.district,
                         region: data.uf ? getRegionByUF(data.uf) : prev.region,
+                        zip: data.cep || prev.zip,
                         contact: data.ddd_telefone_1 || prev.contact,
                         whatsapp: data.ddd_telefone_1 || prev.whatsapp, // Fallback to phone as whatsapp if found
                         lat: data.latitude || 0,
                         lng: data.longitude || 0,
-                        cleanAddress: hasNewAddress
-                            ? `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`
-                            : prev.cleanAddress,
                         mainCnae: data.cnae_fiscal || prev.mainCnae,
                         secondaryCnaes: data.cnaes_secundarios?.map((s: { codigo: number | string; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
                     }));
@@ -158,26 +168,35 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             } else if (cleanDoc.length === 11) {
                 const data = await consultarCPF(cleanDoc);
                 if (data) {
-                    const hasNewAddress = data.logradouro && data.numero;
+                    const hasNewAddress = !!data.logradouro || !!data.municipio;
+                    const street = data.logradouro || '';
+                    const addrNum = data.numero || 'S/N';
+                    const district = data.bairro || formData.district || '';
+                    const city = data.municipio || formData.city || '';
+                    const state = data.uf || formData.state || '';
+
+                    const streetPart = street ? `${street}, ${addrNum}` : '';
+                    const cityStatePart = city && state ? `${city} - ${state}` : (city || state || '');
+
+                    const newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ').trim();
+                    const newOriginalAddress = [streetPart, district, cityStatePart].filter(Boolean).join(', ').trim();
+
                     setDataIsMasked(!!data.isMasked);
                     setFormData(prev => ({
                         ...prev,
                         companyName: data.nome_da_pf || prev.companyName,
                         ownerName: data.nome_da_pf || prev.ownerName,
-                        originalAddress: hasNewAddress
-                            ? `${data.logradouro}, ${data.numero}, ${data.bairro}`
-                            : prev.originalAddress,
+                        originalAddress: hasNewAddress ? newOriginalAddress : prev.originalAddress,
+                        cleanAddress: hasNewAddress ? newCleanAddress : prev.cleanAddress,
                         city: data.municipio || prev.city,
                         state: data.uf || prev.state,
                         district: data.bairro || prev.district,
                         region: data.uf ? getRegionByUF(data.uf) : prev.region,
+                        zip: data.cep || prev.zip,
                         contact: data.telefone || prev.contact,
                         whatsapp: data.telefone || prev.whatsapp,
                         lat: 0,
                         lng: 0,
-                        cleanAddress: hasNewAddress
-                            ? `${data.logradouro}, ${data.numero}, ${data.municipio} - ${data.uf}`
-                            : prev.cleanAddress,
                     }));
                 }
             }
