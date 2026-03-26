@@ -7,7 +7,7 @@ import {
   useMap
 } from '@vis.gl/react-google-maps';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
-import { EnrichedClient, Product, AppUser, PurchaseRecord } from '../types';
+import { EnrichedClient, AppUser } from '../types';
 import { getFilteredPurchases } from '../utils/purchaseUtils';
 import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2, Layers } from 'lucide-react';
 
@@ -19,7 +19,6 @@ interface ClientMapProps {
   onInvalidKey: () => void;
   productFilterActive?: boolean;
   highlightProductTerm?: string;
-  activeProductCategory?: string;
   users?: AppUser[];
   filterContent?: React.ReactNode;
   filterSalespersonId?: string;
@@ -211,7 +210,6 @@ const ClientMapContent: React.FC<{
       clustererRef.current = null;
     }
 
-    // Pre-calculate exact overlaps to apply a visual "spider" scatter
     const coordCounts: Record<string, number> = {};
     const coordSeen: Record<string, number> = {};
     
@@ -219,7 +217,8 @@ const ClientMapContent: React.FC<{
       const lat = Number(client.lat);
       const lng = Number(client.lng);
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        // Use 4 decimals (~11m precision) to catch "near" overlaps
+        const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
         coordCounts[key] = (coordCounts[key] || 0) + 1;
       }
     });
@@ -245,19 +244,21 @@ const ClientMapContent: React.FC<{
           let renderLat = Number(client.lat);
           let renderLng = Number(client.lng);
           
-          const key = `${renderLat.toFixed(5)},${renderLng.toFixed(5)}`;
-          if (coordCounts[key] > 1) {
+          const key = `${renderLat.toFixed(4)},${renderLng.toFixed(4)}`;
+          const totalInCluster = coordCounts[key];
+          
+          if (totalInCluster > 1) {
             const offsetIndex = coordSeen[key] || 0;
             coordSeen[key] = offsetIndex + 1;
             
-            if (offsetIndex > 0) {
-              const totalInCluster = coordCounts[key];
-              const spiralLevel = Math.floor((offsetIndex - 1) / 8) + 1;
-              const angle = (offsetIndex * Math.PI * 2) / Math.min(8, totalInCluster);
-              const radius = 0.0003 * spiralLevel; // approx 30 meters per level
-              renderLat += Math.cos(angle) * radius;
-              renderLng += Math.sin(angle) * radius;
-            }
+            // Jitter even the first one slightly so they are all displaced 
+            // from the actual "exact" center if there is a collision
+            const spiralLevel = Math.floor(offsetIndex / 8) + 1;
+            const angle = (offsetIndex * Math.PI * 2) / Math.min(8, totalInCluster);
+            // Increased radius (0.0004 for ~40m initial displacement)
+            const radius = 0.0004 * spiralLevel; 
+            renderLat += Math.cos(angle) * radius;
+            renderLng += Math.sin(angle) * radius;
           }
 
           let colors = { bg: '#6B7280', border: '#374151', glyph: '#fff' };
@@ -363,20 +364,19 @@ const ClientMapContent: React.FC<{
           try {
             clustererRef.current.clearMarkers();
             (clustererRef.current as any).setMap(null);
-          } catch (e) {
-            console.warn("[MapContent] Clusterer cleanup failed:", e);
+          } catch {
+            console.warn("[MapContent] Clusterer cleanup failed");
           }
         }
         markersRef.current.forEach((m: any) => {
           try {
-            // AdvancedMarkerElement uses .map = null, not .setMap(null)
             if (m) m.map = null;
-          } catch (e) {
+          } catch {
             // Silently fail during cleanup
           }
         });
-      } catch (e) {
-        console.warn("[MapContent] Silent error during marker cleanup:", e);
+      } catch {
+        console.warn("[MapContent] Silent error during marker cleanup");
       }
     };
   }, [map, clients, productFilterActive, onClientSelect, baseGlyphElement, userColorMap, isClusteringEnabled, isAuthFailureDetected]);
@@ -384,7 +384,7 @@ const ClientMapContent: React.FC<{
   return <MapBoundsUpdater clients={clients} />;
 };
 
-const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm, activeProductCategory,
+const ClientMap: React.FC<ClientMapProps> = ({ clients, apiKey, onInvalidKey, productFilterActive, highlightProductTerm,
   users = [],
   filterContent,
   filterSalespersonId,

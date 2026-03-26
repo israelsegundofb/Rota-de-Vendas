@@ -120,9 +120,9 @@ const App: React.FC = () => {
   // REMOVED: distributeProductsToClients function
 
 
-  const missingCoordinatesCount = React.useMemo(() => {
-    return (visibleClients || []).filter((c: EnrichedClient) => !c.lat || !c.lng || Number(c.lat) === 0 || Number(c.lng) === 0).length;
-  }, [visibleClients]);
+  const currentFilteredMissingCount = React.useMemo(() => {
+    return (filteredClients || []).filter((c: EnrichedClient) => !c.lat || !c.lng || Number(c.lat) === 0 || Number(c.lng) === 0).length;
+  }, [filteredClients]);
 
   const [filterMissingCoords, setFilterMissingCoords] = useState(false);
 
@@ -2279,10 +2279,10 @@ const App: React.FC = () => {
                 </p>
                 <div className="flex items-baseline justify-end gap-1.5">
                   <p className="text-lg font-black leading-none text-blue-700">
-                    {finalFilteredClients.length + (!filterMissingCoords ? missingCoordinatesCount : 0)}
+                    {filteredClients.length}
                   </p>
                   {filterMissingCoords && (
-                    <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase">Filtrado</p>
+                    <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase">Listando Pendentes</p>
                   )}
                 </div>
               </div>
@@ -2291,22 +2291,24 @@ const App: React.FC = () => {
 
               <div className="text-right hidden sm:block">
                 <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Localizados</p>
-                <p className="text-sm font-bold leading-none text-emerald-600">{finalFilteredClients.length - (filterMissingCoords ? 0 : missingCoordinatesCount)}</p>
+                <p className="text-sm font-bold leading-none text-emerald-600">
+                  {filteredClients.length - currentFilteredMissingCount}
+                </p>
               </div>
 
-              {missingCoordinatesCount > 0 && (
+              {currentFilteredMissingCount > 0 && (
                 <button
                   onClick={() => {
                     setFilterMissingCoords(!filterMissingCoords);
                     if (activeView !== 'table') setActiveView('table');
                   }}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${filterMissingCoords ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-inner' : 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'}`}
-                  title={`${missingCoordinatesCount} clientes sem localização no mapa. Clique para filtrar.`}
+                  title={`${currentFilteredMissingCount} clientes sem localização no mapa. Clique para filtrar a lista.`}
                 >
                   <AlertTriangle className={`w-4 h-4 ${filterMissingCoords ? 'animate-pulse' : ''}`} />
                   <div className="text-left hidden sm:block">
                     <p className="text-[10px] font-bold uppercase leading-none">Pendentes</p>
-                    <p className="text-xs font-black leading-none">{missingCoordinatesCount}</p>
+                    <p className="text-xs font-black leading-none">{currentFilteredMissingCount}</p>
                   </div>
                 </button>
               )}
@@ -2784,7 +2786,7 @@ const App: React.FC = () => {
                           <ErrorBoundary componentName="Mapa de Clientes">
                             <ClientMap
                               key={`${googleMapsApiKey}-${keyVersion}`} // FORCE REMOUNT when key changes
-                              clients={finalFilteredClients}
+                              clients={filteredClients}
                               apiKey={googleMapsApiKey}
                               onInvalidKey={handleInvalidKey}
                               activeProductCategory={filterProductCategory}
