@@ -1688,8 +1688,16 @@ const App: React.FC = () => {
       let finalNewList = existingUpdatedList;
 
       if (unmatchedRawClients.length > 0) {
-        setProcState(prev => ({ ...prev, status: 'processing', fileName: `Enriquecendo ${unmatchedRawClients.length} novos clientes...` }));
-        const enrichedNewClients = await processClientsSimple(unmatchedRawClients, targetUserId, categories);
+        setProcState(prev => ({ ...prev, status: 'processing', total: unmatchedRawClients.length, current: 0, fileName: `Enriquecendo ${unmatchedRawClients.length} novos clientes...` }));
+        
+        const enrichedNewClients = await processClientsSimple(
+          unmatchedRawClients, 
+          targetUserId, 
+          categories,
+          (curr, total) => {
+            setProcState(prev => ({ ...prev, current: curr, total: total, fileName: `Enriquecendo cliente ${curr} de ${total}...` }));
+          }
+        );
         
         // Attach the purchases to enriched clients
         const enrichedWithPurchases = enrichedNewClients.map(c => {
@@ -1709,6 +1717,7 @@ const App: React.FC = () => {
       // Force-save to Firebase immediately to prevent real-time sync from overwriting
       if (isFirebaseConnected && capturedNewList.length > 0) {
         try {
+          setProcState(prev => ({ ...prev, status: 'processing', fileName: 'Sincronizando dados com a nuvem...' }));
           const { saveToCloud } = await import('./services/firebaseService');
           await saveToCloud(capturedNewList, products, categories, users, uploadedFiles);
           console.log('[APP] ✅ Purchase upload force-saved to Firebase.');
