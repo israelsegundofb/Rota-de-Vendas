@@ -730,6 +730,59 @@ const App: React.FC = () => {
   }, [masterClientList, toast, showConfirm, currentUser, googleMapsApiKey, setMasterClientList]);
 
   const handleUpdateClient = React.useCallback(async (updatedClient: EnrichedClient) => {
+    // 1. DUPLICATE CHECK (Cascade: CNPJ > Razão Social > Endereço Completo)
+    const cleanCNPJ = updatedClient.cnpj?.replace(/\D/g, '');
+    let existingDuplicate: EnrichedClient | undefined;
+    
+    // Helper to normalize strings
+    const normalize = (s: string) => s ? s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim() : '';
+
+    // Check by CNPJ (Priority 1)
+    if (cleanCNPJ && cleanCNPJ.length === 14) {
+        existingDuplicate = masterClientList.find(c => 
+            c.id !== updatedClient.id && 
+            c.cnpj?.replace(/\D/g, '') === cleanCNPJ
+        );
+    }
+
+    // Check by Razão Social (Priority 2)
+    if (!existingDuplicate && updatedClient.companyName) {
+        const normName = normalize(updatedClient.companyName);
+        if (normName.length > 5) {
+            existingDuplicate = masterClientList.find(c => 
+                c.id !== updatedClient.id && 
+                normalize(c.companyName) === normName
+            );
+        }
+    }
+
+    // Check by Endereço Comercial (Priority 3)
+    if (!existingDuplicate && updatedClient.cleanAddress && updatedClient.cleanAddress !== 'Endereço não cadastrado') {
+        const normAddr = normalize(updatedClient.cleanAddress);
+        if (normAddr.length > 10) {
+            existingDuplicate = masterClientList.find(c => 
+                c.id !== updatedClient.id && 
+                c.cleanAddress && c.cleanAddress !== 'Endereço não cadastrado' &&
+                normalize(c.cleanAddress) === normAddr
+            );
+        }
+    }
+
+    if (existingDuplicate) {
+        const confirmMerge = window.confirm(
+            `Foi encontrado um cliente já cadastrado com o mesmo CNPJ (${updatedClient.cnpj}):\n\n` +
+            `"${existingDuplicate.companyName}"\n\n` +
+            `Deseja mesclar este cadastro atual com o cliente já existente?\n` +
+            `• O histórico de compras será unificado.\n` +
+            `• Este registro de cadastro secundário/duplicado será removido permanentemente.`
+        );
+        
+        if (confirmMerge) {
+            handleMergeClients(existingDuplicate.id, updatedClient.id, updatedClient);
+            return; // Stop normal update since merge takes over
+        }
+    }
+
     const finalClient = { ...updatedClient };
 
     // Find original directly for comparison
@@ -904,8 +957,23 @@ const App: React.FC = () => {
       googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
 
       // Activity/Metadata
-      purchasedProducts: (enrichedData.purchasedProducts && enrichedData.purchasedProducts.length > 0)
-        ? enrichedData.purchasedProducts : existingClient.purchasedProducts,
+      purchasedProducts: (() => {
+        const existing = existingClient.purchasedProducts || [];
+        const incoming = enrichedData.purchasedProducts || [];
+        const combined = [...existing, ...incoming];
+        
+        // Deduplicate purchases using item id or a JSON stringified fallback
+        const unique = [];
+        const seen = new Set();
+        for (const item of combined) {
+          const identifier = (item as any).id || JSON.stringify({ ...item, dataCompra: undefined });
+          if (!seen.has(identifier)) {
+            seen.add(identifier);
+            unique.push(item);
+          }
+        }
+        return unique;
+      })(),
       lastUpdated: new Date().toISOString()
     };
 

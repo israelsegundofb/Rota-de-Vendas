@@ -105,15 +105,16 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             const fullData = await consultarCNPJ(cleanCNPJ);
 
             if (fullData) {
-                const hasNewAddress = fullData.logradouro && fullData.numero;
+                const hasNewAddress = !!fullData.logradouro || !!fullData.municipio;
+                const addrNum = fullData.numero || 'S/N';
                 setFormData(prev => ({
                     ...prev,
                     companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
                     originalAddress: hasNewAddress
-                        ? `${fullData.logradouro}, ${fullData.numero}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro}, ${fullData.municipio} - ${fullData.uf}`
+                        ? `${fullData.logradouro || ''}, ${addrNum}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro || 'Sem Bairro'}, ${fullData.municipio || prev.city} - ${fullData.uf || prev.state}`
                         : prev.originalAddress,
                     cleanAddress: hasNewAddress
-                        ? `${fullData.logradouro}, ${fullData.numero}, ${fullData.municipio} - ${fullData.uf}`
+                        ? `${fullData.logradouro || ''}, ${addrNum}, ${fullData.municipio || prev.city} - ${fullData.uf || prev.state}`
                         : prev.cleanAddress,
                     city: fullData.municipio || prev.city,
                     state: fullData.uf || prev.state,
@@ -215,13 +216,14 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
 
             if (enriched.fullData) {
                 const fd = enriched.fullData;
-                const hasAddr = fd.logradouro && fd.numero;
+                const hasAddr = !!fd.logradouro || !!fd.municipio;
+                const fdNum = fd.numero || 'S/N';
                 if (fd.cnpj) enrichedData.cnpj = fd.cnpj;
                 if (fd.nome_fantasia || fd.razao_social) enrichedData.companyName = fd.nome_fantasia || fd.razao_social;
                 if (fd.ddd_telefone_1) enrichedData.contact = fd.ddd_telefone_1;
                 if (hasAddr) {
-                    enrichedData.cleanAddress = `${fd.logradouro}, ${fd.numero}, ${fd.municipio} - ${fd.uf}`;
-                    enrichedData.originalAddress = `${fd.logradouro}, ${fd.numero}${fd.complemento ? ` - ${fd.complemento}` : ''}, ${fd.bairro}, ${fd.municipio} - ${fd.uf}`;
+                    enrichedData.cleanAddress = `${fd.logradouro || ''}, ${fdNum}, ${fd.municipio || enrichedData.city || ''} - ${fd.uf || enrichedData.state || ''}`;
+                    enrichedData.originalAddress = `${fd.logradouro || ''}, ${fdNum}${fd.complemento ? ` - ${fd.complemento}` : ''}, ${fd.bairro || 'Sem Bairro'}, ${fd.municipio || enrichedData.city || ''} - ${fd.uf || enrichedData.state || ''}`;
                 }
                 if (fd.municipio) enrichedData.city = fd.municipio;
                 if (fd.uf) { enrichedData.state = fd.uf; enrichedData.region = getRegionByUF(fd.uf); }
