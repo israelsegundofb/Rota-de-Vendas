@@ -733,6 +733,7 @@ const App: React.FC = () => {
     // 1. DUPLICATE CHECK (Cascade: CNPJ > Razão Social > Endereço Completo)
     const cleanCNPJ = updatedClient.cnpj?.replace(/\D/g, '');
     let existingDuplicate: EnrichedClient | undefined;
+    let duplicateReason = '';
     
     // Helper to normalize strings
     const normalize = (s: string) => s ? s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim() : '';
@@ -743,38 +744,44 @@ const App: React.FC = () => {
             c.id !== updatedClient.id && 
             c.cnpj?.replace(/\D/g, '') === cleanCNPJ
         );
+        if (existingDuplicate) duplicateReason = `mesmo CNPJ/CPF (${updatedClient.cnpj})`;
     }
 
     // Check by Razão Social (Priority 2)
     if (!existingDuplicate && updatedClient.companyName) {
         const normName = normalize(updatedClient.companyName);
-        if (normName.length > 5) {
+        if (normName.length > 5 && !normName.includes('consumidor final')) {
             existingDuplicate = masterClientList.find(c => 
                 c.id !== updatedClient.id && 
                 normalize(c.companyName) === normName
             );
+            if (existingDuplicate) duplicateReason = `mesma Razão Social ("${updatedClient.companyName}")\n\n(Atenção: CNPJ pode ser diferente, deseja mesclar mesmo assim?)`;
         }
     }
 
-    // Check by Endereço Comercial (Priority 3)
+    // Check by Endereço Comercial (Priority 3) - Only if it's a specific address!
     if (!existingDuplicate && updatedClient.cleanAddress && updatedClient.cleanAddress !== 'Endereço não cadastrado') {
         const normAddr = normalize(updatedClient.cleanAddress);
-        if (normAddr.length > 10) {
+        // Avoid matching generic "S/N" addresses or too short addresses
+        const isGeneric = normAddr.includes('s/n') || normAddr.includes('sem numero') || normAddr.length < 15;
+        if (!isGeneric) {
             existingDuplicate = masterClientList.find(c => 
                 c.id !== updatedClient.id && 
                 c.cleanAddress && c.cleanAddress !== 'Endereço não cadastrado' &&
                 normalize(c.cleanAddress) === normAddr
             );
+            if (existingDuplicate) duplicateReason = `mesmo Endereço Comercial exato ("${updatedClient.cleanAddress}")\n\n(Atenção: São clientes no mesmo endereço físico. Eles são de fato a mesma empresa?)`;
         }
     }
 
     if (existingDuplicate) {
         const confirmMerge = window.confirm(
-            `Foi encontrado um cliente já cadastrado com o mesmo CNPJ (${updatedClient.cnpj}):\n\n` +
+            `Foi encontrado um cliente já cadastrado com o(a) ${duplicateReason}:\n\n` +
             `"${existingDuplicate.companyName}"\n\n` +
             `Deseja mesclar este cadastro atual com o cliente já existente?\n` +
             `• O histórico de compras será unificado.\n` +
-            `• Este registro de cadastro secundário/duplicado será removido permanentemente.`
+            `• O registro secundário será removido.\n` +
+            `(Clique em "Cancelar" se são empresas DIFERENTES no mesmo endereço)`
         );
         
         if (confirmMerge) {
