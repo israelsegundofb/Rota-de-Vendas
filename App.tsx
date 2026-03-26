@@ -9,7 +9,7 @@
 */
 /* v6.5.2 — Cache Bust 2026-03-07 */
 import React, { useState, useEffect, useRef } from 'react';
-import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History, Download } from 'lucide-react';
+import { FileUp, Map as MapIcon, Filter, LayoutDashboard, Table as TableIcon, LogOut, ChevronRight, Loader2, AlertCircle, AlertTriangle, Users as UsersIcon, Shield, Lock, ShoppingBag, X, CheckCircle, Search, Layers, Package, Briefcase, User as UserIcon, Database, Menu, Cloud, MessageSquare, Activity, History, Download, Trash2 } from 'lucide-react';
 import { EnrichedClient, Product, UploadedFile, AppUser, PurchaseRecord, UserStatus, RawClient } from './types';
 import { isAdmin, hasFullDataVisibility } from './utils/authUtils';
 import { REGIONS } from './utils/constants';
@@ -1304,8 +1304,11 @@ const App: React.FC = () => {
     } else if (file.type === 'products') {
       newProducts = products.filter(p => p.sourceFileId !== fileId);
     } else if (file.type === 'purchases') {
-      // Deep clean purchasedProducts
-      newClients = masterClientList.map(c => {
+      // Remover clientes que foram auto-criados EXCLUSIVAMENTE por esta planilha de compras
+      const survivingClients = masterClientList.filter(c => c.sourceFileId !== fileId);
+
+      // Deep clean purchasedProducts para os clientes que restaram
+      newClients = survivingClients.map(c => {
         if (!c.purchasedProducts || c.purchasedProducts.length === 0) return c;
 
         // Remove items linked to this file OR items with no sourceFileId (legacy junk/mock data)
@@ -2032,16 +2035,46 @@ const App: React.FC = () => {
               </button>
 
               {isAdminUser && (
-                <button
-                  onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
-                    ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
-                    }`}
-                >
-                  <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
-                  Dashboard Admin
-                </button>
+                <>
+                  <button
+                    onClick={() => { handleViewNavigation('dashboard'); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 ${activeView === 'dashboard'
+                      ? 'bg-secondary-container text-on-secondary-container shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest active:scale-95'
+                      }`}
+                  >
+                    <LayoutDashboard className={`w-5 h-5 ${activeView === 'dashboard' ? 'fill-current' : ''}`} />
+                    Dashboard Admin
+                  </button>
+
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 bg-error-container text-on-error-container hover:bg-error hover:text-on-error shadow-sm mt-2"
+                    onClick={() => {
+                      const orphans = masterClientList.filter(c => 
+                          c.originalAddress === 'Endereço não cadastrado' && 
+                          c.category && c.category.includes('Novo - Importação Compras') &&
+                          (!c.purchasedProducts || c.purchasedProducts.length === 0)
+                      );
+                      if(orphans.length === 0) {
+                          alert("Nenhum cliente órfão encontrado!");
+                          return;
+                      }
+                      if(window.confirm(`Excluir ${orphans.length} clientes órfãos criados pela importação de compras mal-sucedida?`)) {
+                          const remaining = masterClientList.filter(c => !orphans.includes(c));
+                          setMasterClientList(remaining);
+                          import('./services/firebaseService').then(({ saveToCloud }) => {
+                              saveToCloud(remaining, products, categories, users, uploadedFiles).then(() => {
+                                  alert("Limpeza concluída com sucesso! Os clientes órfãos foram removidos.");
+                              });
+                          });
+                      }
+                    }}
+                    title="Remove clientes criados acidentalmente por importações de compras sem endereço"
+                  >
+                    <Trash2 className="w-5 h-5 text-error" />
+                    Limpar Órfãos ({masterClientList.filter(c => c.originalAddress === 'Endereço não cadastrado' && c.category && c.category.includes('Novo - Importação Compras') && (!c.purchasedProducts || c.purchasedProducts.length === 0)).length})
+                  </button>
+                </>
               )}
 
               {currentUser.role !== 'general_viewer' && (
