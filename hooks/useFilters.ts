@@ -224,7 +224,12 @@ export const useFilters = (
         if (filterRegion !== 'Todas') {
             base = base.filter(c => c.region === filterRegion);
         }
-        const states = new Set(base.map(c => c.state).filter(Boolean));
+        // Optimize: Use single-pass Set population to avoid chained array allocations
+        const states = new Set<string>();
+        for (let i = 0; i < base.length; i++) {
+            const state = base[i].state;
+            if (state) states.add(state);
+        }
         return Array.from(states).sort();
     }, [visibleClients, filterRegion]);
 
@@ -238,12 +243,22 @@ export const useFilters = (
         } else {
             return [];
         }
-        const cities = new Set(base.map(c => c.city).filter(Boolean));
+        // Optimize: Use single-pass Set population to avoid chained array allocations
+        const cities = new Set<string>();
+        for (let i = 0; i < base.length; i++) {
+            const city = base[i].city;
+            if (city) cities.add(city);
+        }
         return Array.from(cities).sort();
     }, [visibleClients, filterRegion, filterState]);
 
     const productCategories = useMemo(() => {
-        const cats = new Set(products.map(p => p.category).filter(Boolean));
+        // Optimize: Use single-pass Set population to avoid chained array allocations
+        const cats = new Set<string>();
+        for (let i = 0; i < products.length; i++) {
+            const category = products[i].category;
+            if (category) cats.add(category);
+        }
         return Array.from(cats).sort();
     }, [products]);
 
@@ -252,7 +267,12 @@ export const useFilters = (
         if (filterProductCategory !== 'Todos') {
             base = base.filter(p => p.category === filterProductCategory);
         }
-        const secs = new Set(base.map(p => p.section).filter(Boolean));
+        // Optimize: Use single-pass Set population to avoid chained array allocations
+        const secs = new Set<string>();
+        for (let i = 0; i < base.length; i++) {
+            const section = base[i].section;
+            if (section) secs.add(section);
+        }
         return Array.from(secs).sort();
     }, [products, filterProductCategory]);
 
