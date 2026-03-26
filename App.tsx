@@ -729,6 +729,121 @@ const App: React.FC = () => {
     );
   }, [masterClientList, toast, showConfirm, currentUser, googleMapsApiKey, setMasterClientList]);
 
+  // Merge enriched data into an existing client and remove the duplicate
+  const handleMergeClients = React.useCallback(async (
+    existingClientId: string,
+    duplicateClientId: string,
+    enrichedData: Partial<EnrichedClient>
+  ) => {
+    // 1. Find existing client in current state
+    const existingClient = masterClientList.find(c => c.id === existingClientId);
+    if (!existingClient) {
+      console.warn('[APP] Merge failed: Existing client not found in list.');
+      return;
+    }
+
+    // 2. Perform the Merge logic upfront (Sync/Deterministic)
+    const merged: EnrichedClient = {
+      ...existingClient,
+      // Identification
+      companyName: enrichedData.companyName || existingClient.companyName,
+      cnpj: enrichedData.cnpj || existingClient.cnpj,
+      ownerName: enrichedData.ownerName || existingClient.ownerName,
+      contact: enrichedData.contact || existingClient.contact,
+      whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
+
+      // Address
+      cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
+        ? enrichedData.cleanAddress : existingClient.cleanAddress,
+      originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
+      city: enrichedData.city || existingClient.city,
+      state: enrichedData.state || existingClient.state,
+      district: enrichedData.district || existingClient.district,
+      zip: enrichedData.zip || existingClient.zip,
+      region: enrichedData.region || existingClient.region,
+
+      // Classification
+      mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
+      secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
+        ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+      category: (enrichedData.category && enrichedData.category.length > 0)
+        ? enrichedData.category : existingClient.category,
+
+      // Geography
+      lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
+      lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
+      plusCode: enrichedData.plusCode || existingClient.plusCode,
+      googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
+
+      // Activity/Metadata
+      purchasedProducts: (() => {
+        const existing = existingClient.purchasedProducts || [];
+        const incoming = enrichedData.purchasedProducts || [];
+        const combined = [...existing, ...incoming];
+        
+        // Deduplicate purchases using item id or a JSON stringified fallback
+        const unique = [];
+        const seen = new Set();
+        for (const item of combined) {
+          const identifier = (item as { id?: string }).id || JSON.stringify({ ...item, dataCompra: undefined });
+          if (!seen.has(identifier)) {
+            seen.add(identifier);
+            unique.push(item);
+          }
+        }
+        return unique;
+      })(),
+      lastUpdated: new Date().toISOString()
+    };
+
+    // 3. Update Local State (Functional)
+    setMasterClientList(prev => {
+      return prev
+        .filter(c => c.id !== duplicateClientId)
+        .map(c => c.id === existingClientId ? merged : c);
+    });
+
+    // 4. Persist surgicaly to Cloud (Immediate)
+    if (isFirebaseConnected) {
+      try {
+        const { updateClientInCloud: surgicalUpdate, deleteClientFromCloud } = await import('./services/firebaseService');
+
+        // Parallel but awaited for result
+        await Promise.all([
+          surgicalUpdate(merged),
+          deleteClientFromCloud(duplicateClientId)
+        ]);
+
+        console.log('[APP] ✅ Merge saved surgicaly: duplicate removed, existing updated.');
+
+        // Update local hash after successful cloud sync
+        setMasterClientList(current => {
+          lastClientsHash.current = JSON.stringify(current, (key, value) =>
+            key === 'lastUpdated' ? undefined : value
+          );
+          return current;
+        });
+      } catch (err) {
+        console.error('[APP] Failed to surgical-save merge:', err);
+        toast.error('Erro ao salvar mesclagem na nuvem. Verifique conexão.');
+      }
+    }
+
+    if (currentUser) {
+      logActivityToCloud({
+        timestamp: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'UPDATE',
+        category: 'CLIENTS',
+        details: `Mesclou cliente duplicado em cliente existente (${existingClientId})`,
+        metadata: { existingClientId, removedDuplicateId: duplicateClientId }
+      });
+    }
+    toast.success('Cliente duplicado mesclado com sucesso! Cadastro unificado.');
+  }, [currentUser, toast, setMasterClientList, masterClientList, isFirebaseConnected, lastClientsHash]);
+
   const handleUpdateClient = React.useCallback(async (updatedClient: EnrichedClient) => {
     // 1. DUPLICATE CHECK (Cascade: CNPJ > Razão Social > Endereço Completo)
     const cleanCNPJ = updatedClient.cnpj?.replace(/\D/g, '');
@@ -920,122 +1035,9 @@ const App: React.FC = () => {
         } catch { /* ignore */ }
       })();
     }
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash, syncLockRef]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, lastClientsHash, handleMergeClients]);
 
-  // Merge enriched data into an existing client and remove the duplicate
-  const handleMergeClients = React.useCallback(async (
-    existingClientId: string,
-    duplicateClientId: string,
-    enrichedData: Partial<EnrichedClient>
-  ) => {
-    // 1. Find existing client in current state
-    const existingClient = masterClientList.find(c => c.id === existingClientId);
-    if (!existingClient) {
-      console.warn('[APP] Merge failed: Existing client not found in list.');
-      return;
-    }
 
-    // 2. Perform the Merge logic upfront (Sync/Deterministic)
-    const merged: EnrichedClient = {
-      ...existingClient,
-      // Identification
-      companyName: enrichedData.companyName || existingClient.companyName,
-      cnpj: enrichedData.cnpj || existingClient.cnpj,
-      ownerName: enrichedData.ownerName || existingClient.ownerName,
-      contact: enrichedData.contact || existingClient.contact,
-      whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
-
-      // Address
-      cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
-        ? enrichedData.cleanAddress : existingClient.cleanAddress,
-      originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
-      city: enrichedData.city || existingClient.city,
-      state: enrichedData.state || existingClient.state,
-      district: enrichedData.district || existingClient.district,
-      zip: enrichedData.zip || existingClient.zip,
-      region: enrichedData.region || existingClient.region,
-
-      // Classification
-      mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
-      secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
-        ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
-      category: (enrichedData.category && enrichedData.category.length > 0)
-        ? enrichedData.category : existingClient.category,
-
-      // Geography
-      lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
-      lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
-      plusCode: enrichedData.plusCode || existingClient.plusCode,
-      googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
-
-      // Activity/Metadata
-      purchasedProducts: (() => {
-        const existing = existingClient.purchasedProducts || [];
-        const incoming = enrichedData.purchasedProducts || [];
-        const combined = [...existing, ...incoming];
-        
-        // Deduplicate purchases using item id or a JSON stringified fallback
-        const unique = [];
-        const seen = new Set();
-        for (const item of combined) {
-          const identifier = (item as any).id || JSON.stringify({ ...item, dataCompra: undefined });
-          if (!seen.has(identifier)) {
-            seen.add(identifier);
-            unique.push(item);
-          }
-        }
-        return unique;
-      })(),
-      lastUpdated: new Date().toISOString()
-    };
-
-    // 3. Update Local State (Functional)
-    setMasterClientList(prev => {
-      return prev
-        .filter(c => c.id !== duplicateClientId)
-        .map(c => c.id === existingClientId ? merged : c);
-    });
-
-    // 4. Persist surgicaly to Cloud (Immediate)
-    if (isFirebaseConnected) {
-      try {
-        const { updateClientInCloud: surgicalUpdate, deleteClientFromCloud } = await import('./services/firebaseService');
-
-        // Parallel but awaited for result
-        await Promise.all([
-          surgicalUpdate(merged),
-          deleteClientFromCloud(duplicateClientId)
-        ]);
-
-        console.log('[APP] ✅ Merge saved surgicaly: duplicate removed, existing updated.');
-
-        // Update local hash after successful cloud sync
-        setMasterClientList(current => {
-          lastClientsHash.current = JSON.stringify(current, (key, value) =>
-            key === 'lastUpdated' ? undefined : value
-          );
-          return current;
-        });
-      } catch (err) {
-        console.error('[APP] Failed to surgical-save merge:', err);
-        toast.error('Erro ao salvar mesclagem na nuvem. Verifique conexão.');
-      }
-    }
-
-    if (currentUser) {
-      logActivityToCloud({
-        timestamp: new Date().toISOString(),
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userRole: currentUser.role,
-        action: 'UPDATE',
-        category: 'CLIENTS',
-        details: `Mesclou cliente duplicado em cliente existente (${existingClientId})`,
-        metadata: { existingClientId, removedDuplicateId: duplicateClientId }
-      });
-    }
-    toast.success('Cliente duplicado mesclado com sucesso! Cadastro unificado.');
-  }, [currentUser, toast, setMasterClientList, masterClientList, isFirebaseConnected, products, categories, users, uploadedFiles, lastClientsHash]);
 
   const handleAddClient = React.useCallback(async (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'> & { id?: string; lat?: number; lng?: number; cleanAddress?: string }) => {
     // 1. Geocode Address if coordinates are missing
@@ -1297,8 +1299,8 @@ const App: React.FC = () => {
 
               const existingIdx = list.findIndex(c => {
                 const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj.length === 14 && cleanCnpj.length === 14) {
-                  return cleanNewCnpj === cleanCnpj;
+                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
+                  return true;
                 }
                 return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
                   c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();

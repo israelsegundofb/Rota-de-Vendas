@@ -2,6 +2,7 @@ import { EnrichedClient, RawClient } from "../types";
 import { cleanAddress } from "../utils/csvParser";
 import { geocodeAddress } from "./geocodingService";
 import { consultarCNPJ, CNPJResponse } from "./cnpjService";
+import { consultarCPF, CPFResponse } from "./cpfService";
 import pLimit from 'p-limit';
 
 /**
@@ -99,17 +100,27 @@ export const processClientsSimple = async (
         const sanitizedCnpj = client.cnpj ? client.cnpj.replace(/\D/g, '') : null;
         const resolvedSalespersonId = client.salespersonId || salespersonId;
 
-        const id = sanitizedCnpj && sanitizedCnpj.length === 14
+        const id = sanitizedCnpj && (sanitizedCnpj.length === 14 || sanitizedCnpj.length === 11)
             ? `cli_${sanitizedCnpj}`
             : `cli_${resolvedSalespersonId}-${Date.now()}-${index}`;
 
-        // 1. CNPJ Enrichment
+        // 1. Document Enrichment (CNPJ or CPF)
         let cnpjData: CNPJResponse | null = null;
-        if (client.cnpj && client.cnpj.replace(/\D/g, '').length === 14) {
-            try {
-                cnpjData = await consultarCNPJ(client.cnpj);
-            } catch (e) {
-                console.warn(`CNPJ enrichment failed for ${client.cnpj}`, e);
+        let cpfData: CPFResponse | null = null;
+        
+        if (sanitizedCnpj) {
+            if (sanitizedCnpj.length === 14) {
+                try {
+                    cnpjData = await consultarCNPJ(sanitizedCnpj);
+                } catch (e) {
+                    console.warn(`CNPJ enrichment failed for ${sanitizedCnpj}`, e);
+                }
+            } else if (sanitizedCnpj.length === 11) {
+                try {
+                    cpfData = await consultarCPF(sanitizedCnpj);
+                } catch (e) {
+                    console.warn(`CPF enrichment failed for ${sanitizedCnpj}`, e);
+                }
             }
         }
 
@@ -133,14 +144,16 @@ export const processClientsSimple = async (
 
         if (cnpjData?.logradouro) {
             rawAddress = `${cnpjData.logradouro}, ${cnpjData.numero}${cnpjData.complemento ? ` - ${cnpjData.complemento}` : ''}, ${cnpjData.bairro}, ${cnpjData.municipio} - ${cnpjData.uf}`;
+        } else if (cpfData?.logradouro) {
+            rawAddress = `${cpfData.logradouro}, ${cpfData.numero}, ${cpfData.bairro}, ${cpfData.municipio} - ${cpfData.uf}`;
         }
 
         const address = cleanAddress(rawAddress);
-        const company = cnpjData?.nome_fantasia || cnpjData?.razao_social || client.companyName || "Empresa Desconhecida";
-        const owner = client.ownerName || "";
-        const contact = cnpjData?.ddd_telefone_1 || client.phone || "";
+        const company = cnpjData?.nome_fantasia || cnpjData?.razao_social || cpfData?.nome_da_pf || client.companyName || "Empresa Desconhecida";
+        const owner = cpfData?.nome_da_pf || client.ownerName || "";
+        const contact = cnpjData?.ddd_telefone_1 || cpfData?.telefone || client.phone || "";
         const cepMatch = address.match(/\d{5}[-]?\d{3}/);
-        const extractedCEP = cnpjData?.cep || (cepMatch ? cepMatch[0] : "");
+        const extractedCEP = cnpjData?.cep || cpfData?.cep || (cepMatch ? cepMatch[0] : "");
 
         if (!address && company === "Empresa Desconhecida") {
             processedCount++;
@@ -151,10 +164,12 @@ export const processClientsSimple = async (
         // 3. Geocoding
         let finalLat = cnpjData?.latitude || client.latitude || 0;
         let finalLng = cnpjData?.longitude || client.longitude || 0;
-        let finalAddress = cnpjData?.logradouro ? `${cnpjData.logradouro}, ${cnpjData.numero}, ${cnpjData.municipio} - ${cnpjData.uf}` : address;
-        let finalCity = cnpjData?.municipio || client.city || 'Desconhecido';
-        let finalState = cnpjData?.uf || client.state || 'BR';
-        let finalRegion = (cnpjData?.uf ? getRegionFromState(cnpjData.uf) : null) || 'Indefinido';
+        let finalAddress = (cnpjData?.logradouro || cpfData?.logradouro) 
+            ? `${cnpjData?.logradouro || cpfData?.logradouro}, ${cnpjData?.numero || cpfData?.numero}, ${cnpjData?.municipio || cpfData?.municipio} - ${cnpjData?.uf || cpfData?.uf}` 
+            : address;
+        let finalCity = cnpjData?.municipio || cpfData?.municipio || client.city || 'Desconhecido';
+        let finalState = cnpjData?.uf || cpfData?.uf || client.state || 'BR';
+        let finalRegion = (cnpjData?.uf || cpfData?.uf ? getRegionFromState(cnpjData?.uf || cpfData?.uf || '') : null) || 'Indefinido';
 
         const hasValidCoords = typeof finalLat === 'number' && typeof finalLng === 'number' && finalLat !== 0 && finalLng !== 0;
 
@@ -192,7 +207,7 @@ export const processClientsSimple = async (
             contact: contact,
             originalAddress: rawAddress,
             cleanAddress: finalAddress,
-            cnpj: cnpjData?.cnpj || client.cnpj,
+            cnpj: cnpjData?.cnpj || cpfData?.cpf || client.cnpj,
             mainCnae: cnpjData?.cnae_fiscal,
             secondaryCnaes: cnpjData?.cnaes_secundarios?.map((s) => `${s.codigo} - ${s.texto}`),
             category: ['Importado'], // Default without AI classification
