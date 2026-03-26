@@ -1299,12 +1299,19 @@ const App: React.FC = () => {
     let newProducts = [...products];
     const newFiles = uploadedFiles.filter(f => f.id !== fileId);
 
+    const clientsToDelete: string[] = [];
+
     if (file.type === 'clients') {
+      const removedClients = masterClientList.filter(c => c.sourceFileId === fileId);
+      clientsToDelete.push(...removedClients.map(c => c.id));
       newClients = masterClientList.filter(c => c.sourceFileId !== fileId);
     } else if (file.type === 'products') {
       newProducts = products.filter(p => p.sourceFileId !== fileId);
     } else if (file.type === 'purchases') {
       // Remover clientes que foram auto-criados EXCLUSIVAMENTE por esta planilha de compras
+      const orphans = masterClientList.filter(c => c.sourceFileId === fileId);
+      clientsToDelete.push(...orphans.map(c => c.id));
+      
       const survivingClients = masterClientList.filter(c => c.sourceFileId !== fileId);
 
       // Deep clean purchasedProducts para os clientes que restaram
@@ -1333,6 +1340,14 @@ const App: React.FC = () => {
       try {
         // Force immediate sync to cloud
         await saveToCloud(newClients, newProducts, categories, users, newFiles);
+
+        if (clientsToDelete.length > 0) {
+            import('./services/firebaseService').then(async ({ deleteClientFromCloud }) => {
+                for (const id of clientsToDelete) {
+                    await deleteClientFromCloud(id).catch(console.error);
+                }
+            });
+        }
 
         // Also sync files metadata specifically if needed
         await syncUploadedFilesMetadata(newFiles);
@@ -2063,10 +2078,15 @@ const App: React.FC = () => {
                       if(window.confirm(`Excluir ${orphans.length} clientes gerados indevidamente pela importação?`)) {
                           const remaining = masterClientList.filter(c => !orphans.includes(c));
                           setMasterClientList(remaining);
-                          import('./services/firebaseService').then(({ saveToCloud }) => {
-                              saveToCloud(remaining, products, categories, users, uploadedFiles).then(() => {
-                                  alert("Limpeza concluída com sucesso! Os clientes órfãos foram removidos.");
-                              });
+                          import('./services/firebaseService').then(async ({ saveToCloud, deleteClientFromCloud }) => {
+                              try {
+                                  await saveToCloud(remaining, products, categories, users, uploadedFiles);
+                                  await Promise.all(orphans.map(o => deleteClientFromCloud(o.id).catch(e => console.error(e))));
+                                  alert("Limpeza concluída com sucesso! Os clientes órfãos foram removidos permanentemente.");
+                              } catch(e) {
+                                  alert("Erro na limpeza da nuvem, mas removidos localmente.");
+                                  console.error(e);
+                              }
                           });
                       }
                     }}
