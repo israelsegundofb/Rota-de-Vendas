@@ -737,8 +737,8 @@ const App: React.FC = () => {
     // Helper to normalize strings
     const normalize = (s: string) => s ? s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim() : '';
 
-    // Check by CNPJ (Priority 1)
-    if (cleanCNPJ && cleanCNPJ.length === 14) {
+    // Check by CNPJ/CPF (Priority 1)
+    if (cleanCNPJ && (cleanCNPJ.length === 14 || cleanCNPJ.length === 11)) {
         existingDuplicate = masterClientList.find(c => 
             c.id !== updatedClient.id && 
             c.cnpj?.replace(/\D/g, '') === cleanCNPJ
