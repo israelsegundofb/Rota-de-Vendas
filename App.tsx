@@ -842,7 +842,12 @@ const App: React.FC = () => {
           ].filter(Boolean).join(', ');
 
           const geoResult = await geocodeWithFallback([
-            updatedClient.plusCode, detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress
+            updatedClient.plusCode, 
+            detailedAddress, 
+            updatedClient.cleanAddress, 
+            updatedClient.originalAddress,
+            updatedClient.zip ? `${updatedClient.zip}, Brasil` : undefined,
+            (updatedClient.city && updatedClient.state) ? `${updatedClient.city}, ${updatedClient.state}, Brasil` : undefined
           ]);
 
           if (geoResult) {
