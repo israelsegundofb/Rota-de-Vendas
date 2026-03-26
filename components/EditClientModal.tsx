@@ -107,15 +107,25 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             if (fullData) {
                 const hasNewAddress = !!fullData.logradouro || !!fullData.municipio;
                 const addrNum = fullData.numero || 'S/N';
+                
+                let newCleanAddress = formData.cleanAddress;
+                let newOriginalAddress = formData.originalAddress;
+                
+                if (hasNewAddress) {
+                    const streetPart = fullData.logradouro ? `${fullData.logradouro}, ${addrNum}` : '';
+                    const compPart = fullData.complemento ? ` - ${fullData.complemento}` : '';
+                    const distPart = fullData.bairro ? `${fullData.bairro}` : (fullData.logradouro ? 'Sem Bairro' : '');
+                    const cityStatePart = `${fullData.municipio || formData.city} - ${fullData.uf || formData.state}`;
+                    
+                    newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
+                    newOriginalAddress = [streetPart + compPart, distPart, cityStatePart].filter(Boolean).join(', ');
+                }
+
                 setFormData(prev => ({
                     ...prev,
                     companyName: fullData.nome_fantasia || fullData.razao_social || prev.companyName,
-                    originalAddress: hasNewAddress
-                        ? `${fullData.logradouro || ''}, ${addrNum}${fullData.complemento ? ` - ${fullData.complemento}` : ''}, ${fullData.bairro || 'Sem Bairro'}, ${fullData.municipio || prev.city} - ${fullData.uf || prev.state}`
-                        : prev.originalAddress,
-                    cleanAddress: hasNewAddress
-                        ? `${fullData.logradouro || ''}, ${addrNum}, ${fullData.municipio || prev.city} - ${fullData.uf || prev.state}`
-                        : prev.cleanAddress,
+                    originalAddress: newOriginalAddress,
+                    cleanAddress: newCleanAddress,
                     city: fullData.municipio || prev.city,
                     state: fullData.uf || prev.state,
                     district: fullData.bairro || prev.district,
@@ -222,8 +232,13 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                 if (fd.nome_fantasia || fd.razao_social) enrichedData.companyName = fd.nome_fantasia || fd.razao_social;
                 if (fd.ddd_telefone_1) enrichedData.contact = fd.ddd_telefone_1;
                 if (hasAddr) {
-                    enrichedData.cleanAddress = `${fd.logradouro || ''}, ${fdNum}, ${fd.municipio || enrichedData.city || ''} - ${fd.uf || enrichedData.state || ''}`;
-                    enrichedData.originalAddress = `${fd.logradouro || ''}, ${fdNum}${fd.complemento ? ` - ${fd.complemento}` : ''}, ${fd.bairro || 'Sem Bairro'}, ${fd.municipio || enrichedData.city || ''} - ${fd.uf || enrichedData.state || ''}`;
+                    const streetPart = fd.logradouro ? `${fd.logradouro}, ${fdNum}` : '';
+                    const compPart = fd.complemento ? ` - ${fd.complemento}` : '';
+                    const distPart = fd.bairro ? `${fd.bairro}` : (fd.logradouro ? 'Sem Bairro' : '');
+                    const cityStatePart = `${fd.municipio || enrichedData.city || ''} - ${fd.uf || enrichedData.state || ''}`;
+
+                    enrichedData.cleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ');
+                    enrichedData.originalAddress = [streetPart + compPart, distPart, cityStatePart].filter(Boolean).join(', ');
                 }
                 if (fd.municipio) enrichedData.city = fd.municipio;
                 if (fd.uf) { enrichedData.state = fd.uf; enrichedData.region = getRegionByUF(fd.uf); }
