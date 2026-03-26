@@ -54,65 +54,47 @@ export const consultarCPF = async (cpf: string): Promise<CPFResponse | null> => 
     }
 
     try {
-        // Passo 1: Obter Dados Básicos (Nome e Situação)
-        const basicResponse = await fetchWithTimeout(`${BASE_URL}/cpf/?cpf=${cleanCPF}&token=${token}`);
-        if (!basicResponse.ok) {
-            if (basicResponse.status === 401) throw new Error('Token do Hub do Desenvolvedor inválido ou expirado.');
-            throw new Error(`Erro API CPF (Status ${basicResponse.status})`);
+        // Utilizamos o endpoint cadastropf que retorna dados completos (nome, endereços, telefones)
+        const response = await fetchWithTimeout(`${BASE_URL}/cadastropf/?cpf=${cleanCPF}&token=${token}`);
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('Token do Hub do Desenvolvedor inválido ou expirado.');
+            throw new Error(`Erro API Hub (Status ${response.status})`);
         }
         
-        const basicData = await basicResponse.json();
+        const data = await response.json();
 
-        if (basicData.status === false) {
-            const apiMsg = basicData.message || basicData.result?.mensagem || 'CPF não encontrado ou erro na conta.';
+        if (data.status === false) {
+            const apiMsg = data.message || data.result?.mensagem || 'Consulta não autorizada ou CPF não encontrado.';
             throw new Error(`Hub do Desenvolvedor: ${apiMsg}`);
         }
 
-        if (!basicData.result) {
-            throw new Error('Hub do Desenvolvedor: Resposta da API sem dados de resultado.');
+        const res = data.result;
+        if (!res) {
+            throw new Error('Hub do Desenvolvedor: Resposta sem campo "result".');
         }
 
+        // Mapeamento conforme exemplo fornecido pelo usuário
         const cpfResult: CPFResponse = {
             cpf: cleanCPF,
-            nome_da_pf: basicData.result.nome_da_pf,
-            data_nascimento: basicData.result.data_nascimento,
-            situacao_cadastral: basicData.result.situacao_cadastral
+            nome_da_pf: res.nomeCompleto || res.nome_da_pf || 'Nome não encontrado',
+            data_nascimento: res.dataDeNascimento || res.data_nascimento,
+            situacao_cadastral: res.statusCadastral || res.situacao_cadastral
         };
 
-        // Passo 2: Tentar obter Endereços e Telefones (Modulo Plus / Localizador)
-        // Ignora erros deste passo silenciosamente, apenas retornando o que conseguiu do passo 1 se falhar.
-        try {
-            // Tenta o endpoint provavel de localizador
-            // Se falhar, tentaremos outro endpoint nos proximos refinamentos.
-            const locResponse = await fetchWithTimeout(`${BASE_URL}/localizador/?documento=${cleanCPF}&token=${token}`);
-            if (locResponse.ok) {
-                const locData = await locResponse.json();
-                if (locData.status && locData.result) {
-                    
-                    // Extrai primeiro endereço se existir
-                    const enderecos = locData.result.enderecos;
-                    if (enderecos && enderecos.length > 0) {
-                        const primAdd = enderecos[0];
-                        cpfResult.logradouro = primAdd.logradouro;
-                        cpfResult.numero = primAdd.numero;
-                        cpfResult.bairro = primAdd.bairro;
-                        cpfResult.municipio = primAdd.cidade || primAdd.municipio;
-                        cpfResult.uf = primAdd.uf || primAdd.estado;
-                        cpfResult.cep = primAdd.cep;
-                    }
+        // Extrai endereço da lista se disponível
+        if (res.listaEnderecos && res.listaEnderecos.length > 0) {
+            const addr = res.listaEnderecos[0];
+            cpfResult.logradouro = addr.logradouro;
+            cpfResult.numero = addr.numero;
+            cpfResult.bairro = addr.bairro;
+            cpfResult.municipio = addr.cidade;
+            cpfResult.uf = addr.uf;
+            cpfResult.cep = addr.cep;
+        }
 
-                    // Extrai primeiro telefone se existir
-                    const telefones = locData.result.telefones;
-                    if (telefones && telefones.length > 0) {
-                        const primTel = telefones[0];
-                        cpfResult.telefone = primTel.telefone || primTel.numero || `${primTel.ddd || ''}${primTel.numero || ''}`;
-                    }
-                }
-            } else {
-                 console.warn("Hub do Desenvolvedor: Could not fetch localizador", locResponse.status);
-            }
-        } catch (subErr) {
-            console.warn("Hub do Desenvolvedor: Localizador request failed", subErr);
+        // Extrai telefone da lista se disponível
+        if (res.listaTelefones && res.listaTelefones.length > 0) {
+            cpfResult.telefone = res.listaTelefones[0].telefoneComDDD;
         }
 
         return cpfResult;
