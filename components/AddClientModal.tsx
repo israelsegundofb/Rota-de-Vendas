@@ -186,7 +186,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                 if (onCNPJAuthError) {
                     onCNPJAuthError();
                 } else {
-                    setError('Não foi possível buscar os dados nas APIs. Verifique sua conexão ou as Chaves de API.');
+                    setError(`Falha na API: ${errorMsg}. Verifique sua conexão ou as Chaves de API.`);
                 }
             } else {
                 setError(errorMsg || 'Erro ao consultar documento. Verifique se o número está correto.');

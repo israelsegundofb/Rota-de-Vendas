@@ -189,14 +189,14 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
             console.error('Erro ao atualizar dados:', err);
             setRefreshStatus('error');
             const errorMsg = err instanceof Error ? err.message : String(err);
-            if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api cnpja'))) {
+            if (errorMsg && (errorMsg.includes('401') || errorMsg.toLowerCase().includes('chave de api'))) {
                 if (onCNPJAuthError) {
                     onCNPJAuthError();
                 } else {
-                    alert('As APIs de consulta não conseguiram buscar o cliente. Verifique sua chave de API ou conexão.');
+                    alert(`As APIs de consulta não conseguiram buscar o cliente: ${errorMsg}. Verifique sua conexão ou chaves de API.`);
                 }
             } else {
-                alert('Erro ao consultar CNPJ. Verifique se o número está correto.');
+                alert(errorMsg || 'Erro ao consultar documento (CPF/CNPJ). Verifique se o número está correto.');
             }
         } finally {
             setIsRefreshingByCNPJ(false);

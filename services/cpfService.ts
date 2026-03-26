@@ -57,12 +57,19 @@ export const consultarCPF = async (cpf: string): Promise<CPFResponse | null> => 
         // Passo 1: Obter Dados Básicos (Nome e Situação)
         const basicResponse = await fetchWithTimeout(`${BASE_URL}/cpf/?cpf=${cleanCPF}&token=${token}`);
         if (!basicResponse.ok) {
-            throw new Error(`Erro API Básica CPF: ${basicResponse.status}`);
+            if (basicResponse.status === 401) throw new Error('Token do Hub do Desenvolvedor inválido ou expirado.');
+            throw new Error(`Erro API CPF (Status ${basicResponse.status})`);
         }
+        
         const basicData = await basicResponse.json();
 
-        if (!basicData.status || !basicData.result) {
-            throw new Error('CPF não encontrado na base.');
+        if (basicData.status === false) {
+            const apiMsg = basicData.message || basicData.result?.mensagem || 'CPF não encontrado ou erro na conta.';
+            throw new Error(`Hub do Desenvolvedor: ${apiMsg}`);
+        }
+
+        if (!basicData.result) {
+            throw new Error('Hub do Desenvolvedor: Resposta da API sem dados de resultado.');
         }
 
         const cpfResult: CPFResponse = {
