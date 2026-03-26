@@ -2012,36 +2012,47 @@ const App: React.FC = () => {
 
                   <button
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-full transition-all duration-200 bg-error-container text-on-error-container hover:bg-error hover:text-on-error shadow-sm mt-2"
-                    onClick={() => {
+                    onClick={async () => {
                       const orphans = masterClientList.filter(c => {
-                          const hasNoAddress = c.originalAddress === 'Endereço não cadastrado' || !c.originalAddress;
-                          const hasIndefinidoRegion = c.region === 'Indefinido';
-                          const hasNovoCategory = Array.isArray(c.category) ? c.category.join(',').includes('Novo - Importação') : String(c.category || '').includes('Novo - Importação');
+                          const hasNoAddress = c.originalAddress === "Endereço não cadastrado" || !c.originalAddress;
+                          const hasIndefinidoRegion = c.region === "Indefinido";
+                          const hasNovoCategory = Array.isArray(c.category) ? c.category.join(",").includes("Novo - Importação") : String(c.category || "").includes("Novo - Importação");
                           return hasNoAddress && (hasIndefinidoRegion || hasNovoCategory);
                       });
                       if(orphans.length === 0) {
                           alert("Nenhum cliente órfão encontrado!");
                           return;
                       }
+                      
                       if(window.confirm(`Excluir ${orphans.length} clientes gerados indevidamente pela importação?`)) {
+                          // BLOQUEIA SINCRONISMO PARA EVITAR REGRESSÃO
+                          syncLockRef.current = true;
                           const remaining = masterClientList.filter(c => !orphans.includes(c));
-                          setMasterClientList(remaining);
-                          import('./services/firebaseService').then(async ({ saveToCloud, deleteClientsBatchFromCloud }) => {
-                              try {
-                                  await saveToCloud(remaining, products, categories, users, uploadedFiles);
-                                  await deleteClientsBatchFromCloud(orphans.map(o => o.id));
-                                  alert("Limpeza concluída com sucesso no banco de dados! Os clientes órfãos foram removidos permanentemente.");
-                              } catch(e) {
-                                  alert("Erro na limpeza da nuvem, mas removidos localmente.");
-                                  console.error(e);
-                              }
-                          });
+                          
+                          try {
+                            setMasterClientList(remaining);
+                            
+                            const { deleteClientsBatchFromCloud } = await import("./services/firebaseService");
+                            await deleteClientsBatchFromCloud(orphans.map(o => o.id));
+                            
+                            // Atualiza o hash local para que o auto-save não tente reenviar o que já definimos como "remaining"
+                            const hashDataList = (list) => JSON.stringify(list, (key, value) => key === "lastUpdated" ? undefined : value);
+                            lastClientsHash.current = hashDataList(remaining);
+                            
+                            alert("Limpeza concluída com sucesso no banco de dados! Os clientes órfãos foram removidos permanentemente.");
+                          } catch(e) {
+                            alert("Houve um problema ao sincronizar a limpeza com a nuvem.");
+                            console.error(e);
+                          } finally {
+                            // LIBERA O SINCRONISMO
+                            syncLockRef.current = false;
+                          }
                       }
                     }}
                     title="Remove clientes criados acidentalmente por importações de compras sem endereço"
                   >
                     <Trash2 className="w-5 h-5 text-error" />
-                    Limpar Órfãos ({masterClientList.filter(c => (c.originalAddress === 'Endereço não cadastrado' || !c.originalAddress) && (c.region === 'Indefinido' || (Array.isArray(c.category) ? c.category.join(',').includes('Novo - Importação') : String(c.category || '').includes('Novo - Importação')))).length})
+                    Limpar Órfãos ({masterClientList.filter(c => (c.originalAddress === "Endereço não cadastrado" || !c.originalAddress) && (c.region === "Indefinido" || (Array.isArray(c.category) ? c.category.join(",").includes("Novo - Importação") : String(c.category || "").includes("Novo - Importação")))).length})
                   </button>
                 </>
               )}
