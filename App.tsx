@@ -952,89 +952,76 @@ const App: React.FC = () => {
         metadata: { clientId: finalClient.id }
       });
     }
-    toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
 
-    // ---- GEOCODE IN BACKGROUND (non-blocking) ----
+    // ---- GEOCODE BEFORE SAVING ----
     if (needsGeocoding) {
-      (async () => {
-        try {
-          const detailedAddress = [
-            updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
-            updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
-          ].filter(Boolean).join(', ');
+      try {
+        const detailedAddress = [
+          updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
+          updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
+        ].filter(Boolean).join(', ');
 
-          const geoResult = await geocodeWithFallback([
-            updatedClient.plusCode, 
-            detailedAddress, 
-            updatedClient.cleanAddress, 
-            updatedClient.originalAddress,
-            updatedClient.zip ? `${updatedClient.zip}, Brasil` : undefined,
-            (updatedClient.city && updatedClient.state) ? `${updatedClient.city}, ${updatedClient.state}, Brasil` : undefined
-          ]);
+        const geoResult = await geocodeWithFallback([
+          updatedClient.plusCode, 
+          detailedAddress, 
+          updatedClient.cleanAddress, 
+          updatedClient.originalAddress,
+          updatedClient.zip ? `${updatedClient.zip}, Brasil` : undefined,
+          (updatedClient.city && updatedClient.state) ? `${updatedClient.city}, ${updatedClient.state}, Brasil` : undefined
+        ]);
 
-          if (geoResult) {
-            const geoUpdate = { ...finalClient, lat: geoResult.lat, lng: geoResult.lng };
-            if (geoResult.formattedAddress) geoUpdate.cleanAddress = geoResult.formattedAddress;
+        if (geoResult) {
+          finalClient.lat = geoResult.lat;
+          finalClient.lng = geoResult.lng;
+          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
 
-            if (!geoUpdate.plusCode) {
-              try {
-                const pc = await reverseGeocodePlusCode(geoUpdate.lat, geoUpdate.lng, googleMapsApiKey || '');
-                if (pc) geoUpdate.plusCode = pc;
-              } catch { /* ignore */ }
-            }
-
-            // 4. Update state using functional update to ensure we use the LATEST Master List
-            setMasterClientList(prev => {
-              const newList = prev.map(c => c.id === geoUpdate.id ? geoUpdate : c);
-
-              // 5. Trigger an surgical background save for this specific geocoded record
-              if (isFirebaseConnected) {
-                (async () => {
-                  try {
-                    const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
-                    await surgicalUpdate(geoUpdate);
-
-                    setMasterClientList(current => {
-                      if (lastClientsHash) {
-                        lastClientsHash.current = JSON.stringify(current, (key, value) =>
-                          key === 'lastUpdated' ? undefined : value
-                        );
-                      }
-                      return current;
-                    });
-                    console.log('[APP] ✅ Background geocode persisted surgicaly.');
-                  } catch (e) {
-                    console.warn('[APP] Background geocode save deferred:', e);
-                  }
-                })();
-              }
-              return newList;
-            });
+          if (!finalClient.plusCode) {
+            try {
+              const pc = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+              if (pc) finalClient.plusCode = pc;
+            } catch { /* ignore */ }
           }
-        } catch (err) {
-          console.warn('[APP] Background geocoding failed:', err);
+          toast.success(`Endereço geolocalizado com sucesso!`);
+        } else {
+          toast.warning(`As coordenadas originais foram mantidas. Cliente poderá ser listado como pendente.`, `Não foi possível geolocalizar o endereço`);
         }
-      })();
+      } catch (err) {
+        console.warn('[APP] Geocoding failed:', err);
+        toast.error(`Erro ao tentar geolocalizar o endereço.`);
+      }
     } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
       // Background plus code generation
-      (async () => {
-        try {
-          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-          if (plusCode) {
-            const updated = { ...finalClient, plusCode };
-            setMasterClientList(prev => {
-              const newList = prev.map(c => c.id === updated.id ? updated : c);
-              if (lastClientsHash) {
-                lastClientsHash.current = JSON.stringify(newList, (key, value) =>
-                  key === 'lastUpdated' ? undefined : value
-                );
-              }
-              return newList;
-            });
-          }
-        } catch { /* ignore */ }
-      })();
+      try {
+        const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+        if (plusCode) {
+          finalClient.plusCode = plusCode;
+        }
+      } catch { /* ignore */ }
     }
+
+    // ---- SAVE IMMEDIATELY (surgical update) ----
+    setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
+
+    // Persist to cloud surgicaly
+    if (isFirebaseConnected) {
+      try {
+        const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
+        await surgicalUpdate(finalClient);
+        console.log('[APP] ✅ Edit surgical-saved to Firebase.');
+
+        // Still update hash for local consistency check if needed
+        setMasterClientList(current => {
+          lastClientsHash.current = JSON.stringify(current, (key, value) =>
+            key === 'lastUpdated' ? undefined : value
+          );
+          return current;
+        });
+      } catch (saveErr) {
+        console.error('[APP] Failed to surgical-save edited client:', saveErr);
+      }
+    }
+
+    toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
   }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, lastClientsHash, handleMergeClients]);
 
 
