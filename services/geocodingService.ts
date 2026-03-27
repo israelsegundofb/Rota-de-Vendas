@@ -44,16 +44,17 @@ export const geocodeAddress = async (
                 addressComponents: result.address_components
             };
         } else {
+            const errorMsg = data.error_message ? ` - ${data.error_message}` : '';
             console.warn(`Geocoding failed for address "${address}":`, data.status, data.error_message);
-            return null;
+            throw new Error(`Google Maps API Erro (${data.status})${errorMsg}`);
         }
     } catch (error: any) {
         if (error.name === 'AbortError') {
-            console.error(`Geocoding fetch timeout for address "${address}"`);
+            throw new Error(`Geocoding timeout para o endereço "${address}"`);
         } else {
             console.error(`Geocoding fetch error for address "${address}":`, error);
+            throw error;
         }
-        return null;
     }
 };
 

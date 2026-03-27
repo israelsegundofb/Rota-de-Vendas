@@ -658,15 +658,29 @@ const App: React.FC = () => {
 
   // Helper for sequential geocoding attempts
   const geocodeWithFallback = React.useCallback(async (addresses: (string | undefined)[]) => {
+    let lastError: Error | null = null;
+    let apiKeyError: Error | null = null;
     for (const addr of addresses) {
       const candidate = addr?.trim();
       if (!candidate) continue;
       try {
         const result = await geocodeAddress(candidate, googleMapsApiKey || '');
         if (result) return result;
-      } catch (e) {
-        console.warn(`Geocoding failed for ${candidate}:`, e);
+      } catch (e: any) {
+        lastError = e;
+        const errMsg = e?.message || String(e);
+        console.warn(`Geocoding failed for ${candidate}:`, errMsg);
+        // If it's a critical API key error (e.g. REQUEST_DENIED), abort fallbacks early
+        if (errMsg.includes('REQUEST_DENIED') || errMsg.includes('OVER_QUERY_LIMIT') || errMsg.includes('API key')) {
+           apiKeyError = e;
+           break;
+        }
       }
+    }
+    if (apiKeyError) throw apiKeyError;
+    if (lastError && addresses.filter(a => a?.trim()).length > 0) {
+       // If we exhausted all fallbacks and had an error, throw the last one (usually ZERO_RESULTS or similar)
+       throw lastError;
     }
     return null;
   }, [googleMapsApiKey]);
@@ -990,9 +1004,10 @@ const App: React.FC = () => {
         } else {
           toast.warning(`As coordenadas originais foram mantidas. Cliente poderá ser listado como pendente.`, `Não foi possível geolocalizar o endereço`);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('[APP] Geocoding failed:', err);
-        toast.error(`Erro ao tentar geolocalizar o endereço.`);
+        const errMsg = err?.message || 'Falha ao buscar coordenadas.';
+        toast.error(errMsg, `Erro no Google Maps`);
       }
     } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
       // Background plus code generation
@@ -1045,25 +1060,31 @@ const App: React.FC = () => {
     const isMissingLng = !finalClient.lng || Number(finalClient.lng) === 0 || isNaN(Number(finalClient.lng));
 
     if (isMissingLat || isMissingLng) {
-      const geoResult = await geocodeWithFallback([
-        finalClient.plusCode,
-        finalClient.cleanAddress,
-        finalClient.originalAddress
-      ]);
+      try {
+        const geoResult = await geocodeWithFallback([
+          finalClient.plusCode,
+          finalClient.cleanAddress,
+          finalClient.originalAddress
+        ]);
 
-      if (geoResult) {
-        finalClient.lat = geoResult.lat;
-        finalClient.lng = geoResult.lng;
-        if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
-        console.log(`[APP] Geocoding for manual client successful: ${finalClient.lat}, ${finalClient.lng}`);
+        if (geoResult) {
+          finalClient.lat = geoResult.lat;
+          finalClient.lng = geoResult.lng;
+          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
+          console.log(`[APP] Geocoding for manual client successful: ${finalClient.lat}, ${finalClient.lng}`);
 
-        // Auto-generate Plus Code if missing
-        if (!finalClient.plusCode) {
-          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-          if (plusCode) finalClient.plusCode = plusCode;
+          // Auto-generate Plus Code if missing
+          if (!finalClient.plusCode) {
+            const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+            if (plusCode) finalClient.plusCode = plusCode;
+          }
+        } else {
+          console.warn(`[APP] Geocoding for manual client FAILED: ${finalClient.companyName}`);
         }
-      } else {
-        console.warn(`[APP] Geocoding for manual client FAILED: ${finalClient.companyName}`);
+      } catch (err: any) {
+        console.warn('[APP] Geocoding failed on add:', err);
+        const errMsg = err?.message || 'Falha ao buscar coordenadas.';
+        toast.error(errMsg, `Aviso de Localização (Cliente Salvo)`);
       }
     } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
       // Coords provided but no plus code
