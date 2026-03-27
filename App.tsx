@@ -68,6 +68,9 @@ interface ProcessingState {
   errorMessage?: string;
 }
 
+// Helper to hash data ignoring lastUpdated timestamp to prevent infinite sync loops
+const hashDataList = (list: any[]) => JSON.stringify(list, (key, value) => key === 'lastUpdated' ? undefined : value);
+
 const App: React.FC = () => {
   // --- Custom Hooks ---
   const {
@@ -749,77 +752,81 @@ const App: React.FC = () => {
     duplicateClientId: string,
     enrichedData: Partial<EnrichedClient>
   ) => {
-    // 1. Find existing client in current state
-    const existingClient = masterClientList.find(c => c.id === existingClientId);
-    if (!existingClient) {
-      console.warn('[APP] Merge failed: Existing client not found in list.');
-      return;
-    }
+    try {
+      syncLockRef.current = true;
+      // 1. Find existing client in current state
+      const existingClient = masterClientList.find(c => c.id === existingClientId);
+      if (!existingClient) {
+        console.warn('[APP] Merge failed: Existing client not found in list.');
+        toast.error('Cliente de destino não encontrado.');
+        return;
+      }
 
-    // 2. Perform the Merge logic upfront (Sync/Deterministic)
-    const merged: EnrichedClient = {
-      ...existingClient,
-      // Identification
-      companyName: enrichedData.companyName || existingClient.companyName,
-      cnpj: enrichedData.cnpj || existingClient.cnpj,
-      ownerName: enrichedData.ownerName || existingClient.ownerName,
-      contact: enrichedData.contact || existingClient.contact,
-      whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
+      // 2. Perform the Merge logic upfront (Sync/Deterministic)
+      const merged: EnrichedClient = {
+        ...existingClient,
+        // Identification
+        companyName: enrichedData.companyName || existingClient.companyName,
+        cnpj: enrichedData.cnpj || existingClient.cnpj,
+        ownerName: enrichedData.ownerName || existingClient.ownerName,
+        contact: enrichedData.contact || existingClient.contact,
+        whatsapp: enrichedData.whatsapp || existingClient.whatsapp,
 
-      // Address
-      cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
-        ? enrichedData.cleanAddress : existingClient.cleanAddress,
-      originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
-      city: enrichedData.city || existingClient.city,
-      state: enrichedData.state || existingClient.state,
-      district: enrichedData.district || existingClient.district,
-      zip: enrichedData.zip || existingClient.zip,
-      region: enrichedData.region || existingClient.region,
+        // Address
+        cleanAddress: (enrichedData.cleanAddress && enrichedData.cleanAddress !== 'Endereço não cadastrado')
+          ? enrichedData.cleanAddress : existingClient.cleanAddress,
+        originalAddress: enrichedData.originalAddress || existingClient.originalAddress,
+        city: enrichedData.city || existingClient.city,
+        state: enrichedData.state || existingClient.state,
+        district: enrichedData.district || existingClient.district,
+        zip: enrichedData.zip || existingClient.zip,
+        region: enrichedData.region || existingClient.region,
 
-      // Classification
-      mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
-      secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
-        ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
-      category: (enrichedData.category && enrichedData.category.length > 0)
-        ? enrichedData.category : existingClient.category,
+        // Classification
+        mainCnae: enrichedData.mainCnae || existingClient.mainCnae,
+        secondaryCnaes: (enrichedData.secondaryCnaes && enrichedData.secondaryCnaes.length > 0)
+          ? enrichedData.secondaryCnaes : existingClient.secondaryCnaes,
+        category: (enrichedData.category && enrichedData.category.length > 0)
+          ? enrichedData.category : existingClient.category,
 
-      // Geography
-      lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
-      lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
-      plusCode: enrichedData.plusCode || existingClient.plusCode,
-      googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
+        // Geography
+        lat: (enrichedData.lat && enrichedData.lat !== 0) ? enrichedData.lat : existingClient.lat,
+        lng: (enrichedData.lng && enrichedData.lng !== 0) ? enrichedData.lng : existingClient.lng,
+        plusCode: enrichedData.plusCode || existingClient.plusCode,
+        googleMapsUri: enrichedData.googleMapsUri || existingClient.googleMapsUri,
 
-      // Activity/Metadata
-      purchasedProducts: (() => {
-        const existing = existingClient.purchasedProducts || [];
-        const incoming = enrichedData.purchasedProducts || [];
-        const combined = [...existing, ...incoming];
-        
-        // Deduplicate purchases using item id or a JSON stringified fallback
-        const unique = [];
-        const seen = new Set();
-        for (const item of combined) {
-          const identifier = (item as { id?: string }).id || JSON.stringify({ ...item, dataCompra: undefined });
-          if (!seen.has(identifier)) {
-            seen.add(identifier);
-            unique.push(item);
+        // Activity/Metadata
+        purchasedProducts: (() => {
+          const existing = existingClient.purchasedProducts || [];
+          const incoming = enrichedData.purchasedProducts || [];
+          const combined = [...existing, ...incoming];
+          
+          // Deduplicate purchases using item id or a JSON stringified fallback
+          const unique = [];
+          const seen = new Set();
+          for (const item of combined) {
+            const identifier = (item as { id?: string }).id || JSON.stringify({ ...item, dataCompra: undefined });
+            if (!seen.has(identifier)) {
+              seen.add(identifier);
+              unique.push(item);
+            }
           }
-        }
-        return unique;
-      })(),
-      lastUpdated: new Date().toISOString()
-    };
+          return unique;
+        })(),
+        lastUpdated: new Date().toISOString()
+      };
 
-    // 3. Update Local State (Functional)
-    setMasterClientList(prev => {
-      return prev
-        .filter(c => c.id !== duplicateClientId)
-        .map(c => c.id === existingClientId ? merged : c);
-    });
+      // 3. Update Local State (Functional)
+      setMasterClientList(prev => {
+        const updated = prev
+          .filter(c => c.id !== duplicateClientId)
+          .map(c => c.id === existingClientId ? merged : c);
+        lastClientsHash.current = hashDataList(updated);
+        return updated;
+      });
 
-    // 4. Persist surgicaly to Cloud (Immediate)
-    if (isFirebaseConnected) {
-      try {
+      // 4. Persist surgicaly to Cloud (Immediate)
+      if (isFirebaseConnected) {
         const { updateClientInCloud: surgicalUpdate, deleteClientFromCloud } = await import('./services/firebaseService');
 
         // Parallel but awaited for result
@@ -829,18 +836,12 @@ const App: React.FC = () => {
         ]);
 
         console.log('[APP] ✅ Merge saved surgicaly: duplicate removed, existing updated.');
-
-        // Update local hash after successful cloud sync
-        setMasterClientList(current => {
-          lastClientsHash.current = JSON.stringify(current, (key, value) =>
-            key === 'lastUpdated' ? undefined : value
-          );
-          return current;
-        });
-      } catch (err) {
-        console.error('[APP] Failed to surgical-save merge:', err);
-        toast.error('Erro ao salvar mesclagem na nuvem. Verifique conexão.');
       }
+    } catch (err) {
+      console.error('[APP] Merge persistence failed:', err);
+      toast.error('Erro ao salvar mesclagem na nuvem.');
+    } finally {
+      syncLockRef.current = false;
     }
 
     if (currentUser) {
@@ -856,7 +857,7 @@ const App: React.FC = () => {
       });
     }
     toast.success('Cliente duplicado mesclado com sucesso! Cadastro unificado.');
-  }, [currentUser, toast, setMasterClientList, masterClientList, isFirebaseConnected, lastClientsHash]);
+    }, [currentUser, toast, setMasterClientList, masterClientList, isFirebaseConnected, lastClientsHash, syncLockRef]);
 
   const handleUpdateClient = React.useCallback(async (updatedClient: EnrichedClient) => {
     // 1. DUPLICATE CHECK (Cascade: CNPJ > Razão Social > Endereço Completo)
@@ -920,28 +921,35 @@ const App: React.FC = () => {
     }
 
     // --- START CRITICAL UPDATE ---
-    syncLockRef.current = true;
-    let finalClient = { ...updatedClient };
+    if (syncLockRef.current) {
+        console.warn('[HANDLE_UPDATE] Sync lock active. Wait a moment.');
+        return;
+    }
+
+    const start = Date.now();
+    let finalClient = { ...updatedClient, lastUpdated: new Date().toISOString() };
+    
+    // Determine if geocoding is needed
+    const original = masterClientList.find(c => c.id === updatedClient.id);
+    const addressChanged = original && (
+      original.cleanAddress !== updatedClient.cleanAddress ||
+      original.city !== updatedClient.city ||
+      original.state !== updatedClient.state ||
+      original.zip !== updatedClient.zip ||
+      original.district !== updatedClient.district
+    );
+    const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
+    const isMissingCoords = !updatedClient.lat || Number(updatedClient.lat) === 0 || isNaN(Number(updatedClient.lat));
+    const needsGeocoding = addressChanged || plusCodeChanged || isMissingCoords;
 
     try {
-      // Find original directly for comparison
-      const original = masterClientList.find(c => c.id === updatedClient.id);
-      const addressChanged = original && normalize(original.cleanAddress) !== normalize(updatedClient.cleanAddress);
-      const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
-      const coordsChanged = original && (Number(original.lat) !== Number(updatedClient.lat) || Number(original.lng) !== Number(updatedClient.lng));
-      
-      // Robust coordinate check: Ensure empty strings, undefined, null, or exactly 0 trigger geocoding
-      const isMissingLat = !updatedClient.lat || Number(updatedClient.lat) === 0 || isNaN(Number(updatedClient.lat));
-      const isMissingLng = !updatedClient.lng || Number(updatedClient.lng) === 0 || isNaN(Number(updatedClient.lng));
-      const coordinatesMissing = isMissingLat || isMissingLng;
-      
-      const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
-      const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
+      // 1. Lock synchronization
+      syncLockRef.current = true;
 
-      // 1. Optimistic UI update (Local only)
+      // 2. Immediate Optimistic UI Update
       setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
 
-      // 2. Logging
+      // 3. Log Activity
       if (currentUser) {
         logActivityToCloud({
           timestamp: new Date().toISOString(),
@@ -952,79 +960,91 @@ const App: React.FC = () => {
           category: 'CLIENTS',
           details: `Atualizando cliente: ${finalClient.companyName}`,
           metadata: { clientId: finalClient.id }
-        });
+        }).catch(e => console.error('[APP] Log failed', e));
       }
 
-      // 3. Geocoding (if needed)
-      if (needsGeocoding) {
-        try {
-          const detailedAddress = [
-            updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
-            updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
-          ].filter(Boolean).join(', ');
-
-          // Fallback Strategy: If address changed, DO NOT use old plusCode as first candidate
-          const geocodeCandidates = addressChanged 
-            ? [detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress, updatedClient.zip ? `${updatedClient.zip}, Brasil` : undefined]
-            : [updatedClient.plusCode, detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress];
-
-          const geoResult = await geocodeWithFallback(geocodeCandidates);
-
-          if (geoResult) {
-            // Immutable update for geocoding results
-            finalClient = {
-              ...finalClient,
-              lat: geoResult.lat,
-              lng: geoResult.lng,
-              cleanAddress: geoResult.formattedAddress || finalClient.cleanAddress
-            };
-
-            if (!finalClient.plusCode) {
-              const pc = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-              if (pc) finalClient.plusCode = pc;
-            }
-            toast.success(`Endereço geolocalizado com sucesso!`);
-          } else {
-            toast.warning(`As coordenadas originais foram mantidas.`, `Localização não encontrada`);
-          }
-        } catch (err: any) {
-          console.warn('[APP] Geocoding failed:', err);
-          toast.error(err?.message || 'Falha ao buscar coordenadas.', `Erro Maps`);
-        }
-      } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng && finalClient.lat !== 0) {
-        // Background plus code generation for existing coords
-        try {
-          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-          if (plusCode) finalClient = { ...finalClient, plusCode };
-        } catch { /* ignore */ }
-      }
-
-      // 4. Final Saves (Local & Cloud)
-      setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
-
+      // 4. Immediate Cloud Save (Surgical) - This ensures data is saved before modal closes
       if (isFirebaseConnected) {
         const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
         await surgicalUpdate(finalClient);
         
-        // Update hash synchronously after cloud save to prevent auto-save loop
+        // Update hash to match version A
         setMasterClientList(current => {
-          lastClientsHash.current = JSON.stringify(current, (key, value) => 
-            key === 'lastUpdated' ? undefined : value
-          );
+          lastClientsHash.current = hashDataList(current);
           return current;
         });
-        console.log('[APP] ✅ Client update synced to Cloud.');
       }
 
-      toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
+      // 5. AT THIS POINT, RETURN! This resolutions the promise and CLOSES THE MODAL.
+      // Everything below runs in the BACKGROUND.
+      
+      const runBackgroundTasks = async () => {
+        try {
+          if (needsGeocoding) {
+            console.log('[APP] Running background geocoding for', finalClient.companyName);
+            const detailedAddress = [
+              finalClient.cleanAddress, finalClient.district, finalClient.city,
+              finalClient.state, finalClient.zip, finalClient.region, finalClient.country || 'Brasil'
+            ].filter(Boolean).join(', ');
 
-    } catch (error) {
-      console.error('[APP] Error in handleUpdateClient:', error);
-      toast.error('Ocorreu um erro ao salvar as alterações.');
-    } finally {
-      syncLockRef.current = false;
+            const geocodeCandidates = addressChanged 
+              ? [detailedAddress, finalClient.cleanAddress, finalClient.originalAddress, finalClient.zip ? `${finalClient.zip}, Brasil` : undefined]
+              : [finalClient.plusCode, detailedAddress, finalClient.cleanAddress, finalClient.originalAddress];
+
+            const geoResult = await geocodeWithFallback(geocodeCandidates);
+
+            if (geoResult) {
+              finalClient = {
+                ...finalClient,
+                lat: geoResult.lat,
+                lng: geoResult.lng,
+                cleanAddress: geoResult.formattedAddress || finalClient.cleanAddress
+              };
+
+              if (!finalClient.plusCode) {
+                const pc = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+                if (pc) finalClient.plusCode = pc;
+              }
+
+              // Persist geocoding results to Cloud (Save 2)
+              if (isFirebaseConnected) {
+                const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
+                await surgicalUpdate(finalClient);
+                
+                // Final update of local state and hash
+                setMasterClientList(prev => {
+                  const updated = prev.map(c => c.id === finalClient.id ? finalClient : c);
+                  lastClientsHash.current = hashDataList(updated);
+                  return updated;
+                });
+              }
+              toast.success(`Endereço geolocalizado com sucesso!`);
+            } else {
+              toast.warning(`As coordenadas originais foram mantidas.`, `Localização não encontrada`);
+            }
+          }
+        } catch (bgErr) {
+          console.error('[APP] Background task error:', bgErr);
+        } finally {
+          // RELEASE THE LOCK only after background tasks are done
+          syncLockRef.current = false;
+          console.log('[APP] Save flow complete in background. Lock released.');
+        }
+      };
+
+      // Fork background process
+      runBackgroundTasks();
+      
+      console.log(`[APP] Front-end save finished in ${Date.now() - start}ms. Modal should close.`);
+      toast.success(`Cliente ${finalClient.companyName} salvo.`);
+
+    } catch (err) {
+      syncLockRef.current = false; // Release lock on error
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error('[HANDLE_UPDATE] Error:', error);
+      toast.error(error.message || 'Erro ao atualizar cliente');
     }
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, lastClientsHash, handleMergeClients, syncLockRef]);
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, lastClientsHash, isFirebaseConnected, masterClientList, geocodeWithFallback, syncLockRef, handleMergeClients]);
 
 
 
