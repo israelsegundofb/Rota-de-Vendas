@@ -17,7 +17,34 @@ export interface CNPJResponse {
     situacao_cadastral?: string;
     latitude?: number;
     longitude?: number;
+    fonte?: string;
 }
+
+/**
+ * Busca dados de endereço a partir do CEP usando ViaCEP
+ */
+export const fetchAddressByCEP = async (cep: string): Promise<{ logradouro: string; bairro: string; municipio: string; uf: string } | null> => {
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length !== 8) return null;
+
+    try {
+        const response = await fetchWithTimeout(`https://viacep.com.br/ws/${cleanCEP}/json/`, {}, 5000);
+        if (!response.ok) return null;
+        const data = await response.json();
+        
+        if (data.erro) return null;
+
+        return {
+            logradouro: data.logradouro || '',
+            bairro: data.bairro || '',
+            municipio: data.localidade || '',
+            uf: data.uf || ''
+        };
+    } catch (error) {
+        console.warn("Erro ao consultar ViaCEP:", error);
+        return null;
+    }
+};
 
 const getApiKey = () => {
     return localStorage.getItem('cnpja_api_key') || import.meta.env.VITE_CNPJA_API_KEY || '';
@@ -67,22 +94,32 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
         const data = await response.json();
 
         // Robust address parsing
-        const street = data.address.street || "";
+        let street = data.address.street || "";
         const number = data.address.number || "";
         const district = data.address.district || "";
         const city = data.address.city || "";
         const state = data.address.state || "";
         const streetType = data.address.type || "";
+        const zip = data.address.zip || "";
+
+        // Se o logradouro estiver vazio mas temos o CEP, tenta buscar no ViaCEP
+        if (street.trim() === '' && zip) {
+            console.log("CNPJa retornou logradouro vazio, tentando ViaCEP...");
+            const cepData = await fetchAddressByCEP(zip);
+            if (cepData && cepData.logradouro) {
+                street = cepData.logradouro;
+            }
+        }
 
         return {
             cnpj: data.taxId,
             razao_social: data.company.name,
             nome_fantasia: data.alias || data.company.name,
-            logradouro: streetType ? `${streetType} ${street}` : street,
+            logradouro: (streetType && street) ? `${streetType} ${street}` : street,
             numero: number,
             complemento: data.address.details,
-            bairro: district,
-            cep: data.address.zip,
+            bairro: district || "",
+            cep: zip,
             municipio: city,
             uf: state,
             ddd_telefone_1: data.phones?.[0] ? `(${data.phones[0].area}) ${data.phones[0].number}` : undefined,
@@ -90,25 +127,30 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
                 ? `${(data.mainActivity || data.main_activity).code} - ${(data.mainActivity || data.main_activity).text}`
                 : (data.mainActivity || data.main_activity)?.text,
             cnae_descricao: (data.mainActivity || data.main_activity)?.text,
-            cnaes_secundarios: (data.sideActivities || data.side_activities || data.secondary_activities)?.map((a: any) => ({
+            cnaes_secundarios: (data.sideActivities || data.side_activities || data.secondary_activities)?.map((a: { code: string | number; text: string }) => ({
                 codigo: a.code,
                 texto: a.text
             })),
             situacao_cadastral: data.registration?.status?.description || data.registration?.status,
             latitude: data.address.coordinates?.latitude || data.latitude,
-            longitude: data.address.coordinates?.longitude || data.longitude
+            longitude: data.address.coordinates?.longitude || data.longitude,
+            fonte: 'CNPJa'
         };
     } catch (error) {
         console.error("Erro na consulta CNPJa Comercial:", error);
         // Fallback progressivo: CNPJa -> Minha Receita -> BrasilAPI
-        const minhaReceitaResult = await fallbackMinhaReceita(cleanCNPJ);
-        if (minhaReceitaResult) {
-            console.log("Fallback: Dados obtidos via Minha Receita com sucesso.");
-            return minhaReceitaResult;
+        const result = await fallbackMinhaReceita(cleanCNPJ) || await fallbackBrasilAPI(cleanCNPJ);
+        
+        if (result && (!result.logradouro || result.logradouro.trim() === '') && result.cep) {
+            console.log("Logradouro vazio detectado, tentando enriquecer via CEP...");
+            const cepData = await fetchAddressByCEP(result.cep);
+            if (cepData && cepData.logradouro) {
+                result.logradouro = cepData.logradouro;
+                if (!result.bairro) result.bairro = cepData.bairro;
+            }
         }
-
-        console.log("Fallback: Minha Receita falhou, tentando BrasilAPI...");
-        return await fallbackBrasilAPI(cleanCNPJ);
+        
+        return result;
     }
 };
 
@@ -139,8 +181,8 @@ export const pesquisarEmpresaPorEndereco = async (params: {
 
         if (!response.ok) return [];
 
-        const data = await response.json();
-        return data.items || [];
+        const resData: { items?: any[] } = await response.json();
+        return resData.items || [];
     } catch (error) {
         console.error("Erro na pesquisa por endereço:", error);
         return [];
@@ -169,11 +211,12 @@ const fallbackMinhaReceita = async (cnpj: string): Promise<CNPJResponse | null> 
             ddd_telefone_1: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.substring(0, 2)}) ${data.ddd_telefone_1.substring(2)}`.trim() : undefined,
             cnae_fiscal: data.cnae_fiscal ? `${data.cnae_fiscal} - ${data.cnae_fiscal_descricao}` : data.cnae_fiscal_descricao,
             cnae_descricao: data.cnae_fiscal_descricao,
-            cnaes_secundarios: data.cnaes_secundarios?.map((s: any) => ({
+            cnaes_secundarios: data.cnaes_secundarios?.map((s: { codigo: string | number; descricao: string }) => ({
                 codigo: s.codigo,
                 texto: s.descricao
             })),
-            situacao_cadastral: data.descricao_situacao_cadastral
+            situacao_cadastral: data.descricao_situacao_cadastral,
+            fonte: 'Minha Receita'
         };
     } catch (error) {
         console.warn("Minha Receita API failed, falling back to BrasilAPI...", error);
@@ -200,10 +243,11 @@ const fallbackBrasilAPI = async (cnpj: string): Promise<CNPJResponse | null> => 
             ddd_telefone_1: data.ddd_telefone_1,
             cnae_fiscal: data.cnae_fiscal ? `${data.cnae_fiscal} - ${data.cnae_fiscal_descricao}` : data.cnae_fiscal_descricao,
             cnae_descricao: data.cnae_fiscal_descricao,
-            cnaes_secundarios: data.cnaes_secundarios?.map((s: any) => ({
+            cnaes_secundarios: data.cnaes_secundarios?.map((s: { codigo: string | number; descricao: string }) => ({
                 codigo: s.codigo,
                 texto: s.descricao
-            }))
+            })),
+            fonte: 'BrasilAPI'
         };
     } catch {
         return null;

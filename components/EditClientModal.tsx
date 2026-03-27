@@ -126,7 +126,10 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         const streetPart = street ? `${street}, ${number}` : '';
                         const cityStatePart = city && state ? `${city} - ${state}` : (city || state || '');
 
-                        newCleanAddress = [streetPart, cityStatePart].filter(Boolean).join(', ').trim();
+                        // Se não temos a rua, tenta usar o bairro no endereço limpo para não ficar só Cidade-UF
+                        const cleanStreetPart = streetPart || district || '';
+
+                        newCleanAddress = [cleanStreetPart, cityStatePart].filter(Boolean).join(', ').trim();
                         newOriginalAddress = [streetPart + complement, district, cityStatePart].filter(Boolean).join(', ').trim();
                     }
 
