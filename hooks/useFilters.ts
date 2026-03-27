@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { EnrichedClient, AppUser, Product } from '../types';
 import { isAdmin, hasFullDataVisibility } from '../utils/authUtils';
 import { isValidPurchase } from '../utils/purchaseUtils';
+import { parseDateSafe } from '../utils/dateUtils';
 import useDebounce from './useDebounce';
 import { useUrlParams } from './useUrlParams';
 
@@ -175,19 +176,8 @@ export const useFilters = (
                         }
 
                         if (!matchDate && p.purchaseDate) {
-                            let pDate = new Date(p.purchaseDate);
-                            if (isNaN(pDate.getTime())) {
-                                const parts = p.purchaseDate.split('/');
-                                if (parts.length === 3) {
-                                    pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                                } else {
-                                    const partsHyphen = p.purchaseDate.split('-');
-                                    if (partsHyphen.length === 3) {
-                                        pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
-                                    }
-                                }
-                            }
-                            if (!isNaN(pDate.getTime())) {
+                            const pDate = parseDateSafe(p.purchaseDate);
+                            if (pDate && !isNaN(pDate.getTime())) {
                                 pDate.setHours(0, 0, 0, 0);
                                 const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
                                 const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;

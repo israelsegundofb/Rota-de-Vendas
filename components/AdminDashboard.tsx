@@ -168,11 +168,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 // Daily trend
                 if (p.purchaseDate) {
-                    let dateKey = p.purchaseDate.split('T')[0];
+                    // Optimize: Avoid string allocations from .split()
+                    const tIndex = p.purchaseDate.indexOf('T');
+                    let dateKey = tIndex !== -1 ? p.purchaseDate.substring(0, tIndex) : p.purchaseDate;
+
                     // Handle DD/MM/YYYY for trend key
-                    if (p.purchaseDate.includes('/')) {
-                        const parts = p.purchaseDate.split('/');
-                        if (parts.length === 3) dateKey = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    const slash1 = p.purchaseDate.indexOf('/');
+                    if (slash1 !== -1) {
+                        const slash2 = p.purchaseDate.indexOf('/', slash1 + 1);
+                        if (slash2 !== -1) {
+                            const d = p.purchaseDate.substring(0, slash1);
+                            const m = p.purchaseDate.substring(slash1 + 1, slash2);
+                            const y = p.purchaseDate.substring(slash2 + 1, slash2 + 5);
+                            dateKey = `${y}-${m}-${d}`;
+                        }
                     }
                     dailySales[dateKey] = (dailySales[dateKey] || 0) + pVal;
                 }

@@ -5,24 +5,45 @@ export const parseDateSafe = (dateString: string | undefined | null): Date | nul
     let date = new Date(dateString);
     if (!isNaN(date.getTime())) return date;
 
+    const strDate = String(dateString);
+
     // 2. Try DD/MM/YYYY format (Common in Brazil CSVs)
-    const dmyMatch = String(dateString).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (dmyMatch) {
-        const day = parseInt(dmyMatch[1], 10);
-        const month = parseInt(dmyMatch[2], 10) - 1; // Month is 0-indexed
-        const year = parseInt(dmyMatch[3], 10);
-        date = new Date(year, month, day);
-        if (!isNaN(date.getTime())) return date;
+    let firstSep = strDate.indexOf('/');
+    if (firstSep > 0) {
+        const secondSep = strDate.indexOf('/', firstSep + 1);
+        if (secondSep > firstSep) {
+            const dayStr = strDate.substring(0, firstSep);
+            const monthStr = strDate.substring(firstSep + 1, secondSep);
+            const yearStr = strDate.substring(secondSep + 1, secondSep + 5);
+
+            if (dayStr.length <= 2 && monthStr.length <= 2 && yearStr.length === 4) {
+                const day = parseInt(dayStr, 10);
+                const month = parseInt(monthStr, 10) - 1; // Month is 0-indexed
+                const year = parseInt(yearStr, 10);
+                date = new Date(year, month, day);
+                if (!isNaN(date.getTime())) return date;
+            }
+        }
     }
 
     // 3. Try DD-MM-YYYY
-    const dmyHyphenMatch = String(dateString).match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
-    if (dmyHyphenMatch) {
-        const day = parseInt(dmyHyphenMatch[1], 10);
-        const month = parseInt(dmyHyphenMatch[2], 10) - 1;
-        const year = parseInt(dmyHyphenMatch[3], 10);
-        date = new Date(year, month, day);
-        if (!isNaN(date.getTime())) return date;
+    firstSep = strDate.indexOf('-');
+    if (firstSep > 0) {
+        const secondSep = strDate.indexOf('-', firstSep + 1);
+        // Ensure we matched DD-MM-YYYY and not YYYY-MM-DD which generic Date might have failed on
+        if (secondSep > firstSep) {
+            const dayStr = strDate.substring(0, firstSep);
+            const monthStr = strDate.substring(firstSep + 1, secondSep);
+            const yearStr = strDate.substring(secondSep + 1, secondSep + 5);
+
+            if (dayStr.length <= 2 && monthStr.length <= 2 && yearStr.length === 4) {
+                const day = parseInt(dayStr, 10);
+                const month = parseInt(monthStr, 10) - 1;
+                const year = parseInt(yearStr, 10);
+                date = new Date(year, month, day);
+                if (!isNaN(date.getTime())) return date;
+            }
+        }
     }
 
     return null;
