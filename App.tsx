@@ -18,7 +18,11 @@ import { exportClientsToCSV } from './utils/csvExport';
 import { parseExcel, parseProductExcel } from './utils/excelParser';
 import { processClientsSimple } from './services/clientEnrichmentService';
 import { geocodeAddress, reverseGeocodePlusCode } from './services/geocodingService';
-import { saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud } from './services/firebaseService';
+import { 
+  saveToCloud, uploadFileToCloud, logActivityToCloud, updateUserStatusInCloud, 
+  deleteAllClientsFromCloud, syncUploadedFilesMetadata, deleteUserFromCloud,
+  saveUserToCloud, updateUserInCloud 
+} from './services/firebaseService';
 import { pesquisarEmpresaPorEndereco, consultarCNPJ } from './services/cnpjService';
 import pLimit from 'p-limit';
 // Lazy Load ClientMap to reduce initial bundle size
@@ -1520,11 +1524,13 @@ const App: React.FC = () => {
     // 1. Local update
     baseAddUser(user);
 
-    // 2. Immediate Cloud Save
-    const updatedUsers = [...users, user];
-    saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
-      .then(() => console.warn('[AUTH] Salvamento de novo usuário na nuvem concluído ✅'))
-      .catch(e => console.error('[AUTH] Falha no salvamento imediato do novo usuário:', e));
+    // 2. Immediate Surgical Cloud Save (Atomic)
+    saveUserToCloud(user)
+      .then(() => console.warn(`[AUTH] Novo usuário ${user.username} salvo na nuvem com sucesso ✅`))
+      .catch((e: Error | unknown) => {
+        console.error('[AUTH] Falha no salvamento do novo usuário:', e);
+        toast.error('Erro ao salvar usuário na nuvem.');
+      });
 
     // 3. Log the action
     if (currentUser) {
@@ -1549,14 +1555,16 @@ const App: React.FC = () => {
       password: updatedUser.password === '***' ? (existingUser?.password || updatedUser.password) : updatedUser.password
     };
 
-    // 1. Local update
+    // 1. Local Update
     baseUpdateUser(finalUser);
 
-    // 2. Immediate Cloud Save
-    const updatedUsers = users.map(u => u.id === finalUser.id ? finalUser : u);
-    saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
-      .then(() => console.warn('[AUTH] Atualização de usuário na nuvem concluída ✅'))
-      .catch(e => console.error('[AUTH] Falha no salvamento imediato da atualização:', e));
+    // 2. Immediate Surgical Cloud Update (Atomic)
+    updateUserInCloud(finalUser)
+      .then(() => console.warn(`[AUTH] Usuário ${finalUser.username} atualizado na nuvem ✅`))
+      .catch((e: Error | unknown) => {
+        console.error('[AUTH] Falha na atualização do usuário:', e);
+        toast.error('Erro ao atualizar usuário na nuvem.');
+      });
 
     // 3. Log the action
     if (currentUser) {
@@ -1574,33 +1582,34 @@ const App: React.FC = () => {
   };
 
   const handleDeleteUser = (userId: string) => {
-    const targetUser = users.find(u => u.id === userId);
+    const userToDelete = users.find(u => u.id === userId);
+    if (!userToDelete) return;
 
-    // 1. Local update
-    baseDeleteUser(userId);
+    if (window.confirm(`Tem certeza que deseja excluir o usuário ${userToDelete.name}? Esta ação não pode ser desfeita.`)) {
+      // 1. Local Update
+      baseDeleteUser(userId);
 
-    // 2. Immediate Cloud Save
-    const updatedUsers = users.filter(u => u.id !== userId);
+      // 2. Immediate Surgical Cloud Deletion
+      deleteUserFromCloud(userId)
+        .then(() => console.warn(`[AUTH] Usuário ${userId} removido da nuvem ✅`))
+        .catch((e: Error | unknown) => {
+          console.error('[AUTH] Falha ao excluir usuário:', e);
+          toast.error('Erro ao excluir usuário da nuvem.');
+        });
 
-    // Explicitly delete user document from Firestore First
-    deleteUserFromCloud(userId).catch(e => console.error("Falha ao excluir o documento do usuário:", e));
-
-    saveToCloud(masterClientList, products, categories, updatedUsers, uploadedFiles)
-      .then(() => console.warn('[AUTH] Exclusão de usuário na nuvem concluída ✅'))
-      .catch(e => console.error('[AUTH] Falha no salvamento imediato da exclusão:', e));
-
-    // 3. Log the action
-    if (currentUser && targetUser) {
-      logActivityToCloud({
-        timestamp: new Date().toISOString(),
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userRole: currentUser.role,
-        action: 'DELETE',
-        category: 'USERS',
-        details: `Removeu o usuário: ${targetUser.name}`,
-        metadata: { targetUserId: userId }
-      });
+      // 3. Log the action
+      if (currentUser) {
+        logActivityToCloud({
+          timestamp: new Date().toISOString(),
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userRole: currentUser.role,
+          action: 'DELETE',
+          category: 'USERS',
+          details: `Removeu o usuário: ${userToDelete.name} (${userToDelete.role})`,
+          metadata: { targetUserId: userId }
+        });
+      }
     }
   };
 

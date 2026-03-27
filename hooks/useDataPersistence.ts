@@ -155,7 +155,8 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                             loadInitialProducts(),
                             loadInitialCategories(),
                             usersToSave,
-                            loadInitialFiles()
+                            loadInitialFiles(),
+                            true // isDeepSync: true for initial migration
                         ).catch(() => { });
 
                         setLoadingMessage('Configuração concluída!');
@@ -258,7 +259,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                     lastUsersHash.current = currentUsersHash;
                     lastProductsHash.current = currentProductsHash;
                     lastFilesHash.current = currentFilesHash;
-                    saveToCloud(masterClientList, products, categories, users, uploadedFiles)
+                    saveToCloud(masterClientList, products, categories, users, uploadedFiles, false)
                         .catch(err => console.error("Auto-save failed", err));
                 }, 3000);
                 return () => clearTimeout(timeout);

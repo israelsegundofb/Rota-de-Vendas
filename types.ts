@@ -103,6 +103,7 @@ export interface AppUser {
   salesCategory?: SalesCategory;
   color?: string; // Color for map pins and UI identification
   status?: UserStatus;
+  lastUpdated?: string; // ISO String for sync tracking
 }
 
 export interface UploadedFile {

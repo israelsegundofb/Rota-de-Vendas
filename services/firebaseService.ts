@@ -166,7 +166,8 @@ export const saveToCloud = async (
     products: Product[],
     categories: string[],
     users: AppUser[],
-    uploadedFiles: any[] = []
+    uploadedFiles: any[] = [],
+    isDeepSync: boolean = false
 ) => {
     if (!db) return;
 
@@ -186,13 +187,18 @@ export const saveToCloud = async (
         const lastUpdated = new Date().toISOString();
         const operations: { ref: any, data: any }[] = [];
 
-        // 1. Prepare Operations
-        users.forEach(user => {
-            operations.push({
-                ref: doc(db!, 'rota-vendas-data', 'users', 'list', user.id),
-                data: { ...removeUndefined(user), lastUpdated }
+        // 1. Prepare User Operations (Only if Deep Sync is enabled)
+        if (isDeepSync) {
+            users.forEach(user => {
+                operations.push({
+                    ref: doc(db!, 'rota-vendas-data', 'users', 'list', user.id),
+                    data: { ...removeUndefined(user), lastUpdated }
+                });
             });
-        });
+            console.log(`[FIREBASE] Deep Sync: Including ${users.length} users in batch.`);
+        } else {
+            console.log('[FIREBASE] Standard Sync: Skipping users segment (using surgical saves instead).');
+        }
 
         clients.forEach(client => {
             operations.push({
@@ -344,17 +350,56 @@ export const deleteUserFromCloud = async (userId: string) => {
     try {
         const userRef = doc(db, 'rota-vendas-data', 'users', 'list', userId);
         await deleteDoc(userRef);
-        console.log(`✅ User ${userId} deleted from cloud`);
+        console.log(`✅ [FIREBASE] User ${userId} deleted from cloud`);
 
-        // Also update metadata slightly to reflect total users
-        // This is safe to run in background
+        // Update metadata to reflect change
         const metaRef = doc(db, 'rota-vendas-data', 'metadata');
-        await updateDoc(metaRef, { lastUpdated: new Date().toISOString() });
+        await updateDoc(metaRef, { 
+            lastUpdated: new Date().toISOString() 
+        });
     } catch (e) {
-        console.error("Error deleting user from cloud:", e);
+        console.error("[FIREBASE] Error deleting user from cloud:", e);
         throw e;
     }
 };
+
+/**
+ * Salva um único usuário de forma cirúrgica (atômica).
+ * Evita o custo de salvar todos os clientes ao modificar apenas a lista de usuários.
+ */
+export const saveUserToCloud = async (user: AppUser) => {
+    if (!db) {
+        console.error('[FIREBASE] Cannot save user: DB not initialized');
+        return;
+    }
+    
+    try {
+        const lastUpdated = new Date().toISOString();
+        const userRef = doc(db, 'rota-vendas-data', 'users', 'list', user.id);
+        
+        // 1. Save User Document
+        await setDoc(userRef, { 
+            ...removeUndefined(user), 
+            lastUpdated 
+        }, { merge: true });
+        
+        // 2. Update Global Metadata to trigger sync listeners
+        const metaRef = doc(db, 'rota-vendas-data', 'metadata');
+        await updateDoc(metaRef, { 
+            lastUpdated 
+        }).catch(err => console.warn('[FIREBASE] Non-critical: Failed to update metadata timestamp', err));
+
+        console.log(`✅ [FIREBASE] Usuário ${user.username} (ID: ${user.id}) salvo cirurgicamente.`);
+    } catch (e) {
+        console.error(`[FIREBASE] Erro ao salvar usuário ${user.username}:`, e);
+        throw e;
+    }
+};
+
+/**
+ * Codinome para saveUserToCloud para manter consistência semântica no App.tsx
+ */
+export const updateUserInCloud = saveUserToCloud;
 
 export const deleteAllClientsFromCloud = async () => {
     if (!db) return;
