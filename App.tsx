@@ -911,8 +911,13 @@ const App: React.FC = () => {
     const original = masterClientList.find(c => c.id === updatedClient.id);
     const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
     const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
-    const coordsChanged = original && (original.lat !== updatedClient.lat || original.lng !== updatedClient.lng);
-    const coordinatesMissing = updatedClient.lat === 0 || updatedClient.lng === 0;
+    const coordsChanged = original && (Number(original.lat) !== Number(updatedClient.lat) || Number(original.lng) !== Number(updatedClient.lng));
+    
+    // Robust coordinate check: Ensure empty strings, undefined, null, or exactly 0 trigger geocoding
+    const isMissingLat = !updatedClient.lat || Number(updatedClient.lat) === 0 || isNaN(Number(updatedClient.lat));
+    const isMissingLng = !updatedClient.lng || Number(updatedClient.lng) === 0 || isNaN(Number(updatedClient.lng));
+    const coordinatesMissing = isMissingLat || isMissingLng;
+    
     const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
     const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
 
@@ -1036,7 +1041,10 @@ const App: React.FC = () => {
       cleanAddress: newClient.cleanAddress || ''
     };
 
-    if ((!finalClient.lat || !finalClient.lng) || finalClient.lat === 0) {
+    const isMissingLat = !finalClient.lat || Number(finalClient.lat) === 0 || isNaN(Number(finalClient.lat));
+    const isMissingLng = !finalClient.lng || Number(finalClient.lng) === 0 || isNaN(Number(finalClient.lng));
+
+    if (isMissingLat || isMissingLng) {
       const geoResult = await geocodeWithFallback([
         finalClient.plusCode,
         finalClient.cleanAddress,

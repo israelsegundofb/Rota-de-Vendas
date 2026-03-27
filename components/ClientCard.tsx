@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, ShoppingBag, ExternalLink, Edit2 } from 'lucide-react';
+import { MapPin, ShoppingBag, ExternalLink, Edit2, AlertCircle } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { getFilteredPurchases } from '../utils/purchaseUtils';
 
@@ -48,6 +48,9 @@ const ClientCard: React.FC<ClientCardProps> = ({
 
     const regionClass = getRegionClass(client.region);
 
+    // Check if coordinates exist
+    const hasCoordinates = client.lat && client.lng && Number(client.lat) !== 0 && Number(client.lng) !== 0;
+
     return (
         <div className="h-full" style={style}>
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full group">
@@ -77,8 +80,12 @@ const ClientCard: React.FC<ClientCardProps> = ({
                     </div>
 
                     <div className="flex items-start gap-2 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                        <span className="line-clamp-2 text-xs" title={client.cleanAddress}>{client.cleanAddress}</span>
+                        {hasCoordinates ? (
+                            <div title="Endereço Geolocalizado"><MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" /></div>
+                        ) : (
+                            <div title="Aguardando Coordenadas (Pendente)"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" /></div>
+                        )}
+                        <span className="line-clamp-2 text-xs" title={client.cleanAddress}>{client.cleanAddress || 'Endereço não cadastrado'}</span>
                     </div>
 
                     {/* Purchase Stats (If any) */}
@@ -108,16 +115,19 @@ const ClientCard: React.FC<ClientCardProps> = ({
                         >
                             <ShoppingBag className="w-4 h-4" />
                         </button>
-                        <a
-                            href={client.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.companyName + " " + client.cleanAddress)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-900 rounded-lg transition-colors"
-                            title="Ver no Google Maps"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <ExternalLink className="w-4 h-4" />
-                        </a>
+                        
+                        {hasCoordinates && (
+                            <a
+                                href={client.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.companyName + " " + client.cleanAddress)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-900 rounded-lg transition-colors"
+                                title="Ver no Google Maps"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <ExternalLink className="w-4 h-4" />
+                            </a>
+                        )}
                     </div>
 
                     <button
