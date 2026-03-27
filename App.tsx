@@ -919,130 +919,112 @@ const App: React.FC = () => {
         }
     }
 
-    const finalClient = { ...updatedClient };
+    // --- START CRITICAL UPDATE ---
+    syncLockRef.current = true;
+    let finalClient = { ...updatedClient };
 
-    // Find original directly for comparison
-    const original = masterClientList.find(c => c.id === updatedClient.id);
-    const addressChanged = original && original.cleanAddress !== updatedClient.cleanAddress;
-    const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
-    const coordsChanged = original && (Number(original.lat) !== Number(updatedClient.lat) || Number(original.lng) !== Number(updatedClient.lng));
-    
-    // Robust coordinate check: Ensure empty strings, undefined, null, or exactly 0 trigger geocoding
-    const isMissingLat = !updatedClient.lat || Number(updatedClient.lat) === 0 || isNaN(Number(updatedClient.lat));
-    const isMissingLng = !updatedClient.lng || Number(updatedClient.lng) === 0 || isNaN(Number(updatedClient.lng));
-    const coordinatesMissing = isMissingLat || isMissingLng;
-    
-    const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
-    const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
+    try {
+      // Find original directly for comparison
+      const original = masterClientList.find(c => c.id === updatedClient.id);
+      const addressChanged = original && normalize(original.cleanAddress) !== normalize(updatedClient.cleanAddress);
+      const plusCodeChanged = original && original.plusCode !== updatedClient.plusCode;
+      const coordsChanged = original && (Number(original.lat) !== Number(updatedClient.lat) || Number(original.lng) !== Number(updatedClient.lng));
+      
+      // Robust coordinate check: Ensure empty strings, undefined, null, or exactly 0 trigger geocoding
+      const isMissingLat = !updatedClient.lat || Number(updatedClient.lat) === 0 || isNaN(Number(updatedClient.lat));
+      const isMissingLng = !updatedClient.lng || Number(updatedClient.lng) === 0 || isNaN(Number(updatedClient.lng));
+      const coordinatesMissing = isMissingLat || isMissingLng;
+      
+      const hasExplicitNewCoords = coordsChanged && !coordinatesMissing;
+      const needsGeocoding = !hasExplicitNewCoords && (addressChanged || plusCodeChanged || coordinatesMissing);
 
-    // ---- SAVE IMMEDIATELY (surgical update) ----
-    setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
+      // 1. Optimistic UI update (Local only)
+      setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
 
-    // Persist to cloud surgicaly
-    if (isFirebaseConnected) {
-      (async () => {
+      // 2. Logging
+      if (currentUser) {
+        logActivityToCloud({
+          timestamp: new Date().toISOString(),
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userRole: currentUser.role,
+          action: 'UPDATE',
+          category: 'CLIENTS',
+          details: `Atualizando cliente: ${finalClient.companyName}`,
+          metadata: { clientId: finalClient.id }
+        });
+      }
+
+      // 3. Geocoding (if needed)
+      if (needsGeocoding) {
         try {
-          const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
-          await surgicalUpdate(finalClient);
-          console.log('[APP] ✅ Edit surgical-saved to Firebase.');
+          const detailedAddress = [
+            updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
+            updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
+          ].filter(Boolean).join(', ');
 
-          // Still update hash for local consistency check if needed
-          setMasterClientList(current => {
-            lastClientsHash.current = JSON.stringify(current, (key, value) =>
-              key === 'lastUpdated' ? undefined : value
-            );
-            return current;
-          });
-        } catch (saveErr) {
-          console.error('[APP] Failed to surgical-save edited client:', saveErr);
-        }
-      })();
-    }
+          // Fallback Strategy: If address changed, DO NOT use old plusCode as first candidate
+          const geocodeCandidates = addressChanged 
+            ? [detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress, updatedClient.zip ? `${updatedClient.zip}, Brasil` : undefined]
+            : [updatedClient.plusCode, detailedAddress, updatedClient.cleanAddress, updatedClient.originalAddress];
 
-    if (currentUser) {
-      logActivityToCloud({
-        timestamp: new Date().toISOString(),
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userRole: currentUser.role,
-        action: 'UPDATE',
-        category: 'CLIENTS',
-        details: `Atualizou o cliente: ${finalClient.companyName}`,
-        metadata: { clientId: finalClient.id }
-      });
-    }
+          const geoResult = await geocodeWithFallback(geocodeCandidates);
 
-    // ---- GEOCODE BEFORE SAVING ----
-    if (needsGeocoding) {
-      try {
-        const detailedAddress = [
-          updatedClient.cleanAddress, updatedClient.district, updatedClient.city,
-          updatedClient.state, updatedClient.zip, updatedClient.region, updatedClient.country || 'Brasil'
-        ].filter(Boolean).join(', ');
+          if (geoResult) {
+            // Immutable update for geocoding results
+            finalClient = {
+              ...finalClient,
+              lat: geoResult.lat,
+              lng: geoResult.lng,
+              cleanAddress: geoResult.formattedAddress || finalClient.cleanAddress
+            };
 
-        const geoResult = await geocodeWithFallback([
-          updatedClient.plusCode, 
-          detailedAddress, 
-          updatedClient.cleanAddress, 
-          updatedClient.originalAddress,
-          updatedClient.zip ? `${updatedClient.zip}, Brasil` : undefined,
-          (updatedClient.city && updatedClient.state) ? `${updatedClient.city}, ${updatedClient.state}, Brasil` : undefined
-        ]);
-
-        if (geoResult) {
-          finalClient.lat = geoResult.lat;
-          finalClient.lng = geoResult.lng;
-          if (geoResult.formattedAddress) finalClient.cleanAddress = geoResult.formattedAddress;
-
-          if (!finalClient.plusCode) {
-            try {
+            if (!finalClient.plusCode) {
               const pc = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
               if (pc) finalClient.plusCode = pc;
-            } catch { /* ignore */ }
+            }
+            toast.success(`Endereço geolocalizado com sucesso!`);
+          } else {
+            toast.warning(`As coordenadas originais foram mantidas.`, `Localização não encontrada`);
           }
-          toast.success(`Endereço geolocalizado com sucesso!`);
-        } else {
-          toast.warning(`As coordenadas originais foram mantidas. Cliente poderá ser listado como pendente.`, `Não foi possível geolocalizar o endereço`);
+        } catch (err: any) {
+          console.warn('[APP] Geocoding failed:', err);
+          toast.error(err?.message || 'Falha ao buscar coordenadas.', `Erro Maps`);
         }
-      } catch (err: any) {
-        console.warn('[APP] Geocoding failed:', err);
-        const errMsg = err?.message || 'Falha ao buscar coordenadas.';
-        toast.error(errMsg, `Erro no Google Maps`);
+      } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng && finalClient.lat !== 0) {
+        // Background plus code generation for existing coords
+        try {
+          const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
+          if (plusCode) finalClient = { ...finalClient, plusCode };
+        } catch { /* ignore */ }
       }
-    } else if (!finalClient.plusCode && finalClient.lat && finalClient.lng) {
-      // Background plus code generation
-      try {
-        const plusCode = await reverseGeocodePlusCode(finalClient.lat, finalClient.lng, googleMapsApiKey || '');
-        if (plusCode) {
-          finalClient.plusCode = plusCode;
-        }
-      } catch { /* ignore */ }
-    }
 
-    // ---- SAVE IMMEDIATELY (surgical update) ----
-    setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
+      // 4. Final Saves (Local & Cloud)
+      setMasterClientList(prev => prev.map(c => c.id === finalClient.id ? finalClient : c));
 
-    // Persist to cloud surgicaly
-    if (isFirebaseConnected) {
-      try {
+      if (isFirebaseConnected) {
         const { updateClientInCloud: surgicalUpdate } = await import('./services/firebaseService');
         await surgicalUpdate(finalClient);
-        console.log('[APP] ✅ Edit surgical-saved to Firebase.');
-
-        // Still update hash for local consistency check if needed
+        
+        // Update hash synchronously after cloud save to prevent auto-save loop
         setMasterClientList(current => {
-          lastClientsHash.current = JSON.stringify(current, (key, value) =>
+          lastClientsHash.current = JSON.stringify(current, (key, value) => 
             key === 'lastUpdated' ? undefined : value
           );
           return current;
         });
-      } catch (saveErr) {
-        console.error('[APP] Failed to surgical-save edited client:', saveErr);
+        console.log('[APP] ✅ Client update synced to Cloud.');
       }
-    }
 
-    toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
-  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, lastClientsHash, handleMergeClients]);
+      toast.success(`Cliente ${finalClient.companyName} atualizado com sucesso!`);
+
+    } catch (error) {
+      console.error('[APP] Error in handleUpdateClient:', error);
+      toast.error('Ocorreu um erro ao salvar as alterações.');
+    } finally {
+      syncLockRef.current = false;
+    }
+  }, [currentUser, googleMapsApiKey, toast, setMasterClientList, masterClientList, geocodeWithFallback, isFirebaseConnected, lastClientsHash, handleMergeClients, syncLockRef]);
 
 
 
@@ -2061,7 +2043,7 @@ const App: React.FC = () => {
                             await deleteClientsBatchFromCloud(orphans.map(o => o.id));
                             
                             // Atualiza o hash local para que o auto-save não tente reenviar o que já definimos como "remaining"
-                            const hashDataList = (list: any[]) => JSON.stringify(list, (key, value) => key === "lastUpdated" ? undefined : value);
+                            const hashDataList = (list: EnrichedClient[]) => JSON.stringify(list, (key, value) => key === "lastUpdated" ? undefined : value);
                             lastClientsHash.current = hashDataList(remaining);
                             
                             alert("Limpeza concluída com sucesso no banco de dados! Os clientes órfãos foram removidos permanentemente.");

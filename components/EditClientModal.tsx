@@ -146,6 +146,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                         lastname: prev.companyName, // Force update trigger
                         lat: fullData.latitude || 0, // Reset to 0 if not found to force re-geocoding
                         lng: fullData.longitude || 0, // Reset to 0 if not found to force re-geocoding
+                        plusCode: '', // Clear old plusCode as address is being refreshed
                         contact: fullData.ddd_telefone_1 || prev.contact,
                         mainCnae: fullData.cnae_fiscal || prev.mainCnae,
                         secondaryCnaes: fullData.cnaes_secundarios?.map((s: { codigo: string | number; texto: string }) => `${s.codigo} - ${s.texto}`) || prev.secondaryCnaes
