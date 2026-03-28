@@ -34,10 +34,12 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
         return () => unsubscribe();
     }, []);
 
+    // Optimize: Pre-compute lowercase filter string to avoid O(N) allocations in filter loop
+    const lowerSearchTerm = searchTerm.toLowerCase();
     const filteredLogs = logs.filter(log => {
         const matchesSearch =
-            log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.details.toLowerCase().includes(searchTerm.toLowerCase());
+            log.userName.toLowerCase().includes(lowerSearchTerm) ||
+            log.details.toLowerCase().includes(lowerSearchTerm);
         const matchesCategory = filterCategory === 'ALL' || log.category === filterCategory;
         const matchesAction = filterAction === 'ALL' || log.action === filterAction;
         return matchesSearch && matchesCategory && matchesAction;

@@ -2677,12 +2677,13 @@ const App: React.FC = () => {
                       {showProductSuggestions && searchProductQuery.length >= 2 && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
                           {(() => {
+                            // Optimize: Pre-compute lowercase filter string to avoid O(N) allocations in filter loop
+                            const lowerSearchQuery = searchProductQuery.toLowerCase();
                             const suggestions = products
                               .filter(p => {
-                                const term = searchProductQuery.toLowerCase();
-                                return (p.name || '').toLowerCase().includes(term) ||
-                                  (p.sku || '').toLowerCase().includes(term) ||
-                                  (p.brand || '').toLowerCase().includes(term);
+                                return (p.name || '').toLowerCase().includes(lowerSearchQuery) ||
+                                  (p.sku || '').toLowerCase().includes(lowerSearchQuery) ||
+                                  (p.brand || '').toLowerCase().includes(lowerSearchQuery);
                               })
                               .slice(0, 8);
 

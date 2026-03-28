@@ -110,13 +110,15 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
   };
 
   // Filter first
+  // Optimize: Pre-compute lowercase filter string to avoid O(N) allocations in filter loop
+  const lowerFilter = filter.toLowerCase();
   const filtered = localProducts.map((p, index) => ({ ...p, originalIndex: index } as Product & { originalIndex: number })).filter(p =>
-    (p.name || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.sku || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.brand || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.section || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.factoryCode || '').toLowerCase().includes(filter.toLowerCase())
+    (p.name || '').toLowerCase().includes(lowerFilter) ||
+    (p.sku || '').toLowerCase().includes(lowerFilter) ||
+    (p.brand || '').toLowerCase().includes(lowerFilter) ||
+    (p.category || '').toLowerCase().includes(lowerFilter) ||
+    (p.section || '').toLowerCase().includes(lowerFilter) ||
+    (p.factoryCode || '').toLowerCase().includes(lowerFilter)
   );
 
   // Then Sort
