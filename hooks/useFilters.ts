@@ -224,7 +224,13 @@ export const useFilters = (
         if (filterRegion !== 'Todas') {
             base = base.filter(c => c.region === filterRegion);
         }
-        const states = new Set(base.map(c => c.state).filter(Boolean));
+        // Optimize: Replace chained .map().filter() with single-pass loop to avoid intermediate array allocations
+        const states = new Set<string>();
+        for (let i = 0; i < base.length; i++) {
+            if (base[i].state) {
+                states.add(base[i].state);
+            }
+        }
         return Array.from(states).sort();
     }, [visibleClients, filterRegion]);
 
@@ -238,12 +244,24 @@ export const useFilters = (
         } else {
             return [];
         }
-        const cities = new Set(base.map(c => c.city).filter(Boolean));
+        // Optimize: Replace chained .map().filter() with single-pass loop to avoid intermediate array allocations
+        const cities = new Set<string>();
+        for (let i = 0; i < base.length; i++) {
+            if (base[i].city) {
+                cities.add(base[i].city);
+            }
+        }
         return Array.from(cities).sort();
     }, [visibleClients, filterRegion, filterState]);
 
     const productCategories = useMemo(() => {
-        const cats = new Set(products.map(p => p.category).filter(Boolean));
+        // Optimize: Replace chained .map().filter() with single-pass loop to avoid intermediate array allocations
+        const cats = new Set<string>();
+        for (let i = 0; i < products.length; i++) {
+            if (products[i].category) {
+                cats.add(products[i].category);
+            }
+        }
         return Array.from(cats).sort();
     }, [products]);
 
@@ -252,7 +270,13 @@ export const useFilters = (
         if (filterProductCategory !== 'Todos') {
             base = base.filter(p => p.category === filterProductCategory);
         }
-        const secs = new Set(base.map(p => p.section).filter(Boolean));
+        // Optimize: Replace chained .map().filter() with single-pass loop to avoid intermediate array allocations
+        const secs = new Set<string>();
+        for (let i = 0; i < base.length; i++) {
+            if (base[i].section) {
+                secs.add(base[i].section);
+            }
+        }
         return Array.from(secs).sort();
     }, [products, filterProductCategory]);
 
