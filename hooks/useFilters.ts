@@ -273,8 +273,9 @@ export const useFilters = (
         // Optimize: Replace chained .map().filter() with single-pass loop to avoid intermediate array allocations
         const secs = new Set<string>();
         for (let i = 0; i < base.length; i++) {
-            if (base[i].section) {
-                secs.add(base[i].section);
+            const section = base[i].section;
+            if (section) {
+                secs.add(section);
             }
         }
         return Array.from(secs).sort();
