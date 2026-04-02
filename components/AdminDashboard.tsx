@@ -126,6 +126,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             if (parsedEndDate) parsedEndDate.setHours(23, 59, 59, 999);
         }
 
+        // Optimize: Pre-compute a Map of users to avoid O(N) lookup inside the loop,
+        // transforming an O(N*M) operation into an O(N+M) operation.
+        const userMap = new Map(users.map(u => [u.id, u]));
+
         clients.forEach(client => {
             // Filtrar as compras pelo range de data atual usando helper otimizado
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
@@ -147,7 +151,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
 
                 // Seller
-                const sellerObj = users.find(u => u.id === client.salespersonId);
+                const sellerObj = userMap.get(client.salespersonId);
                 const sellerName = sellerObj?.name || 'Não Atribuído';
                 if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
                 sellerSales[sellerName].revenue += clientTotal;
