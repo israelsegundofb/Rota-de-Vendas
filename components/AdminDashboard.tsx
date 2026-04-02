@@ -172,13 +172,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 // Daily trend
                 if (p.purchaseDate) {
-                    let dateKey = p.purchaseDate.split('T')[0];
-                    // Handle DD/MM/YYYY for trend key
-                    if (p.purchaseDate.includes('/')) {
-                        const parts = p.purchaseDate.split('/');
-                        if (parts.length === 3) dateKey = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    let dateKey = '';
+                    // ⚡ Bolt Performance Optimization: Replace .split() with .indexOf() and .substring()
+                    // to avoid O(N) array allocation overhead within this hot nested loop (~1M iterations).
+                    const slashIdx = p.purchaseDate.indexOf('/');
+                    if (slashIdx !== -1) {
+                        const secondSlash = p.purchaseDate.indexOf('/', slashIdx + 1);
+                        if (secondSlash !== -1) {
+                            const day = p.purchaseDate.substring(0, slashIdx);
+                            const month = p.purchaseDate.substring(slashIdx + 1, secondSlash);
+                            const year = p.purchaseDate.substring(secondSlash + 1, secondSlash + 5);
+                            dateKey = `${year}-${month}-${day}`;
+                        } else {
+                            dateKey = p.purchaseDate;
+                        }
+                    } else {
+                        const tIdx = p.purchaseDate.indexOf('T');
+                        dateKey = tIdx !== -1 ? p.purchaseDate.substring(0, tIdx) : p.purchaseDate;
                     }
-                    dailySales[dateKey] = (dailySales[dateKey] || 0) + pVal;
+
+                    if (dateKey) {
+                        dailySales[dateKey] = (dailySales[dateKey] || 0) + pVal;
+                    }
                 }
             });
         });
