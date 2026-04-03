@@ -111,9 +111,19 @@ export const useFilters = (
         }
         const hasDateFilter = !!(parsedStartDate || parsedEndDate);
 
-        // Optimize: Pre-calculate lowercased queries
-        const query = (debouncedSearchQuery || '').toLowerCase();
-        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+        // Optimize: Pre-calculate Regex for O(1) creation instead of O(N) string allocations inside loops
+        const query = (debouncedSearchQuery || '').trim();
+        const prodQuery = (debouncedProductQuery || '').trim();
+
+        // Escape special regex characters to prevent runtime crashes from user input
+        const escapeRegExp = (string: string) => {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        // Use regex for case-insensitive matching instead of .toLowerCase().includes()
+        // to prevent repetitive string allocations and garbage collection overhead
+        const queryRegex = query ? new RegExp(escapeRegExp(query), 'i') : null;
+        const prodQueryRegex = prodQuery ? new RegExp(escapeRegExp(prodQuery), 'i') : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -132,9 +142,9 @@ export const useFilters = (
             }
 
             // Text Search
-            const matchSearch = debouncedSearchQuery === '' ||
-                (c.companyName || '').toLowerCase().includes(query) ||
-                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
+            const matchSearch = !queryRegex ||
+                queryRegex.test(c.companyName || '') ||
+                queryRegex.test(c.ownerName || '');
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
@@ -164,14 +174,17 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
+                        if (!hasMatch && prodQueryRegex) {
+                            hasMatch = prodQueryRegex.test(p.name || '') ||
+                                prodQueryRegex.test(p.sku || '') ||
+                                prodQueryRegex.test(p.brand || '') ||
+                                prodQueryRegex.test(p.category || '') ||
+                                prodQueryRegex.test(p.section || '') ||
+                                prodQueryRegex.test(p.factoryCode || '') ||
                                 (p.price || 0).toString().includes(prodQuery);
+                        } else if (!hasMatch && !prodQueryRegex) {
+                            // If prodQuery is empty, hasMatch should already be true, but just in case
+                            hasMatch = true;
                         }
 
                         if (!matchDate && p.purchaseDate) {
