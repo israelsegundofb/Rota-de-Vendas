@@ -88,39 +88,53 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
     setSortConfig({ key, direction });
   };
 
-  const getSortedProducts = <T extends Product>(prods: T[]) => {
-    if (!sortConfig) return prods;
+  // Filter and Sort in a single pass using useMemo for performance
+  const displayedProducts = React.useMemo(() => {
+    const result: (Product & { originalIndex: number })[] = [];
 
-    return [...prods].sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
+    // Performance optimization: Hoist the lowercase conversion
+    const searchTerm = filter.toLowerCase();
 
-      if (sortConfig.key === 'price' || sortConfig.key === 'discount') {
-        aVal = Number(aVal || 0);
-        bVal = Number(bVal || 0);
-      } else {
-        aVal = String(aVal || '').toLowerCase();
-        bVal = String(bVal || '').toLowerCase();
+    // Performance optimization: Single pass loop combining map and filter
+    // Avoids creating intermediate arrays and prevents O(N) redundant string allocations
+    for (let i = 0; i < localProducts.length; i++) {
+      const p = localProducts[i];
+
+      const matchesFilter = !searchTerm || (
+        (p.name || '').toLowerCase().includes(searchTerm) ||
+        (p.sku || '').toLowerCase().includes(searchTerm) ||
+        (p.brand || '').toLowerCase().includes(searchTerm) ||
+        (p.category || '').toLowerCase().includes(searchTerm) ||
+        (p.section || '').toLowerCase().includes(searchTerm) ||
+        (p.factoryCode || '').toLowerCase().includes(searchTerm)
+      );
+
+      if (matchesFilter) {
+        result.push({ ...p, originalIndex: i });
       }
+    }
 
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  };
+    if (sortConfig) {
+      result.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
 
-  // Filter first
-  const filtered = localProducts.map((p, index) => ({ ...p, originalIndex: index } as Product & { originalIndex: number })).filter(p =>
-    (p.name || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.sku || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.brand || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.section || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.factoryCode || '').toLowerCase().includes(filter.toLowerCase())
-  );
+        if (sortConfig.key === 'price' || sortConfig.key === 'discount') {
+          aVal = Number(aVal || 0);
+          bVal = Number(bVal || 0);
+        } else {
+          aVal = String(aVal || '').toLowerCase();
+          bVal = String(bVal || '').toLowerCase();
+        }
 
-  // Then Sort
-  const displayedProducts = getSortedProducts(filtered);
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [localProducts, filter, sortConfig]);
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig?.key !== column) return <div className="w-4 h-4 ml-1 inline-block opacity-0 group-hover:opacity-30">↕</div>;
