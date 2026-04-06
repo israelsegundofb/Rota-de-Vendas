@@ -224,7 +224,7 @@ export const useFilters = (
 
                             // Fallback to native parsing if fast paths didn't match
                             if (pDateInt === null || isNaN(pDateInt)) {
-                                let pDate = new Date(p.purchaseDate);
+                                const pDate = new Date(p.purchaseDate);
                                 if (!isNaN(pDate.getTime())) {
                                     pDateInt = pDate.getFullYear() * 10000 + (pDate.getMonth() + 1) * 100 + pDate.getDate();
                                 }
