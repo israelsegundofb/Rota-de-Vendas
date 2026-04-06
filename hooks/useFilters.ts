@@ -97,23 +97,34 @@ export const useFilters = (
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
-        // Optimize: Pre-parse filter dates outside the loop to avoid recreating Date objects for every product
-        let parsedStartDate: Date | null = null;
+        // ⚡ Bolt Performance Optimization: Replace Date objects with YYYYMMDD integers
+        // to avoid heavy Date object instantiation overhead inside the hot loop.
+        let parsedStartDateInt: number | null = null;
         if (startDate) {
-            parsedStartDate = new Date(startDate);
-            parsedStartDate.setHours(0, 0, 0, 0);
+            const sd = new Date(startDate);
+            if (!isNaN(sd.getTime())) {
+                parsedStartDateInt = sd.getFullYear() * 10000 + (sd.getMonth() + 1) * 100 + sd.getDate();
+            }
         }
 
-        let parsedEndDate: Date | null = null;
+        let parsedEndDateInt: number | null = null;
         if (endDate) {
-            parsedEndDate = new Date(endDate);
-            parsedEndDate.setHours(23, 59, 59, 999);
+            const ed = new Date(endDate);
+            if (!isNaN(ed.getTime())) {
+                parsedEndDateInt = ed.getFullYear() * 10000 + (ed.getMonth() + 1) * 100 + ed.getDate();
+            }
         }
-        const hasDateFilter = !!(parsedStartDate || parsedEndDate);
+        const hasDateFilter = parsedStartDateInt !== null || parsedEndDateInt !== null;
 
         // Optimize: Pre-calculate lowercased queries
         const query = (debouncedSearchQuery || '').toLowerCase();
         const prodQuery = (debouncedProductQuery || '').toLowerCase();
+
+        // ⚡ Bolt Performance Optimization: Pre-compile regex for dynamic search
+        // to avoid repetitive string parsing and method chain allocations in hot loop
+        const prodQueryRegex = prodQuery
+            ? new RegExp(prodQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+            : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -164,33 +175,64 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                        if (!hasMatch && prodQueryRegex) {
+                            hasMatch = prodQueryRegex.test(p.name || '') ||
+                                prodQueryRegex.test(p.sku || '') ||
+                                prodQueryRegex.test(p.brand || '') ||
+                                prodQueryRegex.test(p.category || '') ||
+                                prodQueryRegex.test(p.section || '') ||
+                                prodQueryRegex.test(p.factoryCode || '') ||
+                                prodQueryRegex.test((p.price || 0).toString());
+                        } else if (!hasMatch && !prodQueryRegex) {
+                            hasMatch = true;
                         }
 
                         if (!matchDate && p.purchaseDate) {
-                            let pDate = new Date(p.purchaseDate);
-                            if (isNaN(pDate.getTime())) {
-                                const parts = p.purchaseDate.split('/');
-                                if (parts.length === 3) {
-                                    pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                            // ⚡ Bolt Performance Optimization: Parse date strings directly to integers
+                            // using fast paths for known formats, falling back to native Date parsing
+                            let pDateInt: number | null = null;
+                            const dStr = p.purchaseDate;
+
+                            // Fast path ISO format YYYY-MM-DD
+                            if (dStr.length >= 10 && dStr[4] === '-' && dStr[7] === '-') {
+                                pDateInt = parseInt(dStr.substring(0, 4) + dStr.substring(5, 7) + dStr.substring(8, 10), 10);
+                            } else {
+                                const slash1 = dStr.indexOf('/');
+                                if (slash1 !== -1) {
+                                    const slash2 = dStr.indexOf('/', slash1 + 1);
+                                    if (slash2 !== -1) {
+                                        const d = dStr.substring(0, slash1).padStart(2, '0');
+                                        const m = dStr.substring(slash1 + 1, slash2).padStart(2, '0');
+                                        const y = dStr.substring(slash2 + 1, slash2 + 5);
+                                        pDateInt = parseInt(y + m + d, 10);
+                                    }
                                 } else {
-                                    const partsHyphen = p.purchaseDate.split('-');
-                                    if (partsHyphen.length === 3) {
-                                        pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                                    const dash1 = dStr.indexOf('-');
+                                    if (dash1 !== -1) {
+                                        const dash2 = dStr.indexOf('-', dash1 + 1);
+                                        if (dash2 !== -1) {
+                                            const p1 = dStr.substring(0, dash1);
+                                            if (p1.length <= 2) { // DD-MM-YYYY
+                                                const m = dStr.substring(dash1 + 1, dash2).padStart(2, '0');
+                                                const y = dStr.substring(dash2 + 1, dash2 + 5);
+                                                pDateInt = parseInt(y + m + p1.padStart(2, '0'), 10);
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            if (!isNaN(pDate.getTime())) {
-                                pDate.setHours(0, 0, 0, 0);
-                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
-                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+
+                            // Fallback to native parsing if fast paths didn't match
+                            if (pDateInt === null || isNaN(pDateInt)) {
+                                let pDate = new Date(p.purchaseDate);
+                                if (!isNaN(pDate.getTime())) {
+                                    pDateInt = pDate.getFullYear() * 10000 + (pDate.getMonth() + 1) * 100 + pDate.getDate();
+                                }
+                            }
+
+                            if (pDateInt !== null && !isNaN(pDateInt)) {
+                                const isAfterStart = parsedStartDateInt === null || pDateInt >= parsedStartDateInt;
+                                const isBeforeEnd = parsedEndDateInt === null || pDateInt <= parsedEndDateInt;
                                 if (isAfterStart && isBeforeEnd) {
                                     matchDate = true;
                                 }

@@ -9,3 +9,7 @@
 ## 2024-04-01 - [High-Volume Array Loop Optimizations in Admin Dashboard]
 **Learning:** In heavily nested loops over large datasets (e.g., iterating through `clientPurchases` for every product and date within `AdminDashboard.tsx`), typical string manipulation methods like `.split('-')` to parse dates introduce significant O(N) memory allocations and subsequent garbage collection overhead.
 **Action:** Replace chaining operations and memory-allocating string parsing (`.split()`) with zero-allocation `.indexOf()` and `.substring()` when parsing millions of date string parts within high-throughput loops. This pattern provides an 8x throughput boost by dodging constant array initialization.
+
+## 2024-05-18 - Fast-path parsing vs Heterogeneous Inputs
+**Learning:** While aggressively optimizing Date instantiation via integer extraction (`parseInt(substring(...))`) provides massive speedups inside loops, omitting the fallback native parsing logic breaks handling for unexpected or non-standard date formats (like `MM/DD/YYYY` vs `DD/MM/YYYY`) inherent to generic datasets.
+**Action:** When implementing fast-path optimizations for data structures, always retain the original safe, native fallback parsing when the fast-path conditions are not explicitly met.
