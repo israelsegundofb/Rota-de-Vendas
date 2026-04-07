@@ -113,7 +113,13 @@ export const useFilters = (
 
         // Optimize: Pre-calculate lowercased queries
         const query = (debouncedSearchQuery || '').toLowerCase();
-        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+        const prodQueryStr = debouncedProductQuery || '';
+        // ⚡ Bolt Performance Optimization:
+        // Instead of calculating `.toLowerCase().includes()` inside the product loop for 7 fields,
+        // we use a single pre-compiled regular expression. This prevents recreating strings and
+        // garbage collection overhead in hot loops.
+        const escapedProdQuery = prodQueryStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const prodQueryRegex = prodQueryStr ? new RegExp(escapedProdQuery, 'i') : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -144,7 +150,7 @@ export const useFilters = (
                 (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
-            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
+            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQueryRegex) {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
@@ -154,7 +160,7 @@ export const useFilters = (
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = prodQuery === '';
+                    let hasMatch = !prodQueryRegex;
                     let matchDate = !hasDateFilter;
 
                     for (let i = 0; i < c.purchasedProducts.length; i++) {
@@ -164,14 +170,14 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                        if (!hasMatch && prodQueryRegex) {
+                            hasMatch = prodQueryRegex.test(p.name || '') ||
+                                prodQueryRegex.test(p.sku || '') ||
+                                prodQueryRegex.test(p.brand || '') ||
+                                prodQueryRegex.test(p.category || '') ||
+                                prodQueryRegex.test(p.section || '') ||
+                                prodQueryRegex.test(p.factoryCode || '') ||
+                                prodQueryRegex.test((p.price || 0).toString());
                         }
 
                         if (!matchDate && p.purchaseDate) {
