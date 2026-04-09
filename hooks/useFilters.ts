@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { EnrichedClient, AppUser, Product } from '../types';
 import { isAdmin, hasFullDataVisibility } from '../utils/authUtils';
 import { isValidPurchase } from '../utils/purchaseUtils';
+import { parseDateToInt } from '../utils/dateUtils';
 import useDebounce from './useDebounce';
 import { useUrlParams } from './useUrlParams';
 
@@ -98,18 +99,9 @@ export const useFilters = (
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
         // Optimize: Pre-parse filter dates outside the loop to avoid recreating Date objects for every product
-        let parsedStartDate: Date | null = null;
-        if (startDate) {
-            parsedStartDate = new Date(startDate);
-            parsedStartDate.setHours(0, 0, 0, 0);
-        }
-
-        let parsedEndDate: Date | null = null;
-        if (endDate) {
-            parsedEndDate = new Date(endDate);
-            parsedEndDate.setHours(23, 59, 59, 999);
-        }
-        const hasDateFilter = !!(parsedStartDate || parsedEndDate);
+        const startInt = parseDateToInt(startDate);
+        const endInt = parseDateToInt(endDate);
+        const hasDateFilter = startInt !== null || endInt !== null;
 
         // Optimize: Pre-calculate lowercased queries
         const query = (debouncedSearchQuery || '').toLowerCase();
@@ -175,22 +167,10 @@ export const useFilters = (
                         }
 
                         if (!matchDate && p.purchaseDate) {
-                            let pDate = new Date(p.purchaseDate);
-                            if (isNaN(pDate.getTime())) {
-                                const parts = p.purchaseDate.split('/');
-                                if (parts.length === 3) {
-                                    pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                                } else {
-                                    const partsHyphen = p.purchaseDate.split('-');
-                                    if (partsHyphen.length === 3) {
-                                        pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
-                                    }
-                                }
-                            }
-                            if (!isNaN(pDate.getTime())) {
-                                pDate.setHours(0, 0, 0, 0);
-                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
-                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                            const pDateInt = parseDateToInt(p.purchaseDate);
+                            if (pDateInt !== null) {
+                                const isAfterStart = startInt === null || pDateInt >= startInt;
+                                const isBeforeEnd = endInt === null || pDateInt <= endInt;
                                 if (isAfterStart && isBeforeEnd) {
                                     matchDate = true;
                                 }

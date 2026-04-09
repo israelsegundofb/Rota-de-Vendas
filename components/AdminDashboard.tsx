@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { REGIONS } from '../utils/constants';
-import { isDateWithinBounds, parseDateSafe } from '../utils/dateUtils';
+import { parseDateToInt } from '../utils/dateUtils';
 
 interface AdminDashboardProps {
     clients: EnrichedClient[];
@@ -114,17 +114,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         console.log('[DASHBOARD] Calculating stats for', clients.length, 'clients');
 
         // Optimize: Pre-parse filter dates outside the loop to avoid O(N) Date instantiations
-        let parsedStartDate: Date | null = null;
-        if (startDate) {
-            parsedStartDate = parseDateSafe(startDate);
-            if (parsedStartDate) parsedStartDate.setHours(0, 0, 0, 0);
-        }
-
-        let parsedEndDate: Date | null = null;
-        if (endDate) {
-            parsedEndDate = parseDateSafe(endDate);
-            if (parsedEndDate) parsedEndDate.setHours(23, 59, 59, 999);
-        }
+        const startInt = parseDateToInt(startDate);
+        const endInt = parseDateToInt(endDate);
 
         // Optimize: Pre-compute a Map of users to avoid O(N) lookup inside the loop,
         // transforming an O(N*M) operation into an O(N+M) operation.
@@ -133,11 +124,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         clients.forEach(client => {
             // Filtrar as compras pelo range de data atual usando helper otimizado
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
-                if (!startDate && !endDate) return true;
-                const pDate = parseDateSafe(p.purchaseDate);
-                if (!pDate) return false;
-                pDate.setHours(0, 0, 0, 0);
-                return isDateWithinBounds(pDate, parsedStartDate, parsedEndDate);
+                if (startInt === null && endInt === null) return true;
+                const pDateInt = parseDateToInt(p.purchaseDate);
+                if (pDateInt === null) return false;
+
+                const isAfterStart = startInt === null || pDateInt >= startInt;
+                const isBeforeEnd = endInt === null || pDateInt <= endInt;
+                return isAfterStart && isBeforeEnd;
             });
 
             const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);

@@ -71,3 +71,51 @@ export const isDateInRange = (
 
     return true;
 };
+
+/**
+ * High-performance fast path to parse standard date strings into YYYYMMDD integer format.
+ * Used in hot-loops to avoid new Date() instantiation overhead and GC pressure.
+ */
+export const parseDateToInt = (dateString: string | undefined | null): number | null => {
+    if (!dateString) return null;
+
+    // Fast path: YYYY-MM-DD (length 10)
+    if (dateString.length >= 10 && dateString[4] === '-' && dateString[7] === '-') {
+        const y = parseInt(dateString.substring(0, 4), 10);
+        const m = parseInt(dateString.substring(5, 7), 10);
+        const d = parseInt(dateString.substring(8, 10), 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return y * 10000 + m * 100 + d;
+    }
+
+    // Fast path: DD/MM/YYYY
+    const slash1 = dateString.indexOf('/');
+    if (slash1 !== -1) {
+        const slash2 = dateString.indexOf('/', slash1 + 1);
+        if (slash2 !== -1) {
+            const d = parseInt(dateString.substring(0, slash1), 10);
+            const m = parseInt(dateString.substring(slash1 + 1, slash2), 10);
+            const y = parseInt(dateString.substring(slash2 + 1, slash2 + 5), 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return y * 10000 + m * 100 + d;
+        }
+    }
+
+    // Fast path: DD-MM-YYYY
+    const dash1 = dateString.indexOf('-');
+    if (dash1 !== -1 && dash1 <= 2) {
+        const dash2 = dateString.indexOf('-', dash1 + 1);
+        if (dash2 !== -1) {
+            const d = parseInt(dateString.substring(0, dash1), 10);
+            const m = parseInt(dateString.substring(dash1 + 1, dash2), 10);
+            const y = parseInt(dateString.substring(dash2 + 1, dash2 + 5), 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return y * 10000 + m * 100 + d;
+        }
+    }
+
+    // Fallback native parse
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+        return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+    }
+
+    return null;
+};
