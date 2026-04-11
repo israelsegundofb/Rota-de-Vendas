@@ -39,11 +39,22 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
     }, [clients, startDate, endDate]);
 
     const stats = useMemo(() => {
-        const totalValue = allPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
-        const uniqueClients = new Set(allPurchases.map(p => p.clientId)).size;
-        const totalItems = allPurchases.reduce((sum, p) => sum + (p.quantity || 1), 0);
+        // ⚡ Bolt Performance Optimization: Replace multiple array iterations (.reduce, .map)
+        // with a single-pass loop. This prevents creating intermediate arrays and
+        // significantly reduces garbage collection (GC) overhead when processing large datasets.
+        let totalValue = 0;
+        let totalItems = 0;
+        const uniqueClientIds = new Set<string>();
 
-        return { totalValue, uniqueClients, totalItems };
+        for (let i = 0; i < allPurchases.length; i++) {
+            const p = allPurchases[i];
+            const qty = p.quantity || 1;
+            totalValue += p.totalValue || (p.price * qty);
+            totalItems += qty;
+            uniqueClientIds.add(p.clientId);
+        }
+
+        return { totalValue, uniqueClients: uniqueClientIds.size, totalItems };
     }, [allPurchases]);
 
     const formatCurrency = (value: number) => {
