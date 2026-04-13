@@ -71,3 +71,58 @@ export const isDateInRange = (
 
     return true;
 };
+
+
+/**
+ * High-performance fast-path for date parsing in hot loops.
+ * Converts YYYY-MM-DD or DD/MM/YYYY strings to an integer like YYYYMMDD.
+ * Used for direct integer comparisons to avoid allocating Date objects.
+ */
+export const parseDateToInt = (dateString: string | undefined | null): number | null => {
+    if (!dateString) return null;
+
+    // Fast path for ISO: YYYY-MM-DD
+    if (dateString.length >= 10 && dateString[4] === '-' && dateString[7] === '-') {
+        const y = dateString.substring(0, 4);
+        const m = dateString.substring(5, 7);
+        const d = dateString.substring(8, 10);
+        return parseInt(y + m + d, 10);
+    }
+
+    // Fast path for Brazilian: DD/MM/YYYY
+    if (dateString.length >= 10 && dateString[2] === '/' && dateString[5] === '/') {
+        const d = dateString.substring(0, 2);
+        const m = dateString.substring(3, 5);
+        const y = dateString.substring(6, 10);
+        return parseInt(y + m + d, 10);
+    }
+
+    // Fast path for DD-MM-YYYY
+    if (dateString.length >= 10 && dateString[2] === '-' && dateString[5] === '-') {
+        const d = dateString.substring(0, 2);
+        const m = dateString.substring(3, 5);
+        const y = dateString.substring(6, 10);
+        return parseInt(y + m + d, 10);
+    }
+
+    // Fallback using native Date parsing
+    let date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        // Try parsing unpadded DD/MM/YYYY or DD-MM-YYYY
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+            date = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        } else {
+            const partsHyphen = dateString.split('-');
+            if (partsHyphen.length === 3) {
+                date = new Date(parseInt(partsHyphen[2], 10), parseInt(partsHyphen[1], 10) - 1, parseInt(partsHyphen[0], 10));
+            }
+        }
+    }
+
+    if (!isNaN(date.getTime())) {
+        return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+    }
+
+    return null;
+};

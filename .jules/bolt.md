@@ -9,3 +9,6 @@
 ## 2024-04-01 - [High-Volume Array Loop Optimizations in Admin Dashboard]
 **Learning:** In heavily nested loops over large datasets (e.g., iterating through `clientPurchases` for every product and date within `AdminDashboard.tsx`), typical string manipulation methods like `.split('-')` to parse dates introduce significant O(N) memory allocations and subsequent garbage collection overhead.
 **Action:** Replace chaining operations and memory-allocating string parsing (`.split()`) with zero-allocation `.indexOf()` and `.substring()` when parsing millions of date string parts within high-throughput loops. This pattern provides an 8x throughput boost by dodging constant array initialization.
+## 2026-04-13 - [Optimize date filtering in useFilters hot loop]
+**Learning:** Instantiating `new Date()` inside the innermost loop of a large `Array.prototype.filter` operation can cause severe performance issues due to continuous object allocation and string parsing, especially when comparing formatted date strings.
+**Action:** Convert date strings (like ISO `YYYY-MM-DD` or Brazilian `DD/MM/YYYY`) into primitives like integers (e.g. `YYYYMMDD`) using string slicing in a fast-path, which skips complex `Date` initialization. Then perform fast numeric comparisons (`20231025 <= 20231231`).
