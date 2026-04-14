@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { EnrichedClient, Product, AppUser } from '../types';
 import { REGIONS } from '../utils/constants';
-import { isDateWithinBounds, parseDateSafe } from '../utils/dateUtils';
+import { isDateWithinBounds, parseDateSafe, parseDateToInt } from '../utils/dateUtils';
 
 interface AdminDashboardProps {
     clients: EnrichedClient[];
@@ -113,31 +113,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         // DEBUG: Log initial clients count
         console.log('[DASHBOARD] Calculating stats for', clients.length, 'clients');
 
-        // Optimize: Pre-parse filter dates outside the loop to avoid O(N) Date instantiations
-        let parsedStartDate: Date | null = null;
-        if (startDate) {
-            parsedStartDate = parseDateSafe(startDate);
-            if (parsedStartDate) parsedStartDate.setHours(0, 0, 0, 0);
-        }
-
-        let parsedEndDate: Date | null = null;
-        if (endDate) {
-            parsedEndDate = parseDateSafe(endDate);
-            if (parsedEndDate) parsedEndDate.setHours(23, 59, 59, 999);
-        }
+        // Optimize: Pre-parse filter dates to integers outside the loop to avoid O(N) Date instantiations
+        const parsedStartInt = startDate ? parseDateToInt(startDate) : null;
+        const parsedEndInt = endDate ? parseDateToInt(endDate) : null;
 
         // Optimize: Pre-compute a Map of users to avoid O(N) lookup inside the loop,
         // transforming an O(N*M) operation into an O(N+M) operation.
         const userMap = new Map(users.map(u => [u.id, u]));
 
         clients.forEach(client => {
-            // Filtrar as compras pelo range de data atual usando helper otimizado
+            // Filtrar as compras pelo range de data atual usando inteiros para alta performance
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
                 if (!startDate && !endDate) return true;
-                const pDate = parseDateSafe(p.purchaseDate);
-                if (!pDate) return false;
-                pDate.setHours(0, 0, 0, 0);
-                return isDateWithinBounds(pDate, parsedStartDate, parsedEndDate);
+                const pDateInt = parseDateToInt(p.purchaseDate);
+                if (pDateInt === null) return false;
+                if (parsedStartInt !== null && pDateInt < parsedStartInt) return false;
+                if (parsedEndInt !== null && pDateInt > parsedEndInt) return false;
+                return true;
             });
 
             const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);

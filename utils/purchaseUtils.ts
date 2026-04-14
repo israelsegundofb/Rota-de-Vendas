@@ -1,4 +1,5 @@
 import { PurchaseRecord } from '../types';
+import { parseDateToInt } from './dateUtils';
 
 /**
  * Valida se um registro de compra é real e possui valor.
@@ -18,8 +19,20 @@ export const isValidPurchase = (p: PurchaseRecord, filterSalespersonId?: string,
     }
 
     // 4. Filtro de Data (opcional)
-    if (startDate && p.purchaseDate < startDate) return false;
-    if (endDate && p.purchaseDate > endDate) return false;
+    if (startDate || endDate) {
+        const pDateInt = parseDateToInt(p.purchaseDate);
+        if (pDateInt === null) return false;
+
+        if (startDate) {
+            const startInt = parseDateToInt(startDate);
+            if (startInt !== null && pDateInt < startInt) return false;
+        }
+
+        if (endDate) {
+            const endInt = parseDateToInt(endDate);
+            if (endInt !== null && pDateInt > endInt) return false;
+        }
+    }
 
     return true;
 };

@@ -1,3 +1,54 @@
+/**
+ * Fast-path utility to parse known date strings directly to an integer (YYYYMMDD)
+ * for high-performance primitive comparisons without allocating Date objects.
+ */
+export const parseDateToInt = (dateString: string | undefined | null): number | null => {
+    if (!dateString) return null;
+
+    // Fast paths using charCodeAt to avoid regex or string split allocations
+    const len = dateString.length;
+    if (len >= 10) {
+        // Fast path for YYYY-MM-DD
+        if (dateString.charCodeAt(4) === 45 && dateString.charCodeAt(7) === 45) { // '-' is 45
+            const y = parseInt(dateString.substring(0, 4), 10);
+            const m = parseInt(dateString.substring(5, 7), 10);
+            const d = parseInt(dateString.substring(8, 10), 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                return y * 10000 + m * 100 + d;
+            }
+        }
+
+        // Fast path for DD/MM/YYYY
+        if (dateString.charCodeAt(2) === 47 && dateString.charCodeAt(5) === 47) { // '/' is 47
+            const d = parseInt(dateString.substring(0, 2), 10);
+            const m = parseInt(dateString.substring(3, 5), 10);
+            const y = parseInt(dateString.substring(6, 10), 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                return y * 10000 + m * 100 + d;
+            }
+        }
+
+        // Fast path for DD-MM-YYYY
+        if (dateString.charCodeAt(2) === 45 && dateString.charCodeAt(5) === 45) { // '-' is 45
+            const d = parseInt(dateString.substring(0, 2), 10);
+            const m = parseInt(dateString.substring(3, 5), 10);
+            const y = parseInt(dateString.substring(6, 10), 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                return y * 10000 + m * 100 + d;
+            }
+        }
+    }
+
+    // Fallback to safe parsing for unpadded dates (e.g. D/M/YYYY or DD/M/YYYY)
+    // We can reuse parseDateSafe logic which already handles this robustly
+    const safeDate = parseDateSafe(dateString);
+    if (safeDate) {
+        return safeDate.getFullYear() * 10000 + (safeDate.getMonth() + 1) * 100 + safeDate.getDate();
+    }
+
+    return null;
+};
+
 export const parseDateSafe = (dateString: string | undefined | null): Date | null => {
     if (!dateString) return null;
 
