@@ -9,3 +9,6 @@
 ## 2024-04-01 - [High-Volume Array Loop Optimizations in Admin Dashboard]
 **Learning:** In heavily nested loops over large datasets (e.g., iterating through `clientPurchases` for every product and date within `AdminDashboard.tsx`), typical string manipulation methods like `.split('-')` to parse dates introduce significant O(N) memory allocations and subsequent garbage collection overhead.
 **Action:** Replace chaining operations and memory-allocating string parsing (`.split()`) with zero-allocation `.indexOf()` and `.substring()` when parsing millions of date string parts within high-throughput loops. This pattern provides an 8x throughput boost by dodging constant array initialization.
+## 2025-03-08 - O(1) Lookups in React Hot Loops
+**Learning:** Found an O(N*M) nested loop inside `handlePurchaseUpdateUpload` in `App.tsx` doing `.findIndex()` with string replacements `replace(/\D/g, '')` for every single upload record against every single existing client.
+**Action:** Replaced `.findIndex` inside loops with O(1) Map lookups pre-built outside the loop (`cnpjMap` and `nameMap`), changing time complexity from O(N*M) to O(N+M) and reducing heavy regex allocations.

@@ -1651,24 +1651,43 @@ const App: React.FC = () => {
       let updatedCount = 0;
       let capturedNewList: typeof masterClientList = [];
 
+      // Hoist normalization function
+      const normalizeName = (name: string | undefined) => (name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+
+      // Pre-build O(1) lookup maps to prevent O(N*M) runtime complexity
+      const cnpjMap = new Map<string, number>();
+      const nameMap = new Map<string, number>();
+
+      existingUpdatedList.forEach((c, index) => {
+        if (c.cnpj) {
+          const cleanCnpj = c.cnpj.replace(/\D/g, '');
+          if (cleanCnpj && !cnpjMap.has(cleanCnpj)) cnpjMap.set(cleanCnpj, index);
+        }
+        if (c.companyName) {
+          const cleanName = normalizeName(c.companyName);
+          if (cleanName && !nameMap.has(cleanName)) nameMap.set(cleanName, index);
+        }
+      });
+
       clientKeysInFile.forEach((key, index) => {
         setProcState(prev => ({ ...prev, current: index + 1 }));
         const clientPurchases = groupedByClient[key];
         const firstRec = clientPurchases[0];
 
-        // Find client index
+        // Find client index (O(1) lookups)
         let clientIdx = -1;
         if (firstRec.cnpj) {
           const cleanSearchCnpj = String(firstRec.cnpj).replace(/\D/g, '');
-          clientIdx = existingUpdatedList.findIndex(c => (c.cnpj || '').replace(/\D/g, '') === cleanSearchCnpj);
+          if (cnpjMap.has(cleanSearchCnpj)) {
+             clientIdx = cnpjMap.get(cleanSearchCnpj)!;
+          }
         }
 
         if (clientIdx === -1) {
           // Name Matching Fallback
-          const normalizeName = (name: string | undefined) => (name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
           const cleanCSVName = normalizeName(firstRec.companyName || '');
-          if (cleanCSVName) {
-            clientIdx = existingUpdatedList.findIndex(c => normalizeName(c.companyName || '') === cleanCSVName);
+          if (cleanCSVName && nameMap.has(cleanCSVName)) {
+            clientIdx = nameMap.get(cleanCSVName)!;
           }
         }
 
