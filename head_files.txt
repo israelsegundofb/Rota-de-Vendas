@@ -1,0 +1,2544 @@
+==> utils/csvParser.ts <==
+import * as Papa from 'papaparse';
+import { RawClient, Product } from '../types';
+import { ClientSchema, ProductSchema } from './schemas';
+import { z } from 'zod';
+
+/**
+ * Extracts coordinates from a Google Maps URL if possible.
+ */
+const extractCoordsFromUrl = (url: string): { lat?: number; lng?: number } | null => {
+  if (!url) return null;
+
+  // Match @lat,lng (common in maps urls)
+  const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+
+  // Match q=lat,lng (search parameter)
+  const qMatch = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+
+  return null;
+};
+
+/**
+ * Extracts address from a Google Maps URL query parameter if present.
+ * Example: ...?query=Avenida+Paulista... -> Avenida Paulista
+ */
+const extractAddressFromUrl = (url: string): string | null => {
+  if (!url) return null;
+
+  try {
+    const urlObj = new URL(url);
+    const query = urlObj.searchParams.get('query') || urlObj.searchParams.get('q');
+    if (query && !query.match(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/)) {
+      // If query is NOT coordinates, it's likely an address
+      return query;
+    }
+  } catch (e) {
+    // Fallback for partial URLs or invalid formats
+    const match = url.match(/[?&]query=([^&]+)/) || url.match(/[?&]q=([^&]+)/);
+    if (match) {
+      return decodeURIComponent(match[1].replace(/\+/g, ' '));
+    }
+  }
+  return null;
+};
+
+/**
+ * Parses an Excel HYPERLINK formula to extract both the URL and the display address.
+ * Formula format in CSV (raw): =HYPERLINK("url"; "ADDRESS") or =HYPERLINK("url", "ADDRESS")
+ */
+
+==> utils/csvExport.ts <==
+import Papa from 'papaparse';
+import { EnrichedClient, AppUser } from '../types';
+
+export const exportClientsToCSV = (clients: EnrichedClient[], users: AppUser[]) => {
+    // Map clients to the desired CSV format
+    const exportData = clients.map(client => {
+        const seller = users.find(u => u.id === client.salespersonId);
+
+        return {
+            'CNPJ / CPF': client.cnpj || '',
+            'Razão Social / Nome': client.companyName || '',
+            'Nome Fantasia': client.ownerName || '',
+            'Vendedor Responsável': seller ? seller.name : 'Desconhecido',
+            'Endereço Completo': client.cleanAddress || client.originalAddress || '',
+            'Bairro': client.district || '',
+            'Cidade': client.city || '',
+            'Estado': client.state || '',
+            'CEP': client.zip || '',
+            'Telefone': client.contact || '',
+            'Status Geocodificação': client.lat && client.lng && client.lat !== 0 ? 'Encontrado' : 'Pendência de Endereço'
+        };
+    });
+
+    // Convert to CSV string with semicolon delimiter for Excel PT-BR compatibility
+    const csv = Papa.unparse(exportData, {
+        quotes: false, // or true if you want to force quotes, papaparse handles it automatically usually
+        delimiter: ';',
+        header: true
+    });
+
+    // Add BOM for UTF-8 Excel compatibility
+    const csvWithBOM = '\uFEFF' + csv;
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Base_Clientes_Consolidada_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
+
+==> utils/constants.ts <==
+
+export const REGIONS = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
+
+export const CATEGORIES = [
+    'Todos',
+    'Som e Vídeo',
+    'Pneus e Rodas',
+    'Peças e Mecânica',
+    'Acessórios',
+    'Vidros e Películas',
+    'Outros'
+];
+
+export const UF_TO_REGION: Record<string, string> = {
+    'AC': 'Norte', 'AL': 'Nordeste', 'AP': 'Norte', 'AM': 'Norte', 'BA': 'Nordeste',
+    'CE': 'Nordeste', 'DF': 'Centro-Oeste', 'ES': 'Sudeste', 'GO': 'Centro-Oeste',
+    'MA': 'Nordeste', 'MT': 'Centro-Oeste', 'MS': 'Centro-Oeste', 'MG': 'Sudeste',
+    'PA': 'Norte', 'PB': 'Nordeste', 'PR': 'Sul', 'PE': 'Nordeste', 'PI': 'Nordeste',
+    'RJ': 'Sudeste', 'RN': 'Nordeste', 'RS': 'Sul', 'RO': 'Norte', 'RR': 'Norte',
+    'SC': 'Sul', 'SP': 'Sudeste', 'SE': 'Nordeste', 'TO': 'Norte'
+};
+
+export const getRegionByUF = (uf: string): 'Norte' | 'Nordeste' | 'Centro-Oeste' | 'Sudeste' | 'Sul' | 'Indefinido' => {
+    const normalizedUF = uf.toUpperCase().trim();
+    return (UF_TO_REGION[normalizedUF] as any) || 'Indefinido';
+};
+
+==> utils/imageUtils.ts <==
+/**
+ * Resizes an image file to a maximum dimension and converts it to a Base64 string.
+ * Used to optimize profile pictures for Firestore storage.
+ *
+ * @param file The File object (image) from an input element.
+ * @param maxWidth Maximum width in pixels (default: 200).
+ * @param maxHeight Maximum height in pixels (default: 200).
+ * @param quality JPEG quality (0 to 1, default: 0.7).
+ * @returns Promise resolving to the Base64 string.
+ */
+export const resizeImageToBase64 = (
+    file: File,
+    maxWidth = 200,
+    maxHeight = 200,
+    quality = 0.7
+): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Calculate new dimensions maintaining aspect ratio
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height *= maxWidth / width));
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width *= maxHeight / height));
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error('Could not get canvas context'));
+                    return;
+                }
+
+                ctx.drawImage(img, 0, 0, width, height);
+                // Convert to Base64 (JPEG for better compression)
+
+==> utils/authUtils.ts <==
+import { UserRole, AppUser } from '../types';
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+    admin_dev: '🛠️ Admin DEV',
+    admin_general: '👨‍💼 Admin Geral',
+    general_manager: '👔 Gerente Geral',
+    sales_manager: '📈 Gerente de Vendas',
+    sales_supervisor: '📋 Supervisor de Vendas',
+    general_viewer: '👁️ Visualizador Geral',
+    sales_internal: '🏢 Vendedor Interno',
+    sales_external: '🚗 Vendedor Externo',
+    admin: '👑 Admin (Legado)',
+    salesperson: '👤 Vendedor (Legado)'
+};
+
+// Menor número = Maior Poder
+export const ROLE_HIERARCHY: Record<UserRole, number> = {
+    admin_dev: 1,
+    admin: 1, // Legacy treats as top level
+    admin_general: 2,
+    general_manager: 3,
+    sales_manager: 4,
+    sales_supervisor: 5,
+    general_viewer: 6,
+    sales_internal: 7,
+    sales_external: 8,
+    salesperson: 8 // Legacy treats as lowest level
+};
+
+export const getRoleLabel = (role: UserRole) => ROLE_LABELS[role] || role;
+
+/**
+ * Normaliza roles legados para os novos roles equivalentes
+ */
+export const normalizeRole = (role: UserRole): UserRole => {
+    if (role === 'admin') return 'admin_dev';
+    if (role === 'salesperson') return 'sales_external';
+    return role;
+};
+
+/**
+ * Retorna lista de cargos que o usuário atual pode gerenciar (criar/editar).
+ * Regra: Só pode criar cargos com nível HIERÁRQUICO MAIOR (número maior) que o seu.
+ * Ex: Nível 2 cria 3, 4, 5... mas não cria 1 ou 2.
+ */
+export const getAvailableRoles = (currentUserRole: UserRole): UserRole[] => {
+    const currentLevel = ROLE_HIERARCHY[currentUserRole];
+
+    // Lista de novos roles (excluindo legados)
+    const newRoles: UserRole[] = [
+
+==> utils/purchaseUtils.ts <==
+import { PurchaseRecord } from '../types';
+
+/**
+ * Valida se um registro de compra é real e possui valor.
+ * Usado para filtrar dados legados/órfãos ou de mock da interface.
+ */
+export const isValidPurchase = (p: PurchaseRecord, filterSalespersonId?: string, startDate?: string, endDate?: string): boolean => {
+    // 1. Deve ter vínculo de arquivo (sourceFileId) para não ser dado fictício/órfão
+    if (!p.sourceFileId) return false;
+
+    // 2. Deve ter quantidade válida ou valor monetário
+    const hasPurchaseData = (p.quantity && p.quantity > 0) || (p.totalValue && p.totalValue > 0) || (p.price && p.price > 0);
+    if (!hasPurchaseData) return false;
+
+    // 3. Filtro de Vendedor (opcional)
+    if (filterSalespersonId && filterSalespersonId !== 'Todos' && p.salespersonId !== filterSalespersonId) {
+        return false;
+    }
+
+    // 4. Filtro de Data (opcional)
+    if (startDate && p.purchaseDate < startDate) return false;
+    if (endDate && p.purchaseDate > endDate) return false;
+
+    return true;
+};
+
+/**
+ * Retorna apenas as compras válidas de um cliente baseada nos filtros ativos.
+ */
+export const getFilteredPurchases = (purchases: PurchaseRecord[] | undefined, filterSalespersonId?: string, startDate?: string, endDate?: string): PurchaseRecord[] => {
+    if (!purchases) return [];
+    return purchases.filter(p => isValidPurchase(p, filterSalespersonId, startDate, endDate));
+};
+
+==> utils/excelParser.ts <==
+import * as XLSX from 'xlsx';
+import { RawClient, Product } from '../types';
+import { parseHyperlink } from './csvParser';
+
+// Helper to normalize headers (remove accents, lowercase)
+const normalizeHeader = (header: string): string => {
+    return String(header)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .trim();
+};
+
+const parseMoney = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    const str = String(value).trim();
+    if (!str) return 0;
+    const clean = str.replace(/[R$\s.]/g, '').replace(',', '.');
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+};
+
+const parsePercentage = (value: any): number => {
+    if (!value) return 0;
+    if (typeof value === 'number') return value;
+    const clean = String(value).replace(/[%]/g, '').replace(',', '.');
+    return parseFloat(clean) || 0;
+};
+
+export const parseExcel = (file: File): Promise<RawClient[]> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                if (!worksheet['!ref']) {
+                    resolve([]);
+                    return;
+                }
+
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
+                const normalizedData: RawClient[] = [];
+
+                // 1. Identify Headers
+
+==> utils/schemas.ts <==
+import { z } from 'zod';
+
+export const ClientSchema = z.object({
+    companyName: z.string().min(1, "Nome da empresa é obrigatório"),
+    cnpj: z.string().optional(),
+    address: z.string().min(5, "Endereço inválido"),
+    contactName: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().email("Email inválido").optional().or(z.literal('')),
+    category: z.string().or(z.array(z.string())).optional(),
+    status: z.enum(['Ativo', 'Inativo', 'Prospeccao']).optional().default('Ativo'),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+});
+
+export const ProductSchema = z.object({
+    name: z.string().default(''),
+    price: z.number().nonnegative().default(0),
+    category: z.string().default('Geral'),
+    section: z.string().optional(),
+    sku: z.string().optional(),
+    brand: z.string().default('Genérico'),
+    factoryCode: z.string().optional(),
+    margin: z.number().optional(),
+    discount: z.number().optional(),
+});
+
+export type ValidatedClient = z.infer<typeof ClientSchema>;
+export type ValidatedProduct = z.infer<typeof ProductSchema>;
+
+==> utils/dateUtils.ts <==
+export const parseDateSafe = (dateString: string | undefined | null): Date | null => {
+    if (!dateString) return null;
+
+    // 1. Try generic Date constructor (handles ISO YYYY-MM-DD)
+    let date = new Date(dateString);
+    if (!isNaN(date.getTime())) return date;
+
+    // 2. Try DD/MM/YYYY format (Common in Brazil CSVs)
+    const dmyMatch = String(dateString).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const month = parseInt(dmyMatch[2], 10) - 1; // Month is 0-indexed
+        const year = parseInt(dmyMatch[3], 10);
+        date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) return date;
+    }
+
+    // 3. Try DD-MM-YYYY
+    const dmyHyphenMatch = String(dateString).match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+    if (dmyHyphenMatch) {
+        const day = parseInt(dmyHyphenMatch[1], 10);
+        const month = parseInt(dmyHyphenMatch[2], 10) - 1;
+        const year = parseInt(dmyHyphenMatch[3], 10);
+        date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) return date;
+    }
+
+    return null;
+};
+
+/**
+ * High-performance helper to check if a parsed target date falls within pre-parsed boundaries.
+ * Useful when iterating over large datasets to avoid parsing start/end dates repeatedly.
+ */
+export const isDateWithinBounds = (
+    tDate: Date,
+    parsedStartDate: Date | null,
+    parsedEndDate: Date | null
+): boolean => {
+    if (parsedStartDate && tDate < parsedStartDate) return false;
+    if (parsedEndDate && tDate > parsedEndDate) return false;
+    return true;
+};
+
+export const isDateInRange = (
+    targetDate: string | undefined | null,
+    startDate: string | undefined | null,
+    endDate: string | undefined | null
+): boolean => {
+    const tDate = parseDateSafe(targetDate);
+
+==> hooks/useDataPersistence.ts <==
+import { useState, useEffect, useRef } from 'react';
+import { EnrichedClient, Product, UploadedFile, AppUser } from '../types';
+import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from '../services/firebaseService';
+import { CATEGORIES, getRegionByUF } from '../utils/constants';
+import { migrateUsers } from '../utils/authUtils';
+
+// Initial Data Loaders
+const loadInitialClients = (): EnrichedClient[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_clients');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            return parsed.map((c: any) => ({
+                ...c,
+                category: Array.isArray(c.category)
+                    ? c.category
+                    : (typeof c.category === 'string' ? [c.category] : ['Outros']),
+                region: getRegionByUF(c.state)
+            }));
+        }
+    } catch (e) {
+        console.error("Failed to load clients", e);
+    }
+    return [];
+};
+
+const loadInitialProducts = (): Product[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_products');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+};
+
+const loadInitialCategories = (): string[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_categories');
+        return saved ? JSON.parse(saved) : CATEGORIES.filter(c => c !== 'Todos');
+    } catch (e) { return CATEGORIES.filter(c => c !== 'Todos'); }
+};
+
+const loadInitialFiles = (): UploadedFile[] => {
+    try {
+        const saved = localStorage.getItem('vendas_ai_files');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+};
+
+// Helper to hash data ignoring lastUpdated timestamp to prevent infinite sync loops
+const hashDataList = (list: any[]) => JSON.stringify(list, (key, value) => key === 'lastUpdated' ? undefined : value);
+
+
+==> hooks/useChat.ts <==
+import { useState, useEffect, useMemo } from 'react';
+import { ChatMessage, ChatConversation, AppUser } from '../types';
+import {
+  sendMessageToCloud,
+  subscribeToMessages,
+  markMessageAsReadInCloud,
+  deleteMessageFromCloud,
+  clearAllMessagesFromCloud
+} from '../services/firebaseService';
+
+export const useChat = (currentUser: AppUser | null, allUsers: AppUser[]) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+  // Subscribe to messages from Firebase
+  useEffect(() => {
+    const unsubscribe = subscribeToMessages((msgs) => {
+      setMessages(msgs);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Process conversations based on messages
+  const conversations: ChatConversation[] = useMemo(() => {
+    if (!currentUser) return [];
+
+    const convMap = new Map<string, ChatConversation>();
+
+    // Group messages by participants
+    messages.forEach(message => {
+      const isSender = message.senderId === currentUser.id;
+      const otherParticipantId = isSender ? message.receiverId : message.senderId;
+
+      // We use the other participant's ID as the conversation ID for simplicity in UI
+      const convId = otherParticipantId;
+
+      const existing = convMap.get(convId);
+      const isUnread = !message.read && !isSender;
+
+      if (!existing) {
+        convMap.set(convId, {
+          userId: convId,
+          lastMessage: message,
+          unreadCount: isUnread ? 1 : 0
+        });
+      } else {
+        // Update last message if this one is newer
+        if (!existing.lastMessage || new Date(message.timestamp) > new Date(existing.lastMessage.timestamp)) {
+          existing.lastMessage = message;
+        }
+
+==> hooks/useAnalytics.ts <==
+import { useEffect, useRef } from 'react';
+import { logActivityToCloud } from '../services/firebaseService';
+import { useAuth } from './useAuth';
+
+export const usePageTracking = (pageName: string, path?: string) => {
+    const { currentUser } = useAuth();
+    const startTimeRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        // Start timer
+        startTimeRef.current = Date.now();
+
+        // Log entry
+        logActivityToCloud({
+            userId: currentUser.id,
+            userName: currentUser.name,
+            userRole: currentUser.role,
+            action: 'VIEW',
+            category: 'NAVIGATION',
+            details: `Acessou a tela: ${pageName}`,
+            metadata: { path: path || window.location.pathname },
+            timestamp: new Date().toISOString()
+        });
+
+        return () => {
+            if (startTimeRef.current) {
+                const duration = (Date.now() - startTimeRef.current) / 1000; // seconds
+
+                if (duration > 2) {
+                    logActivityToCloud({
+                        userId: currentUser.id,
+                        userName: currentUser.name,
+                        userRole: currentUser.role,
+                        action: 'VIEW',
+                        category: 'NAVIGATION',
+                        details: `Permaneceu em ${pageName} por ${duration.toFixed(1)}s`,
+                        metadata: {
+                            duration,
+                            path: path || window.location.pathname
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        };
+    }, [pageName, currentUser, path]);
+};
+
+
+==> hooks/useFilters.ts <==
+import { useState, useMemo } from 'react';
+import { EnrichedClient, AppUser, Product } from '../types';
+import { isAdmin, hasFullDataVisibility } from '../utils/authUtils';
+import { isValidPurchase } from '../utils/purchaseUtils';
+import useDebounce from './useDebounce';
+import { useUrlParams } from './useUrlParams';
+
+export const useFilters = (
+    masterClientList: EnrichedClient[],
+    users: AppUser[],
+    currentUser: AppUser | null,
+    products: Product[]
+) => {
+    // URL Params Helper
+    const { getParam, setParam, clearParams } = useUrlParams();
+
+    // Filter State (Initialize from URL if available)
+    const [searchQuery, setSearchQueryState] = useState<string>(() => getParam('q') || '');
+    const [filterRegion, setFilterRegionState] = useState<string>(() => getParam('region') || 'Todas');
+    const [filterState, setFilterStateState] = useState<string>(() => getParam('state') || 'Todos');
+    const [filterCity, setFilterCityState] = useState<string>(() => getParam('city') || 'Todas');
+    const [filterCategory, setFilterCategoryState] = useState<string>(() => getParam('category') || 'Todos');
+    const [filterSalespersonId, setFilterSalespersonIdState] = useState<string>(() => getParam('salesperson') || 'Todos');
+    const [filterSalesCategory, setFilterSalesCategoryState] = useState<string>(() => getParam('sales_cat') || 'Todos'); // Admin only really
+    const [filterCnae, setFilterCnaeState] = useState<string>(() => getParam('cnae') || 'Todos');
+    const [filterOnlyWithPurchases, setFilterOnlyWithPurchasesState] = useState<boolean>(() => getParam('purchases') === 'true');
+    const [startDate, setStartDateState] = useState<string>(() => getParam('startDict') || '');
+    const [endDate, setEndDateState] = useState<string>(() => getParam('endDate') || '');
+
+    // Product Filters
+    const [filterProductCategory, setFilterProductCategoryState] = useState<string>(() => getParam('prod_cat') || 'Todos');
+    const [filterProductSection, setFilterProductSectionState] = useState<string>(() => getParam('prod_sec') || 'Todas');
+    const [filterProductSku, setFilterProductSkuState] = useState<string>(() => getParam('sku') || 'Todos');
+    const [searchProductQuery, setSearchProductQueryState] = useState<string>(() => getParam('prod_q') || '');
+    const [showProductSuggestions, setShowProductSuggestions] = useState<boolean>(false);
+
+    // --- State Setters Wrappers (Sync with URL) ---
+    const setSearchQuery = (val: string) => { setSearchQueryState(val); setParam('q', val); };
+    const setFilterRegion = (val: string) => { setFilterRegionState(val); setParam('region', val === 'Todas' ? '' : val); };
+    const setFilterState = (val: string) => { setFilterStateState(val); setParam('state', val === 'Todos' ? '' : val); };
+    const setFilterCity = (val: string) => { setFilterCityState(val); setParam('city', val === 'Todas' ? '' : val); };
+    const setFilterCategory = (val: string) => { setFilterCategoryState(val); setParam('category', val === 'Todos' ? '' : val); };
+    const setFilterSalespersonId = (val: string) => { setFilterSalespersonIdState(val); setParam('salesperson', val === 'Todos' ? '' : val); };
+    const setFilterSalesCategory = (val: string) => { setFilterSalesCategoryState(val); setParam('sales_cat', val === 'Todos' ? '' : val); };
+    const setFilterCnae = (val: string) => { setFilterCnaeState(val); setParam('cnae', val === 'Todos' ? '' : val); };
+    const setFilterOnlyWithPurchases = (val: boolean) => { setFilterOnlyWithPurchasesState(val); setParam('purchases', val ? 'true' : ''); };
+    const setStartDate = (val: string) => { setStartDateState(val); setParam('startDict', val); };
+    const setEndDate = (val: string) => { setEndDateState(val); setParam('endDate', val); };
+    const setFilterProductCategory = (val: string) => { setFilterProductCategoryState(val); setParam('prod_cat', val === 'Todos' ? '' : val); };
+    const setFilterProductSection = (val: string) => { setFilterProductSectionState(val); setParam('prod_sec', val === 'Todas' ? '' : val); };
+
+==> hooks/useAuth.ts <==
+import { useState, useMemo } from 'react';
+import { AppUser, UserRole } from '../types';
+
+export const INITIAL_USERS: AppUser[] = [
+    { id: 'admin_dev', name: 'Admin DEV', username: 'admin', email: 'admin@vendas.ai', role: 'admin_dev', password: '123', salesCategory: 'N/A', color: '#6B7280', status: 'Online' },
+    { id: '1', name: 'João Silva (Vendedor A)', username: 'vendedor_a', email: 'joao.silva@vendas.ai', role: 'sales_external', password: '123', salesCategory: 'Externo', color: '#EF4444', status: 'Offline' }, // Red
+    { id: '2', name: 'Maria Santos (Vendedor B)', username: 'vendedor_b', email: 'maria.santos@vendas.ai', role: 'sales_internal', password: '123', salesCategory: 'Interno', color: '#3B82F6', status: 'Offline' }, // Blue
+];
+
+export const useAuth = () => {
+    const [users, setUsers] = useState<AppUser[]>(INITIAL_USERS);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    const currentUser = useMemo(() => {
+        if (!currentUserId) return null;
+        return users.find(u => u.id === currentUserId) || null;
+    }, [users, currentUserId]);
+
+    const login = (user: AppUser) => {
+        // Garantir que o usuário exista na lista para que a derivação funcione
+        if (!users.find(u => u.id === user.id)) {
+            setUsers(prev => [...prev, user]);
+        }
+        setCurrentUserId(user.id);
+    };
+
+    const logout = () => {
+        setCurrentUserId(null);
+    };
+
+    const addUser = (newUser: AppUser) => {
+        setUsers(prev => [...prev, newUser]);
+    };
+
+    const updateUser = (updatedUser: AppUser) => {
+        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    };
+
+    const deleteUser = (userId: string) => {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        if (currentUserId === userId) setCurrentUserId(null);
+    };
+
+    const publicUsers = useMemo(() => {
+        const isAdmDev = currentUser?.role === 'admin_dev';
+        return users.map(u => {
+            if (isAdmDev) return u;
+            return { ...u, password: '***' };
+        });
+    }, [users, currentUser]);
+
+==> hooks/useUrlParams.ts <==
+import { useCallback } from 'react';
+
+export const useUrlParams = () => {
+
+    // Get a specific param
+    const getParam = useCallback((key: string): string | null => {
+        const searchParams = new URLSearchParams(window.location.search);
+        return searchParams.get(key);
+    }, []);
+
+    // Set a specific param (updates URL without reload)
+    const setParam = useCallback((key: string, value: string | null | undefined) => {
+        const searchParams = new URLSearchParams(window.location.search);
+
+        if (value === null || value === undefined || value === '') {
+            searchParams.delete(key);
+        } else {
+            searchParams.set(key, value);
+        }
+
+        const newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
+        window.history.replaceState(null, '', newRelativePathQuery);
+    }, []);
+
+    // Clear all params
+    const clearParams = useCallback(() => {
+        const newRelativePathQuery = window.location.pathname;
+        window.history.replaceState(null, '', newRelativePathQuery);
+    }, []);
+
+    return { getParam, setParam, clearParams };
+};
+
+==> hooks/useDebounce.ts <==
+import { useState, useEffect } from 'react';
+
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
+export default useDebounce;
+
+==> hooks/useChat.ts.tmp <==
+import { useState, useEffect, useCallback } from 'react';
+import { ChatMessage, ChatConversation, AppUser } from '../types';
+import { isFirebaseInitialized, subscribeToCloudChanges } from '../services/firebaseService';
+import { db } from './firebaseService'; // Wait, let's check how to import db from firebaseService.ts properly or just use the subscriber.
+// Looking at firebaseService.ts, db is not exported. But subscribeToCloudChanges listens to 'rota-vendas/master-data'.
+// To implement a real-time chat without messing with the main master-data doc too much,
+// I should probably use a separate collection 'chats'.
+// I'll need to export db from firebaseService or add new functions there.
+
+==> hooks/useFilters.test.ts <==
+import { renderHook, act } from '@testing-library/react';
+import { useFilters } from './useFilters';
+import { EnrichedClient, AppUser, Product } from '../types';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock useUrlParams
+vi.mock('./useUrlParams', () => ({
+    useUrlParams: () => ({
+        getParam: vi.fn(() => null),
+        setParam: vi.fn(),
+        clearParams: vi.fn()
+    })
+}));
+
+// Mock data
+const mockClients: EnrichedClient[] = [
+    {
+        id: '1',
+        companyName: 'Empresa A',
+        ownerName: 'João da Silva',
+        cleanAddress: 'Rua A, 123',
+        city: 'São Paulo',
+        state: 'SP',
+        region: 'Sudeste',
+        category: ['Varejo'],
+        salespersonId: 'user1',
+        lat: 0, lng: 0,
+        purchasedProducts: [],
+        contact: '1199999999',
+        originalAddress: 'Rua A, 123'
+    },
+    {
+        id: '2',
+        companyName: 'Empresa B',
+        ownerName: 'Maria Oliveira',
+        cleanAddress: 'Rua B, 456',
+        city: 'Recife',
+        state: 'PE',
+        region: 'Nordeste',
+        category: ['Atacado'],
+        salespersonId: 'user2',
+        lat: 0, lng: 0,
+        purchasedProducts: [
+            { sku: 'PROD1', name: 'Produto 1', category: 'Cat1', price: 10, quantity: 1, purchaseDate: '2023-01-01', brand: 'Brand1', factoryCode: 'F1', sourceFileId: 'file1' }
+        ],
+        contact: '8199999999',
+        originalAddress: 'Rua B, 456'
+    }
+];
+
+
+==> components/CloudConfigModal.tsx <==
+
+import React, { useState, useEffect } from 'react';
+import { Cloud, Check, Loader2, Trash2, X, Info } from 'lucide-react';
+import { FirebaseConfig, getStoredFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig } from '../firebaseConfig';
+import { initializeFirebase } from '../services/firebaseService';
+import { getSystemSettings, saveSystemSettings, SystemSettings } from '../services/settingsService';
+
+interface CloudConfigModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSaveToCloud?: () => void;
+    onClearDatabase?: () => void;
+    isFirebaseConnected?: boolean;
+}
+
+const CloudConfigModal: React.FC<CloudConfigModalProps> = ({
+    isOpen,
+    onClose,
+    onSaveToCloud,
+    onClearDatabase,
+    isFirebaseConnected = false
+}) => {
+    const [formData, setFormData] = useState<FirebaseConfig>(() => getStoredFirebaseConfig() || {
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: ''
+    });
+
+    // Configurações Globais do Sistema (Chaves API)
+    const [settingsData, setSettingsData] = useState<SystemSettings>({
+        googleMapsApiKey: '',
+        geminiApiKey: '',
+        cnpjaApiKey: '',
+        hubDevToken: '',
+    });
+
+    const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+    const [message, setMessage] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            const stored = getStoredFirebaseConfig();
+            if (stored) {
+                setTimeout(() => {
+                    setFormData(stored);
+                    setStatus('success'); // Assume if stored, it was valid, or let user re-test
+                    setMessage('Configuração salva encontrada.');
+
+==> components/ClientList.tsx <==
+import React, { useState, useEffect, forwardRef, useCallback } from 'react';
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
+import { EnrichedClient, UserRole, Product, AppUser, UploadedFile, PurchaseRecord } from '../types';
+import { REGIONS, CATEGORIES } from '../utils/constants';
+import { isAdmin, isSalesTeam } from '../utils/authUtils';
+import { Search, Filter, Plus, Download, MapPin } from 'lucide-react';
+import EditClientModal from './EditClientModal';
+import AddClientModal from './AddClientModal';
+import ClientProductAssignmentModal from './ClientProductAssignmentModal';
+
+import ClientListSkeleton from './skeletons/ClientListSkeleton';
+import ClientCard from './ClientCard';
+import { AnimatePresence } from 'framer-motion';
+
+interface ClientListProps {
+  clients: EnrichedClient[];
+  isLoading?: boolean;
+  onUpdateClient: (updatedClient: EnrichedClient) => void;
+  onAddClient?: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng' | 'cleanAddress'>) => void;
+  currentUserRole?: UserRole;
+  currentUserId?: string;
+  currentUserName?: string;
+  products: Product[];
+  productCategories: string[];
+  users?: AppUser[];
+  uploadedFiles?: UploadedFile[];
+  onGeneratePlusCodes?: () => void;
+  onCNPJAuthError?: () => void;
+  allClients?: EnrichedClient[];
+  onMergeClients?: (existingClientId: string, duplicateClientId: string, enrichedData: Partial<EnrichedClient>) => void;
+  filterOnlyWithPurchases?: boolean;
+  setFilterOnlyWithPurchases?: (value: boolean) => void;
+  resetFilters?: () => void;
+
+  // Controlled Filter Props
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+  regionFilter: string;
+  onRegionFilterChange: (value: string) => void;
+  categoryFilter: string;
+  onCategoryFilterChange: (value: string) => void;
+
+  // Purchase Filter Context
+  filterSalespersonId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+const ClientList: React.FC<ClientListProps> = ({
+  clients,
+
+==> components/skeletons/ClientListSkeleton.tsx <==
+import React from 'react';
+
+const ClientListSkeleton: React.FC = () => {
+    // Determine valid items count based on screen size (approximate)
+    const isMobile = window.innerWidth < 768;
+    const items = Array.from({ length: isMobile ? 6 : 12 });
+
+    return (
+        <div className={`h-full w-full p-2 ${isMobile ? 'flex flex-col gap-2' : 'grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 content-start'}`}>
+            {items.map((_, index) => (
+                <div
+                    key={index}
+                    className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm animate-pulse flex flex-col gap-3"
+                >
+                    {/* Header: Avatar + Title */}
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3 w-full">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0" />
+                            <div className="flex flex-col gap-1.5 w-full">
+                                <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                <div className="h-3 bg-gray-200 rounded w-1/2" />
+                            </div>
+                        </div>
+                        <div className="w-6 h-6 bg-gray-200 rounded-full flex-shrink-0" />
+                    </div>
+
+                    {/* Body: Info Rows */}
+                    <div className="space-y-2 mt-1">
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 bg-gray-200 rounded" />
+                            <div className="h-3 bg-gray-200 rounded w-full" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 bg-gray-200 rounded" />
+                            <div className="h-3 bg-gray-200 rounded w-2/3" />
+                        </div>
+                    </div>
+
+                    {/* Footer: Tags/Actions */}
+                    <div className="mt-2 flex gap-2 pt-2 border-t border-gray-50">
+                        <div className="h-6 w-16 bg-gray-200 rounded-full" />
+                        <div className="h-6 w-16 bg-gray-200 rounded-full" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+export default ClientListSkeleton;
+
+==> components/LogPanel.tsx <==
+import React, { useState, useEffect } from 'react';
+import {
+    Activity,
+    Search,
+    Filter,
+    Clock,
+    User,
+    AlertCircle,
+    FileText,
+    MessageSquare,
+    RefreshCw,
+    Shield,
+    X,
+    MousePointer2,
+    Eye,
+    Timer
+} from 'lucide-react';
+import { SystemLog, AppUser } from '../types';
+import { subscribeToSystemLogs } from '../services/firebaseService';
+
+interface LogPanelProps {
+    currentUser: AppUser;
+    onClose: () => void;
+}
+
+const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
+    const [logs, setLogs] = useState<SystemLog[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState<string>('ALL');
+    const [filterAction, setFilterAction] = useState<string>('ALL');
+
+    useEffect(() => {
+        const unsubscribe = subscribeToSystemLogs(setLogs);
+        return () => unsubscribe();
+    }, []);
+
+    const filteredLogs = logs.filter(log => {
+        const matchesSearch =
+            log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.details.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = filterCategory === 'ALL' || log.category === filterCategory;
+        const matchesAction = filterAction === 'ALL' || log.action === filterAction;
+        return matchesSearch && matchesCategory && matchesAction;
+    });
+
+    const getActionColor = (action: string) => {
+        switch (action) {
+            case 'CREATE': return 'bg-green-100 text-green-700';
+            case 'UPDATE': return 'bg-blue-100 text-blue-700';
+            case 'DELETE': return 'bg-red-100 text-red-700';
+
+==> components/AdminFileManager.tsx <==
+import React, { useState } from 'react';
+import { FileUp, Users, Package, AlertCircle, CheckCircle, Loader2, Trash2, Calendar, FileText, FileSpreadsheet, Search, Filter, X, RefreshCw } from 'lucide-react';
+import { isSalesTeam } from '../utils/authUtils';
+import { AppUser, UploadedFile } from '../types';
+
+
+interface AdminFileManagerProps {
+    users: AppUser[];
+    uploadedFiles: UploadedFile[];
+    onUploadClients: (file: File, targetUserId: string) => void;
+    onUploadProducts: (file: File) => void;
+    onUploadPurchases: (file: File, targetUserId: string) => void;
+    onDeleteFile: (fileId: string) => void;
+    onReassignSalesperson?: (fileId: string, newSalespersonId: string) => void;
+    procState?: {
+        isActive: boolean;
+        current: number; // Added for progress tracking
+        total: number;   // Added for progress tracking
+        status: 'reading' | 'processing' | 'completed' | 'error';
+        errorMessage?: string;
+    };
+}
+
+interface PendingFile {
+    file: File;
+    targetUserId: string;
+}
+
+const AdminFileManager: React.FC<AdminFileManagerProps> = ({
+    users,
+    uploadedFiles,
+    onUploadClients,
+    onUploadProducts,
+    onUploadPurchases,
+    onDeleteFile,
+    onReassignSalesperson,
+    procState = { isActive: false, status: 'completed', errorMessage: '', current: 0, total: 0 }
+}) => {
+    const [activeTab, setActiveTab] = useState<'clients' | 'products' | 'purchases'>('clients');
+    const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]); // Staging area
+
+    const handleClientFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files).map(file => ({
+                file,
+                targetUserId: targetUploadUserId || '' // Default to currently selected, or empty
+            }));
+
+            setPendingFiles(prev => [...prev, ...newFiles]);
+
+==> components/GoogleMapsKeyModal.tsx <==
+import React from 'react';
+import { Key, Check, Copy, AlertCircle, X, Eye, EyeOff, Edit3 } from 'lucide-react';
+
+interface GoogleMapsKeyModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (key: string) => void;
+    suggestedKey: string;
+}
+
+const GoogleMapsKeyModal: React.FC<GoogleMapsKeyModalProps> = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    suggestedKey
+}) => {
+    const [isManual, setIsManual] = React.useState(false);
+    const [manualKey, setManualKey] = React.useState('');
+    const [showKey, setShowKey] = React.useState(false);
+
+    if (!isOpen) return null;
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(suggestedKey);
+    };
+
+    const maskKey = (key: string) => {
+        if (!key) return '';
+        if (key.length <= 10) return '••••••••';
+        return `${key.slice(0, 6)}•••••••••${key.slice(-4)}`;
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-scale-in border border-white">
+                <div className="bg-blue-600 p-8 text-center relative">
+                    <button
+                        onClick={onClose}
+                        className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors"
+                        title="Fechar"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                    <div className="mx-auto w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md ring-4 ring-blue-500/30 shadow-inner">
+                        <Key className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Ativar Mapa</h2>
+                    <p className="text-blue-100 text-sm mt-2 font-medium">Configure seu acesso ao Google Maps</p>
+                </div>
+
+
+==> components/ChatPanel.tsx <==
+import React, { useState, useRef, useEffect } from 'react';
+import { User, Send, Search, ArrowLeft, Check, CheckCheck, Clock, MessageSquare, Users, Trash2 } from 'lucide-react';
+import { AppUser, ChatMessage, ChatConversation } from '../types';
+
+interface ChatPanelProps {
+    currentUser: AppUser;
+    allUsers: AppUser[];
+    conversations: ChatConversation[];
+    messages: ChatMessage[];
+    activeUserId: string | null;
+    onSelectUser: (userId: string) => void;
+    onSendMessage: (userId: string, text: string) => void;
+    onDeleteMessage?: (messageId: string) => void;
+    onClearMessages?: () => void;
+    onClose?: () => void;
+}
+
+const ChatPanel: React.FC<ChatPanelProps> = ({
+    currentUser,
+    allUsers,
+    conversations,
+    messages,
+    activeUserId,
+    onSelectUser,
+    onSendMessage,
+    onDeleteMessage,
+    onClearMessages,
+    onClose
+}) => {
+    const [inputText, setInputText] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<'conversations' | 'users'>('conversations');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const activeUser = allUsers.find(u => u.id === activeUserId);
+    const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
+    const isMonitorMode = isAdminDev && activeUserId;
+
+    const filteredMessages = messages.filter(m => {
+        if (!activeUserId) return false;
+
+        // If normal user: see only messages with the other party
+        // If Admin Dev: see ALL messages where the activeUserId is involved
+        if (currentUser.role === 'admin_dev' || currentUser.role === 'admin') {
+            return m.senderId === activeUserId || m.receiverId === activeUserId;
+        }
+
+        return (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
+            (m.senderId === activeUserId && m.receiverId === currentUser.id);
+    });
+
+==> components/LoadingSpinner.tsx <==
+import React from 'react';
+import { Loader2 } from 'lucide-react';
+
+interface LoadingSpinnerProps {
+    size?: 'sm' | 'md' | 'lg';
+    color?: 'primary' | 'white' | 'gray';
+    fullScreen?: boolean;
+    text?: string;
+}
+
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
+    size = 'md',
+    color = 'primary',
+    fullScreen = false,
+    text
+}) => {
+    const sizeClasses = {
+        sm: 'w-4 h-4',
+        md: 'w-8 h-8',
+        lg: 'w-12 h-12'
+    };
+
+    const colorClasses = {
+        primary: 'text-blue-600',
+        white: 'text-white',
+        gray: 'text-gray-400'
+    };
+
+    const spinner = (
+        <div className="flex flex-col items-center gap-3">
+            <Loader2 className={`animate-spin ${sizeClasses[size]} ${colorClasses[color]}`} />
+            {text && <p className={`text-sm font-medium ${color === 'white' ? 'text-white' : 'text-gray-600'}`}>{text}</p>}
+        </div>
+    );
+
+    if (fullScreen) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                {spinner}
+            </div>
+        );
+    }
+
+    return spinner;
+};
+
+export default LoadingSpinner;
+
+==> components/AddClientModal.tsx <==
+import React, { useState, useEffect } from 'react';
+import { EnrichedClient, AppUser } from '../types';
+import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
+import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase, Building2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { consultarCNPJ } from '../services/cnpjService';
+import { consultarCPF, buscarSocios, SocioInfo } from '../services/cpfService';
+
+interface AddClientModalProps {
+    isOpen: boolean;
+    isFirebaseConnected?: boolean;
+    onCNPJAuthError?: () => void;
+    onClose: () => void;
+    onAdd: (newClient: Omit<EnrichedClient, 'id' | 'lat' | 'lng'> & { lat?: number; lng?: number }) => void;
+    salespersonId: string;
+    ownerName: string;
+    users?: AppUser[];
+}
+
+const AddClientModal: React.FC<AddClientModalProps> = ({
+    isOpen, onClose, onAdd, salespersonId, ownerName, users = [], onCNPJAuthError
+}) => {
+    const [selectedSalespersonId, setSelectedSalespersonId] = useState(salespersonId);
+    // State for form
+    const [formData, setFormData] = useState({
+        companyName: '',
+        cnpj: '',
+        ownerName: '',
+        contact: '',
+        whatsapp: '',
+        category: ['Outros'],
+        region: 'Nordeste',
+        state: 'CE',
+        city: 'Fortaleza',
+        district: '',
+        originalAddress: '',
+        cleanAddress: '',
+        plusCode: '',
+        zip: '',
+        country: 'Brasil',
+        lat: 0,
+        lng: 0,
+        mainCnae: '',
+        secondaryCnaes: [] as string[]
+    });
+
+    const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
+    const [dataIsMasked, setDataIsMasked] = useState(false);
+    const [socios, setSocios] = useState<SocioInfo[]>([]);
+    const [isSearchingSocios, setIsSearchingSocios] = useState(false);
+
+
+==> components/SalesHistoryPanel.tsx <==
+import React, { useMemo } from 'react';
+import { EnrichedClient, PurchaseRecord, AppUser } from '../types';
+import { ShoppingBag, Calendar, User, TrendingUp, DollarSign } from 'lucide-react';
+import DateRangePicker from './DateRangePicker';
+import { isValidPurchase } from '../utils/purchaseUtils';
+interface SalesHistoryPanelProps {
+    clients: EnrichedClient[];
+    startDate: string;
+    endDate: string;
+    onRangeChange: (start: string, end: string) => void;
+}
+
+const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
+    clients,
+    startDate,
+    endDate,
+    onRangeChange
+}) => {
+    const allPurchases = useMemo(() => {
+        const records: (PurchaseRecord & { clientName: string; clientId: string })[] = [];
+
+        clients.forEach(client => {
+            if (client.purchasedProducts) {
+                client.purchasedProducts.forEach(purchase => {
+                    // Filtro de validade e temporal
+                    if (!isValidPurchase(purchase, 'Todos', startDate, endDate)) return;
+
+                    records.push({
+                        ...purchase,
+                        clientName: client.companyName,
+                        clientId: client.id
+                    });
+                });
+            }
+        });
+
+        // Ordenar por data (mais recente primeiro)
+        return records.sort((a, b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || ''));
+    }, [clients, startDate, endDate]);
+
+    const stats = useMemo(() => {
+        const totalValue = allPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
+        const uniqueClients = new Set(allPurchases.map(p => p.clientId)).size;
+        const totalItems = allPurchases.reduce((sum, p) => sum + (p.quantity || 1), 0);
+
+        return { totalValue, uniqueClients, totalItems };
+    }, [allPurchases]);
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+==> components/CookieConsent.tsx <==
+import React, { useState, useEffect } from 'react';
+import { Cookie, X, Check } from 'lucide-react';
+
+interface CookieConsentProps {
+    onAccept: () => void;
+    onDecline: () => void;
+}
+
+const CookieConsent: React.FC<CookieConsentProps> = ({ onAccept, onDecline }) => {
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const consent = localStorage.getItem('vendas_ai_cookie_consent');
+        if (!consent) {
+            // Small delay for better UX
+            const timer = setTimeout(() => setIsVisible(true), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, []);
+
+    const handleAccept = () => {
+        localStorage.setItem('vendas_ai_cookie_consent', 'accepted');
+        setIsVisible(false);
+        onAccept();
+    };
+
+    const handleDecline = () => {
+        localStorage.setItem('vendas_ai_cookie_consent', 'declined');
+        setIsVisible(false);
+        onDecline();
+    };
+
+    if (!isVisible) return null;
+
+    return (
+        <div className="fixed bottom-0 left-0 right-0 z-[100] p-4 animate-slide-up">
+            <div className="max-w-4xl mx-auto bg-white/95 backdrop-blur-md border border-blue-100 shadow-2xl rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 ring-1 ring-blue-500/10">
+
+                <div className="flex items-start gap-5">
+                    <div className="bg-blue-600/10 p-4 rounded-2xl text-blue-600 shrink-0 ring-1 ring-blue-500/20">
+                        <Cookie className="w-7 h-7" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800 mb-1.5 tracking-tight">Privacidade e Performance</h3>
+                        <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                            Utilizamos armazenamento local para garantir que seu sistema carregue instantaneamente (cache offline).
+                            Isso permite agilidade máxima e operação em áreas com sinal oscilante.
+                        </p>
+                    </div>
+                </div>
+
+==> components/EditClientModal.tsx <==
+import React, { useState } from 'react';
+import { X, Save, User, Store, Phone, Globe, Briefcase, FileText, Search, Loader2, Sparkles, MapPin, Building2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { consultarCNPJ } from '../services/cnpjService';
+import { consultarCPF, buscarSocios, SocioInfo } from '../services/cpfService';
+import { searchClientByName, enrichFromResult, SearchResult } from '../services/clientSearchService';
+import { EnrichedClient, AppUser, UploadedFile } from '../types';
+import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
+import LoadingSpinner from './LoadingSpinner';
+
+interface EditClientModalProps {
+    client: EnrichedClient;
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (updatedClient: EnrichedClient) => void | Promise<void>;
+    users?: AppUser[];
+    uploadedFiles?: UploadedFile[];
+    onCNPJAuthError?: () => void;
+    allClients?: EnrichedClient[];
+    onMergeClients?: (existingClientId: string, duplicateClientId: string, enrichedData: Partial<EnrichedClient>) => void;
+}
+
+const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError, allClients = [], onMergeClients }) => {
+    const [formData, setFormData] = useState<EnrichedClient>(() => ({
+        ...client,
+        cnpj: client.cnpj || '',
+        category: Array.isArray(client.category)
+            ? client.category
+            : (typeof client.category === 'string' ? [client.category] : ['Outros'])
+    }));
+
+    const [isRefreshingByCNPJ, setIsRefreshingByCNPJ] = useState(false);
+    const [refreshStatus, setRefreshStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [dataIsMasked, setDataIsMasked] = useState(false);
+    const [socios, setSocios] = useState<SocioInfo[]>([]);
+    const [isSearchingSocios, setIsSearchingSocios] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Auto-enrichment search state
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [showResults, setShowResults] = useState(false);
+    const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
+
+    const isClientIncomplete = !formData.cnpj?.replace(/\D/g, '') || formData.lat === 0 || formData.lng === 0
+        || !formData.cleanAddress || formData.cleanAddress === 'Endereço não cadastrado';
+
+    // Duplicate detection state
+    const [duplicateWarnings, setDuplicateWarnings] = useState<{ clientId: string; companyName: string; similarity: string }[]>([]);
+
+
+==> components/ClientMap.tsx <==
+import * as React from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  APIProvider,
+  Map as GoogleMap,
+  InfoWindow,
+  useMap
+} from '@vis.gl/react-google-maps';
+import { MarkerClusterer } from '@googlemaps/markerclusterer';
+import { EnrichedClient, AppUser } from '../types';
+import { getFilteredPurchases } from '../utils/purchaseUtils';
+import { Store, User, Phone, MapPin, Tag, AlertCircle, Key, Globe, Plus, Minus, ShoppingBag, Maximize2, Minimize2, Layers } from 'lucide-react';
+
+declare const google: any;
+
+interface ClientMapProps {
+  clients: EnrichedClient[];
+  apiKey: string;
+  onInvalidKey: () => void;
+  productFilterActive?: boolean;
+  highlightProductTerm?: string;
+  users?: AppUser[];
+  filterContent?: React.ReactNode;
+  filterSalespersonId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+interface MapStyleSelectorProps {
+  mapTypeId: string;
+  setMapTypeId: (id: string) => void;
+}
+
+const MapStyleSelector: React.FC<MapStyleSelectorProps> = ({ mapTypeId, setMapTypeId }) => (
+  <div className="relative group">
+    <button
+      className="bg-white p-1.5 px-3 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none flex items-center gap-2 text-xs font-bold"
+      title="Alterar Estilo do Mapa"
+    >
+      <Layers className="w-4 h-4" />
+      <span className="hidden sm:inline">Estilo</span>
+    </button>
+    <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-xl border border-gray-100 py-1 hidden group-hover:block z-50">
+      <button onClick={() => setMapTypeId('roadmap')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'roadmap' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Map</button>
+      <button onClick={() => setMapTypeId('hybrid')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'hybrid' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Satélite</button>
+      <button onClick={() => setMapTypeId('terrain')} className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${mapTypeId === 'terrain' ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}>Relevo</button>
+    </div>
+  </div>
+);
+
+
+==> components/DateRangePicker.tsx <==
+import React, { useState, useRef, useEffect } from 'react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
+
+interface DateRangePickerProps {
+    startDate: string;
+    endDate: string;
+    onRangeChange: (start: string, end: string) => void;
+    label?: string;
+}
+
+const DateRangePicker: React.FC<DateRangePickerProps> = ({
+    startDate,
+    endDate,
+    onRangeChange,
+    label = "Período"
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [viewDate, setViewDate] = useState(new Date());
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const formatDate = (date: Date) => {
+        return date.toISOString().split('T')[0];
+    };
+
+    const handleDateClick = (date: Date) => {
+        const dateStr = formatDate(date);
+
+        if (!startDate || (startDate && endDate)) {
+            // Start new selection
+            onRangeChange(dateStr, '');
+        } else {
+            // Second click: set end date or swap if start > end
+            if (dateStr < startDate) {
+                onRangeChange(dateStr, startDate);
+            } else if (dateStr === startDate) {
+                onRangeChange(startDate, dateStr); // effectively range of 1 day
+            } else {
+                onRangeChange(startDate, dateStr);
+            }
+
+==> components/ClientProductAssignmentModal.tsx <==
+import React, { useState, useMemo } from 'react';
+import { Product, EnrichedClient } from '../types';
+import { X, Search, CheckCircle, Save, ShoppingBag } from 'lucide-react';
+
+interface ClientProductAssignmentModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    client: EnrichedClient | null;
+    products: Product[];
+    onSave: (clientId: string, products: Product[]) => void;
+    productCategories: string[];
+}
+
+const ClientProductAssignmentModal: React.FC<ClientProductAssignmentModalProps> = ({
+    isOpen,
+    onClose,
+    client,
+    products,
+    onSave,
+    productCategories
+}) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('Todos');
+    const [selectedProductSkus, setSelectedProductSkus] = useState<string[]>([]);
+    const [showOnlyPurchased, setShowOnlyPurchased] = useState(false);
+
+    // Initialize selected products when client changes
+    React.useEffect(() => {
+        if (client && client.purchasedProducts) {
+            setSelectedProductSkus(client.purchasedProducts.map(p => p.sku));
+        } else {
+            setSelectedProductSkus([]);
+        }
+    }, [client]);
+
+    const filteredProducts = useMemo(() => {
+        // Optimization: Hoist searchTerm lowercase conversion outside the filter loop
+        // to avoid O(N) redundant string allocations and conversions.
+        const normalizedSearch = searchTerm.toLowerCase();
+
+        return products.filter(product => {
+            const matchesSearch =
+                (product.name || '').toLowerCase().includes(normalizedSearch) ||
+                (product.sku || '').toLowerCase().includes(normalizedSearch) ||
+                (product.brand || '').toLowerCase().includes(normalizedSearch);
+
+            const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
+
+            const isSelected = selectedProductSkus.includes(product.sku);
+            const matchesPurchased = !showOnlyPurchased || isSelected;
+
+==> components/AdminDashboard.tsx <==
+import React, { useMemo, useState } from 'react';
+import {
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend, BarChart, Bar
+} from 'recharts';
+import {
+    TrendingUp, Users, Package, DollarSign,
+    ArrowUpRight, ArrowDownRight, Globe, RefreshCcw, Activity,
+    Search, Filter, User as UserIcon, Briefcase, ShoppingBag, X, Calendar
+} from 'lucide-react';
+import { EnrichedClient, Product, AppUser } from '../types';
+import { REGIONS } from '../utils/constants';
+import { isDateWithinBounds, parseDateSafe } from '../utils/dateUtils';
+
+interface AdminDashboardProps {
+    clients: EnrichedClient[];
+    products: Product[];
+    users: AppUser[];
+    onClose: () => void;
+    // Filters from App.tsx
+    searchQuery: string;
+    setSearchQuery: (val: string) => void;
+    filterRegion: string;
+    setFilterRegion: (val: string) => void;
+    filterState: string;
+    setFilterState: (val: string) => void;
+    filterCity: string;
+    setFilterCity: (val: string) => void;
+    filterCategory: string;
+    setFilterCategory: (val: string) => void;
+    filterSalespersonId: string;
+    setFilterSalespersonId: (val: string) => void;
+    filterSalesCategory: string;
+    setFilterSalesCategory: (val: string) => void;
+    filterCnae: string;
+    setFilterCnae: (val: string) => void;
+    filterProductCategory: string;
+    setFilterProductCategory: (val: string) => void;
+    productCategories: string[];
+    filterOnlyWithPurchases?: boolean;
+    setFilterOnlyWithPurchases?: (value: boolean) => void;
+    resetFilters?: () => void;
+    startDate: string;
+    setStartDate: (val: string) => void;
+    endDate: string;
+    setEndDate: (val: string) => void;
+    // Utils
+    availableStates: string[];
+    availableCities: string[];
+    availableCnaes: string[];
+
+==> components/ui/Toast.tsx <==
+import React, { useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { ToastMessage, useToast } from '../../contexts/ToastContext';
+
+interface ToastProps {
+    message: ToastMessage;
+}
+
+const icons = {
+    success: <CheckCircle className="w-5 h-5" />,
+    error: <AlertCircle className="w-5 h-5" />,
+    info: <Info className="w-5 h-5" />,
+    warning: <AlertTriangle className="w-5 h-5" />,
+};
+
+const colors = {
+    success: 'bg-green-50 border-green-200 text-green-800',
+    error: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-blue-50 border-blue-200 text-blue-800',
+    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+};
+
+const iconColors = {
+    success: 'text-green-600',
+    error: 'text-red-600',
+    info: 'text-blue-600',
+    warning: 'text-yellow-600',
+};
+
+const Toast: React.FC<ToastProps> = ({ message }) => {
+    const { removeToast } = useToast();
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            removeToast(message.id);
+        }, message.duration);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [message.id, message.duration, removeToast]);
+
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, y: 50, scale: 0.3 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
+            className={`relative flex items-start gap-3 w-full max-w-sm rounded-lg border p-4 shadow-lg pointer-events-auto ${colors[message.type]}`}
+
+==> components/CustomDialog.tsx <==
+import React from 'react';
+import { X, AlertCircle, CheckCircle2, Info, HelpCircle, LucideIcon } from 'lucide-react';
+
+export type DialogType = 'info' | 'success' | 'warning' | 'error' | 'confirm';
+
+interface CustomDialogProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm?: () => void;
+    title: string;
+    message: string | string[];
+    type?: DialogType;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    icon?: LucideIcon;
+}
+
+const CustomDialog: React.FC<CustomDialogProps> = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    title,
+    message,
+    type = 'info',
+    confirmLabel = 'Confirmar',
+    cancelLabel = 'Cancelar',
+    icon: CustomIcon
+}) => {
+    if (!isOpen) return null;
+
+    const getIcon = () => {
+        if (CustomIcon) return <CustomIcon className="w-8 h-8" />;
+        switch (type) {
+            case 'success': return <CheckCircle2 className="w-8 h-8 text-green-600" />;
+            case 'error': return <AlertCircle className="w-8 h-8 text-red-600" />;
+            case 'warning': return <AlertCircle className="w-8 h-8 text-amber-600" />;
+            case 'confirm': return <HelpCircle className="w-8 h-8 text-blue-600" />;
+            default: return <Info className="w-8 h-8 text-blue-600" />;
+        }
+    };
+
+    const getColors = () => {
+        switch (type) {
+            case 'success': return { bg: 'bg-green-50', border: 'border-green-100', text: 'text-green-800' };
+            case 'error': return { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-800' };
+            case 'warning': return { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-800' };
+            case 'confirm': return { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-800' };
+            default: return { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-800' };
+        }
+    };
+
+==> components/AdminUserManagement.tsx <==
+import React, { useState, useRef } from 'react';
+import { User, UserPlus, Shield, Trash2, Pencil, X, Save, Briefcase, AlertCircle, Camera, Upload } from 'lucide-react';
+import { AppUser, SalesCategory, UserRole } from '../types';
+import { getRoleLabel, getAvailableRoles, canManageRole, normalizeRole, ROLE_HIERARCHY, ROLE_LABELS } from '../utils/authUtils';
+import { resizeImageToBase64 } from '../utils/imageUtils';
+import { logActivityToCloud } from '../services/firebaseService';
+
+interface AdminUserManagementProps {
+  currentUser: AppUser;
+  users: AppUser[];
+  onAddUser: (user: AppUser) => void;
+  onUpdateUser: (user: AppUser) => void;
+  onDeleteUser: (userId: string) => void;
+  onCleanupDuplicates: () => void;
+  onClearPurchases: () => void;
+  totalClients: number;
+}
+
+const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
+  currentUser,
+  users,
+  onAddUser,
+  onUpdateUser,
+  onDeleteUser,
+  onCleanupDuplicates,
+  onClearPurchases,
+  totalClients
+}) => {
+  // Form State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  // Default to the first available role or lowest hierarchy role
+  const availableRoles = getAvailableRoles(currentUser.role);
+  const defaultRole = availableRoles.includes('sales_external') ? 'sales_external' : availableRoles[0];
+
+  const [role, setRole] = useState<UserRole>(defaultRole);
+  const [salesCategory, setSalesCategory] = useState<SalesCategory>('Externo');
+  const [color, setColor] = useState('#3B82F6'); // Default Blue
+  const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter State
+  const [filterType, setFilterType] = useState<'Todos' | SalesCategory>('Todos');
+
+  const resetForm = () => {
+    setEditingId(null);
+
+==> components/CNPJaKeyModal.tsx <==
+import React from 'react';
+import { Key, Check, Copy, AlertCircle, X, Eye, EyeOff, Edit3, ExternalLink } from 'lucide-react';
+
+interface CNPJaKeyModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (key: string) => void;
+}
+
+const CNPJaKeyModal: React.FC<CNPJaKeyModalProps> = ({
+    isOpen,
+    onClose,
+    onConfirm
+}) => {
+    const [manualKey, setManualKey] = React.useState('');
+    const [showKey, setShowKey] = React.useState(false);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            const storedKey = localStorage.getItem('cnpja_api_key') || '';
+            setManualKey(storedKey);
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-scale-in border border-white">
+                <div className="bg-blue-600 p-8 text-center relative">
+                    <button
+                        onClick={onClose}
+                        className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors"
+                        title="Fechar"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                    <div className="mx-auto w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md ring-4 ring-blue-500/30 shadow-inner">
+                        <Key className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">API Comercial CNPJa</h2>
+                    <p className="text-blue-100 text-sm mt-2 font-medium">Configure sua chave de consulta comercial</p>
+                </div>
+
+                <div className="p-8 space-y-6">
+                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-4">
+                        <div className="bg-white p-2 rounded-lg shadow-sm shrink-0">
+                            <AlertCircle className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div className="space-y-2">
+
+==> components/ErrorBoundary.tsx <==
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
+
+interface Props {
+    children?: ReactNode;
+    fallback?: ReactNode;
+    onReset?: () => void;
+    componentName?: string;
+}
+
+interface State {
+    hasError: boolean;
+    error?: Error;
+}
+
+class ErrorBoundary extends Component<Props, State> {
+    public state: State = {
+        hasError: false
+    };
+
+    public static getDerivedStateFromError(error: Error): State {
+        return { hasError: true, error };
+    }
+
+    public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+        console.error(`[ErrorBoundary] Erro capturado em ${this.props.componentName || 'Componente'}:`, error, errorInfo);
+    }
+
+    private handleReset = () => {
+        this.setState({ hasError: false, error: undefined });
+        if (this.props.onReset) {
+            this.props.onReset();
+        }
+    };
+
+    public render() {
+        if (this.state.hasError) {
+            if (this.props.fallback) {
+                return this.props.fallback;
+            }
+
+            return (
+                <div className="h-full w-full min-h-[300px] flex flex-col items-center justify-center bg-rose-50 rounded-xl border border-rose-200 p-8 text-center shadow-inner">
+                    <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                        <AlertTriangle className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Ops! Algo deu errado.</h3>
+                    <p className="text-sm text-gray-600 mb-6 max-w-sm">
+                        Ocorreu um erro inesperado ao carregar {this.props.componentName || 'este componente'}.
+                    </p>
+
+==> components/ClientList.test.tsx <==
+import { render, screen, fireEvent } from '@testing-library/react';
+import ClientList from './ClientList';
+import { EnrichedClient, AppUser } from '../types';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock Dependencies
+vi.mock('react-virtuoso', () => ({
+    Virtuoso: ({ data, itemContent }: any) => (
+        <div data-testid="virtuoso-list">
+            {data.map((item: any, index: number) => (
+                <div key={index}>{itemContent(index, item)}</div>
+            ))}
+        </div>
+    ),
+    VirtuosoGrid: ({ data, itemContent }: any) => (
+        <div data-testid="virtuoso-grid">
+            {data.map((item: any, index: number) => (
+                <div key={index}>{itemContent(index, item)}</div>
+            ))}
+        </div>
+    ),
+}));
+
+vi.mock('./EditClientModal', () => ({ default: () => <div data-testid="edit-modal">Edit Modal</div> }));
+vi.mock('./AddClientModal', () => ({ default: () => <div data-testid="add-modal">Add Modal</div> }));
+vi.mock('./ClientProductAssignmentModal', () => ({ default: () => <div data-testid="product-modal">Product Modal</div> }));
+
+const mockClients: EnrichedClient[] = [
+    {
+        id: '1',
+        companyName: 'Empresa Teste',
+        ownerName: 'Dono Teste',
+        cleanAddress: 'Rua Teste',
+        city: 'Cidade Teste',
+        state: 'TE',
+        region: 'Sul',
+        category: ['Varejo'],
+        salespersonId: 'user1',
+        lat: 0, lng: 0,
+        purchasedProducts: [],
+        contact: '999999999',
+        originalAddress: 'Rua Teste',
+    }
+];
+
+const mockUsers: AppUser[] = [
+    { id: 'user1', name: 'Vendedor 1', username: 'vendedor1', role: 'sales_external' }
+];
+
+describe('ClientList Component', () => {
+
+==> components/ClientCard.tsx <==
+import React from 'react';
+import { MapPin, ShoppingBag, ExternalLink, Edit2, AlertCircle } from 'lucide-react';
+import { EnrichedClient, Product, AppUser } from '../types';
+import { getFilteredPurchases } from '../utils/purchaseUtils';
+
+interface ClientCardProps {
+    client: EnrichedClient;
+    onEdit: (client: EnrichedClient) => void;
+    onAssignProducts: (client: EnrichedClient) => void;
+    style?: React.CSSProperties;
+    filterSalespersonId?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+}
+
+const ClientCard: React.FC<ClientCardProps> = ({
+    client,
+    onEdit,
+    onAssignProducts,
+    style,
+    filterSalespersonId,
+    startDate,
+    endDate
+}) => {
+    // Determine if we have valid purchases for the current UI context
+    const activePurchases = getFilteredPurchases(
+        client.purchasedProducts,
+        filterSalespersonId,
+        startDate || undefined,
+        endDate || undefined
+    );
+    const hasPurchases = activePurchases.length > 0;
+
+    // Helper to get initials
+    const getInitials = (name: string) => name.charAt(0).toUpperCase();
+
+    // Determine region color
+    const getRegionClass = (region: string) => {
+        switch (region) {
+            case 'Sul': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'Norte': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case 'Nordeste': return 'bg-amber-100 text-amber-700 border-amber-200';
+            case 'Sudeste': return 'bg-purple-100 text-purple-700 border-purple-200';
+            case 'Centro-Oeste': return 'bg-rose-100 text-rose-700 border-rose-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
+
+    const regionClass = getRegionClass(client.region);
+
+
+==> components/AdminProductManagement.tsx <==
+import React, { useState, useEffect } from 'react';
+import { Package, Upload, Trash2, Search, Save, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react';
+import { Product } from '../types';
+import { parseProductCSV } from '../utils/csvParser';
+import { parseProductExcel } from '../utils/excelParser';
+
+interface AdminProductManagementProps {
+  products: Product[];
+  onUploadProducts: (products: Product[]) => void;
+  onClearProducts: () => void;
+  onSaveProducts?: (products: Product[]) => void;
+}
+
+type SortKey = 'sku' | 'brand' | 'factoryCode' | 'name' | 'price' | 'category' | 'section' | 'discount';
+
+interface SortConfig {
+  key: SortKey;
+  direction: 'asc' | 'desc';
+}
+
+const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
+  products,
+  onUploadProducts,
+  onClearProducts,
+  onSaveProducts,
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [filter, setFilter] = useState('');
+
+  // Local state for editing and sorting
+  const [localProducts, setLocalProducts] = useState<Product[]>([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Sync props to local state when props change
+  useEffect(() => {
+    setLocalProducts(products);
+    setHasChanges(false);
+  }, [products]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      let newProducts: Product[] = [];
+      const lowerName = file.name.toLowerCase();
+
+      if (lowerName.endsWith('.csv')) {
+
+==> components/LoadingScreen.tsx <==
+
+import React, { useState, useEffect } from 'react';
+import { Loader2, ShieldCheck, Database, Package, CheckCircle2 } from 'lucide-react';
+
+interface LoadingScreenProps {
+    progress: number;
+    message: string;
+}
+
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, message }) => {
+    const [displayProgress, setDisplayProgress] = useState(0);
+
+    // Smooth progress animation
+    useEffect(() => {
+        if (displayProgress < progress) {
+            const timer = setTimeout(() => setDisplayProgress(prev => Math.min(prev + 1, progress)), 20);
+            return () => clearTimeout(timer);
+        }
+    }, [progress, displayProgress]);
+
+    const getIcon = () => {
+        if (progress < 30) return <ShieldCheck className="w-8 h-8 text-blue-400 animate-pulse" />;
+        if (progress < 60) return <Database className="w-8 h-8 text-purple-400 animate-bounce" />;
+        if (progress < 90) return <Package className="w-8 h-8 text-orange-400 animate-pulse" />;
+        return <CheckCircle2 className="w-8 h-8 text-green-400" />;
+    };
+
+    return (
+        <div className="fixed inset-0 z-[999] bg-slate-900 flex flex-col items-center justify-center p-6 text-white font-sans">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] opacity-10 bg-cover bg-center"></div>
+
+            <div className="relative z-10 w-full max-w-sm text-center">
+                <div className="mb-8 flex justify-center">
+                    <div className="p-4 bg-white/5 rounded-3xl backdrop-blur-md border border-white/10 shadow-2xl">
+                        {getIcon()}
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold mb-2 tracking-tight">Preparando seu Ambiente</h2>
+                <p className="text-slate-400 text-sm mb-10 h-5">{message}</p>
+
+                <div className="relative pt-1">
+                    <div className="flex mb-4 items-center justify-between">
+                        <div>
+                            <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-200 bg-blue-900/30 border border-blue-500/20">
+                                {displayProgress === 100 ? 'Concluído' : 'Sincronizando'}
+                            </span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-sm font-bold inline-block text-blue-400">
+
+==> components/AdminCategoryManagement.tsx <==
+import React, { useState } from 'react';
+import { Tag, Plus, Trash2, Layers } from 'lucide-react';
+
+interface AdminCategoryManagementProps {
+  categories: string[];
+  onAddCategory: (category: string) => void;
+  onDeleteCategory: (category: string) => void;
+}
+
+const AdminCategoryManagement: React.FC<AdminCategoryManagementProps> = ({
+  categories,
+  onAddCategory,
+  onDeleteCategory
+}) => {
+  const [newCategory, setNewCategory] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newCategory.trim()) {
+      onAddCategory(newCategory.trim());
+      setNewCategory('');
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6 animate-fade-in pb-20">
+      <div className="bg-white rounded-[28px] shadow-elevation-1 p-6 border border-transparent">
+        <h2 className="text-xl font-normal text-on-surface mb-2 flex items-center gap-2">
+          <Layers className="w-5 h-5 text-primary" />
+          Gerenciar Categorias de Produtos
+        </h2>
+        <p className="text-sm text-on-surface-variant mb-6">
+          Defina as categorias que a Inteligência Artificial utilizará para classificar os novos clientes importados.
+        </p>
+
+        <form onSubmit={handleSubmit} className="flex gap-3 mb-8">
+          <div className="relative flex-1">
+            <Tag className="absolute left-3 top-3 h-5 w-5 text-on-surface-variant" />
+            <input
+              type="text"
+              value={newCategory}
+              onChange={e => setNewCategory(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border-b border-outline-variant rounded-t-lg text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none transition-colors placeholder:text-on-surface-variant/50"
+              placeholder="Nova Categoria (ex: Auto Elétrica)"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!newCategory.trim()}
+            className="bg-primary text-on-primary font-medium px-6 py-2.5 rounded-full hover:bg-primary/90 disabled:bg-on-surface/12 disabled:text-on-surface/38 disabled:cursor-not-allowed transition-all shadow-elevation-1 hover:shadow-elevation-2 flex items-center gap-2"
+
+==> components/LoginScreen.tsx <==
+import React, { useState, useEffect } from 'react';
+import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, Mail, ArrowLeft, Check, Send, Shield } from 'lucide-react';
+import { AppUser } from '../types';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { migrateUsers } from '../utils/authUtils';
+
+interface LoginScreenProps {
+  users: AppUser[];
+  onLogin: (user: AppUser) => void;
+}
+
+type LoginView = 'login' | 'forgot_pass';
+
+const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
+  const [view, setView] = useState<LoginView>('login');
+
+  // Login Form State
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  // Recovery Form State
+  const [isLoading, setIsLoading] = useState(false);
+
+  // CAPTCHA Hook
+  const { executeRecaptcha } = useGoogleReCaptcha();
+  const [isVerifying, setIsVerifying] = useState(false);
+
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Log da chave para debug (sem expor chave completa)
+    const captchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    console.log('[CAPTCHA] Key configured:', captchaKey ? `${captchaKey.substring(0, 10)}...` : 'MISSING');
+    console.log('[CAPTCHA] executeRecaptcha available:', !!executeRecaptcha);
+
+    setIsVerifying(true);
+
+    try {
+      // Tenta executar o reCAPTCHA de forma silenciosa e não bloqueante (Bypass Universal Ativado)
+      if (executeRecaptcha) {
+        executeRecaptcha('login').catch(e => console.warn('[CAPTCHA] Falha silenciosa:', e));
+      } else {
+        console.warn('[CAPTCHA] Bypass automático ativado: executeRecaptcha não disponível.');
+      }
+
+      // Simular um pequeno delay de "segurança" para UX e então entrar direto
+
+==> services/clientSearchService.ts <==
+import { pesquisarEmpresaPorEndereco, consultarCNPJ, CNPJResponse } from './cnpjService';
+import { EnrichedClient } from '../types';
+
+export interface SearchResult {
+    source: 'local' | 'cnpja';
+    cnpj?: string;
+    companyName: string;
+    ownerName?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    district?: string;
+    phone?: string;
+    mainCnae?: string;
+    lat?: number;
+    lng?: number;
+    googleMapsUri?: string;
+    /** Full CNPJ data if fetched */
+    fullData?: CNPJResponse;
+}
+
+/**
+ * Normalizes a string for fuzzy comparison (lowercase, no accents, no extra spaces)
+ */
+const normalize = (s: string): string =>
+    s.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+/**
+ * Checks if two strings are a fuzzy match (one contains the other)
+ */
+const fuzzyMatch = (a: string, b: string): boolean => {
+    const na = normalize(a);
+    const nb = normalize(b);
+    if (!na || !nb) return false;
+    return na.includes(nb) || nb.includes(na);
+};
+
+/**
+ * Search for client data locally (in existing client list) and externally (CNPJa API).
+ * Returns a list of SearchResult suggestions.
+ */
+export const searchClientByName = async (
+    query: string,
+    state: string | undefined,
+    allClients: EnrichedClient[],
+    currentClientId: string
+
+==> services/firebaseService.ts <==
+
+import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
+import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
+import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus } from '../types';
+
+let app: FirebaseApp | undefined;
+let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
+
+export const initializeFirebase = async (config?: FirebaseConfig): Promise<boolean> => {
+    try {
+        const firebaseConfig = config || getStoredFirebaseConfig();
+        if (!firebaseConfig) return false;
+
+        if (getApps().length > 0) {
+            app = getApp();
+        } else {
+            app = initializeApp(firebaseConfig);
+        }
+
+        // Initialize Cloud Firestore with default settings (persistence is enabled by default in many environments)
+        db = initializeFirestore(app, {});
+        storage = getStorage(app);
+        return true;
+    } catch (error) {
+        console.error("Error initializing Firebase:", error);
+        return false;
+    }
+};
+
+export const getFirestoreDb = () => db;
+
+export const isFirebaseInitialized = () => !!db;
+
+// -- CHAT FUNCTIONS --
+
+export const sendMessageToCloud = async (message: Omit<ChatMessage, 'id'>) => {
+    if (!db) {
+        console.error("❌ Firebase not initialized. Cannot send message.");
+        return;
+    }
+    try {
+        const chatRef = collection(db, 'chats');
+        await addDoc(chatRef, removeUndefined(message));
+        console.log("✅ Message sent to cloud");
+    } catch (e) {
+        console.error("Error sending message:", e);
+    }
+
+==> services/cnpjService.ts <==
+
+export interface CNPJResponse {
+    cnpj: string;
+    razao_social: string;
+    nome_fantasia?: string;
+    logradouro: string;
+    numero: string;
+    complemento?: string;
+    bairro: string;
+    cep: string;
+    municipio: string;
+    uf: string;
+    ddd_telefone_1?: string;
+    cnae_fiscal?: string;
+    cnae_descricao?: string;
+    cnaes_secundarios?: { codigo: number; texto: string }[];
+    situacao_cadastral?: string;
+    latitude?: number;
+    longitude?: number;
+    fonte?: string;
+}
+
+/**
+ * Busca dados de endereço a partir do CEP usando ViaCEP
+ */
+export const fetchAddressByCEP = async (cep: string): Promise<{ logradouro: string; bairro: string; municipio: string; uf: string } | null> => {
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length !== 8) return null;
+
+    try {
+        const response = await fetchWithTimeout(`https://viacep.com.br/ws/${cleanCEP}/json/`, {}, 5000);
+        if (!response.ok) return null;
+        const data = await response.json();
+
+        if (data.erro) return null;
+
+        return {
+            logradouro: data.logradouro || '',
+            bairro: data.bairro || '',
+            municipio: data.localidade || '',
+            uf: data.uf || ''
+        };
+    } catch (error) {
+        console.warn("Erro ao consultar ViaCEP:", error);
+        return null;
+    }
+};
+
+const getApiKey = () => {
+    return localStorage.getItem('cnpja_api_key') || import.meta.env.VITE_CNPJA_API_KEY || '';
+
+==> services/cpfService.ts <==
+export interface CPFResponse {
+    cpf: string;
+    nome_da_pf: string;
+    data_nascimento?: string;
+    situacao_cadastral?: string;
+    logradouro?: string;
+    numero?: string;
+    bairro?: string;
+    cep?: string;
+    municipio?: string;
+    uf?: string;
+    telefone?: string;
+    isMasked?: boolean;
+}
+
+export interface SocioInfo {
+    cnpj: string;
+    razao_social: string;
+    situacao_cadastral: string;
+}
+
+import { getSystemSettings } from './settingsService';
+
+const getApiKey = async () => {
+    const settings = await getSystemSettings();
+    return settings?.hubDevToken || localStorage.getItem('hub_dev_token') || import.meta.env.VITE_HUB_DEV_TOKEN || '';
+};
+
+const BASE_URL = 'https://ws.hubdodesenvolvedor.com.br/v2';
+
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs: number = 8000) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        throw error;
+    }
+};
+
+/**
+ * Detecta se uma string contém asteriscos de mascaramento
+ */
+const detectMask = (text?: string): boolean => {
+
+==> services/geocodingService.ts <==
+
+interface GeocodeResult {
+    lat: number;
+    lng: number;
+    formattedAddress?: string;
+    locationType?: string;
+    addressComponents?: Array<{
+        long_name: string;
+        short_name: string;
+        types: string[];
+    }>;
+}
+
+export const geocodeAddress = async (
+    address: string,
+    apiKey: string
+): Promise<GeocodeResult | null> => {
+    if (!address || !apiKey) {
+        console.warn("Geocoding aborted: Missing address or API key");
+        return null;
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        const encodedAddress = encodeURIComponent(address);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+            const result = data.results[0];
+            const location = result.geometry.location;
+
+            return {
+                lat: location.lat,
+                lng: location.lng,
+                formattedAddress: result.formatted_address,
+                locationType: result.geometry.location_type,
+                addressComponents: result.address_components
+            };
+        } else {
+            const errorMsg = data.error_message ? ` - ${data.error_message}` : '';
+            console.warn(`Geocoding failed for address "${address}":`, data.status, data.error_message);
+            throw new Error(`Google Maps API Erro (${data.status})${errorMsg}`);
+        }
+
+==> services/clientEnrichmentService.ts <==
+import { EnrichedClient, RawClient } from "../types";
+import { cleanAddress } from "../utils/csvParser";
+import { geocodeAddress } from "./geocodingService";
+import { consultarCNPJ, CNPJResponse } from "./cnpjService";
+import { consultarCPF, CPFResponse } from "./cpfService";
+import pLimit from 'p-limit';
+
+/**
+ * Helper to determine Region from CEP
+ */
+const getRegionFromCEP = (cep: string): string => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length < 5) return 'Indefinido';
+
+    const prefix = parseInt(cleanCep.substring(0, 1));
+    const range = parseInt(cleanCep.substring(0, 2));
+
+    if (prefix === 0 || prefix === 1 || prefix === 2 || prefix === 3) return 'Sudeste';
+    if (prefix === 8 || prefix === 9) return 'Sul';
+    if (prefix === 4 || prefix === 5) return 'Nordeste';
+
+    if (prefix === 6) {
+        if (range >= 60 && range <= 65) return 'Nordeste';
+        return 'Norte';
+    }
+
+    if (prefix === 7) {
+        if (range === 77 || range === 76) return 'Norte';
+        return 'Centro-Oeste';
+    }
+
+    return 'Indefinido';
+};
+
+/**
+ * Helper to determine Region from State (UF)
+ */
+const getRegionFromState = (uf: string): string => {
+    const nordeste = ['MA', 'PI', 'CE', 'RN', 'PB', 'PE', 'AL', 'SE', 'BA'];
+    const norte = ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'];
+    const centroOeste = ['GO', 'MT', 'MS', 'DF'];
+    const sudeste = ['ES', 'MG', 'RJ', 'SP'];
+    const sul = ['PR', 'SC', 'RS'];
+
+    const normalizedUF = uf.toUpperCase().trim();
+    if (nordeste.includes(normalizedUF)) return 'Nordeste';
+    if (norte.includes(normalizedUF)) return 'Norte';
+    if (centroOeste.includes(normalizedUF)) return 'Centro-Oeste';
+    if (sudeste.includes(normalizedUF)) return 'Sudeste';
+    if (sul.includes(normalizedUF)) return 'Sul';
+
+==> services/settingsService.ts <==
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestoreDb } from './firebaseService';
+
+export interface SystemSettings {
+    googleMapsApiKey?: string;
+    geminiApiKey?: string;
+    cnpjaApiKey?: string;
+    hubDevToken?: string;
+    lastUpdated?: string;
+}
+
+const SETTINGS_COLLECTION = 'rota-vendas-data';
+const SETTINGS_DOCUMENT = 'system_settings';
+
+export const getSystemSettings = async (): Promise<SystemSettings | null> => {
+    const db = getFirestoreDb();
+    if (!db) {
+        console.warn('[SETTINGS] Firestore not initialized yet.');
+        return null;
+    }
+
+    try {
+        const settingsRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOCUMENT);
+        const snapshot = await getDoc(settingsRef);
+
+        if (snapshot.exists()) {
+            return snapshot.data() as SystemSettings;
+        } else {
+            console.log('[SETTINGS] No system settings document found.');
+            return null;
+        }
+    } catch (error) {
+        console.error('[SETTINGS] Error fetching system settings:', error);
+        return null;
+    }
+};
+
+export const saveSystemSettings = async (settings: Partial<SystemSettings>): Promise<boolean> => {
+    const db = getFirestoreDb();
+    if (!db) {
+        console.error('[SETTINGS] Cannot save: Firestore not initialized.');
+        return false;
+    }
+
+    try {
+        const settingsRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOCUMENT);
+        await setDoc(settingsRef, {
+            ...settings,
+            lastUpdated: new Date().toISOString()
+        }, { merge: true });

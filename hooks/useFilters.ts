@@ -220,39 +220,57 @@ export const useFilters = (
 
     // 3. Dropdown Options
     const availableStates = useMemo(() => {
-        let base = visibleClients;
-        if (filterRegion !== 'Todas') {
-            base = base.filter(c => c.region === filterRegion);
+        // Optimize: Replaced chained .filter().map().filter() with a single-pass loop
+        // Avoids multiple intermediate array allocations and reduces GC overhead.
+        const states = new Set<string>();
+        for (let i = 0; i < visibleClients.length; i++) {
+            const c = visibleClients[i];
+            if ((filterRegion === 'Todas' || c.region === filterRegion) && c.state) {
+                states.add(c.state);
+            }
         }
-        const states = new Set(base.map(c => c.state).filter(Boolean));
         return Array.from(states).sort();
     }, [visibleClients, filterRegion]);
 
     const availableCities = useMemo(() => {
-        let base = visibleClients;
-        if (filterRegion !== 'Todas') {
-            base = base.filter(c => c.region === filterRegion);
-        }
-        if (filterState !== 'Todos') {
-            base = base.filter(c => c.state === filterState);
-        } else {
+        // Optimize: Replaced chained .filter().map().filter() with a single-pass loop
+        // Avoids multiple intermediate array allocations and reduces GC overhead.
+        if (filterState === 'Todos') {
             return [];
         }
-        const cities = new Set(base.map(c => c.city).filter(Boolean));
+
+        const cities = new Set<string>();
+        for (let i = 0; i < visibleClients.length; i++) {
+            const c = visibleClients[i];
+            const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
+            const matchState = c.state === filterState;
+
+            if (matchRegion && matchState && c.city) {
+                cities.add(c.city);
+            }
+        }
         return Array.from(cities).sort();
     }, [visibleClients, filterRegion, filterState]);
 
     const productCategories = useMemo(() => {
-        const cats = new Set(products.map(p => p.category).filter(Boolean));
+        // Optimize: Replaced chained .map().filter() with a single-pass loop
+        const cats = new Set<string>();
+        for (let i = 0; i < products.length; i++) {
+            const cat = products[i].category;
+            if (cat) cats.add(cat);
+        }
         return Array.from(cats).sort();
     }, [products]);
 
     const productSections = useMemo(() => {
-        let base = products;
-        if (filterProductCategory !== 'Todos') {
-            base = base.filter(p => p.category === filterProductCategory);
+        // Optimize: Replaced chained .filter().map().filter() with a single-pass loop
+        const secs = new Set<string>();
+        for (let i = 0; i < products.length; i++) {
+            const p = products[i];
+            if ((filterProductCategory === 'Todos' || p.category === filterProductCategory) && p.section) {
+                secs.add(p.section);
+            }
         }
-        const secs = new Set(base.map(p => p.section).filter(Boolean));
         return Array.from(secs).sort();
     }, [products, filterProductCategory]);
 
