@@ -88,7 +88,7 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
     setSortConfig({ key, direction });
   };
 
-  const getSortedProducts = <T extends Product>(prods: T[]) => {
+  const getSortedProducts = React.useCallback(<T extends Product>(prods: T[]) => {
     if (!sortConfig) return prods;
 
     return [...prods].sort((a, b) => {
@@ -107,20 +107,33 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  };
+  }, [sortConfig]);
 
   // Filter first
-  const filtered = localProducts.map((p, index) => ({ ...p, originalIndex: index } as Product & { originalIndex: number })).filter(p =>
-    (p.name || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.sku || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.brand || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.section || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (p.factoryCode || '').toLowerCase().includes(filter.toLowerCase())
-  );
+  const filtered = React.useMemo(() => {
+    // Optimization: Hoist the lowercased filter string out of the loop
+    const lowerFilter = filter.toLowerCase();
+
+    // Optimization: Replace chained .map().filter() with a single-pass reduce
+    // to avoid intermediate array allocations and skip creating new objects for filtered-out items
+    return localProducts.reduce((acc: (Product & { originalIndex: number })[], p, index) => {
+      if (
+        !lowerFilter ||
+        (p.name || '').toLowerCase().includes(lowerFilter) ||
+        (p.sku || '').toLowerCase().includes(lowerFilter) ||
+        (p.brand || '').toLowerCase().includes(lowerFilter) ||
+        (p.category || '').toLowerCase().includes(lowerFilter) ||
+        (p.section || '').toLowerCase().includes(lowerFilter) ||
+        (p.factoryCode || '').toLowerCase().includes(lowerFilter)
+      ) {
+        acc.push({ ...p, originalIndex: index } as Product & { originalIndex: number });
+      }
+      return acc;
+    }, []);
+  }, [localProducts, filter]);
 
   // Then Sort
-  const displayedProducts = getSortedProducts(filtered);
+  const displayedProducts = React.useMemo(() => getSortedProducts(filtered), [filtered, getSortedProducts]);
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig?.key !== column) return <div className="w-4 h-4 ml-1 inline-block opacity-0 group-hover:opacity-30">↕</div>;
