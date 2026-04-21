@@ -19,3 +19,7 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+
+## 2024-04-21 - [O(1) Lookups for Nested Arrays in React]
+**Learning:** Running `Array.prototype.find()` with multiple string manipulations (`.toLowerCase().trim()`) inside a `.map()` or nested loop iteration against a large dataset (like products) leads to O(N * M) runtime complexity, significant CPU overhead, and excessive garbage collection from string allocations.
+**Action:** Always pre-build O(1) lookup dictionaries (`Map` objects) for target arrays (e.g. `productSkuMap` and `productNameMap`) *before* entering nested loops, enabling constant-time matching without repeatedly allocating new string memory.
