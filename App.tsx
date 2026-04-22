@@ -1669,6 +1669,24 @@ const App: React.FC = () => {
         }
       });
 
+      // ⚡ Bolt Optimization: Replaced O(N) products.find() inside loop with O(1) Map lookups
+      // Impact: Reduces complexity from O(N*M) to O(N+M) for product matching during file uploads.
+      // Measurement: Execution time for large files (e.g. 10k products, 50k purchases) drops significantly as nested iterations are avoided.
+      const productSkuMap = new Map<string, number>();
+      const productNameMap = new Map<string, number>();
+
+      products.forEach((p, index) => {
+        if (p.sku && !productSkuMap.has(p.sku)) {
+          productSkuMap.set(p.sku, index);
+        }
+        if (p.name) {
+          const cleanName = p.name.toLowerCase().trim();
+          if (cleanName && !productNameMap.has(cleanName)) {
+            productNameMap.set(cleanName, index);
+          }
+        }
+      });
+
       clientKeysInFile.forEach((key, index) => {
         setProcState(prev => ({ ...prev, current: index + 1 }));
         const clientPurchases = groupedByClient[key];
@@ -1692,7 +1710,17 @@ const App: React.FC = () => {
         }
 
         const mappedPurchases: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
-          const masterProd = products.find(p => (rec.sku && p.sku === rec.sku) || (p.name && rec.name && p.name.toLowerCase().trim() === rec.name.toLowerCase().trim()));
+          let masterProdIndex = -1;
+          if (rec.sku && productSkuMap.has(rec.sku)) {
+            masterProdIndex = productSkuMap.get(rec.sku)!;
+          } else if (rec.name) {
+            const cleanRecName = rec.name.toLowerCase().trim();
+            if (cleanRecName && productNameMap.has(cleanRecName)) {
+              masterProdIndex = productNameMap.get(cleanRecName)!;
+            }
+          }
+          const masterProd = masterProdIndex !== -1 ? products[masterProdIndex] : undefined;
+
           if (masterProd) {
             return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId };
           }
