@@ -1,3 +1,49 @@
+/**
+ * Fast-path utility that converts common date strings into YYYYMMDD integers.
+ * Ideal for high-throughput filtering loops to avoid `new Date()` allocation overhead.
+ * Returns null if the format isn't strictly recognized by the fast path.
+ *
+ * Supports formats like YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD, etc.
+ * Uses `charCodeAt` to check positions.
+ */
+export const parseDateToInt = (dateString: string | undefined | null): number | null => {
+    if (!dateString || typeof dateString !== 'string' || dateString.length < 10) return null;
+
+    // ISO: YYYY-MM-DD or YYYY/MM/DD
+    if (
+        (dateString.charCodeAt(4) === 45 || dateString.charCodeAt(4) === 47) &&
+        (dateString.charCodeAt(7) === 45 || dateString.charCodeAt(7) === 47)
+    ) {
+        const y = parseInt(dateString.substring(0, 4), 10);
+        const m = parseInt(dateString.substring(5, 7), 10);
+        const d = parseInt(dateString.substring(8, 10), 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            return y * 10000 + m * 100 + d;
+        }
+    }
+
+    // Brazilian: DD/MM/YYYY or DD-MM-YYYY
+    if (
+        (dateString.charCodeAt(2) === 47 || dateString.charCodeAt(2) === 45) &&
+        (dateString.charCodeAt(5) === 47 || dateString.charCodeAt(5) === 45)
+    ) {
+        const d = parseInt(dateString.substring(0, 2), 10);
+        const m = parseInt(dateString.substring(3, 5), 10);
+        const y = parseInt(dateString.substring(6, 10), 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            return y * 10000 + m * 100 + d;
+        }
+    }
+
+    // Fallback using Native Date parsing
+    const fallbackDate = new Date(dateString);
+    if (!isNaN(fallbackDate.getTime())) {
+        return fallbackDate.getFullYear() * 10000 + (fallbackDate.getMonth() + 1) * 100 + fallbackDate.getDate();
+    }
+
+    return null;
+};
+
 export const parseDateSafe = (dateString: string | undefined | null): Date | null => {
     if (!dateString) return null;
 

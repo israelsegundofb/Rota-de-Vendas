@@ -19,3 +19,6 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+## 2026-04-23 - [Fast-path Date Parsing for Performance]
+**Learning:** Instantiating `Date` objects inside hot loops (e.g., `Array.prototype.filter`) causes massive memory allocation overhead and GC pauses. Native date parsing of ISO strings can also cause timezone shift bugs.
+**Action:** Implement fast-path date parsers (e.g., `parseDateToInt`) using `charCodeAt`, `substring`, and `parseInt` to convert dates to `YYYYMMDD` integers for primitive comparisons. Always provide a fallback to native `Date` parsing to prevent regressions caused by heterogeneous formats.
