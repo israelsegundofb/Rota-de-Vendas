@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { EnrichedClient, Product, UploadedFile, AppUser } from '../types';
+import { EnrichedClient, Product, UploadedFile, AppUser, CloudData } from '../types';
 import { initializeFirebase, saveToCloud, loadFromCloud, isFirebaseInitialized } from '../services/firebaseService';
 import { CATEGORIES, getRegionByUF } from '../utils/constants';
 import { migrateUsers } from '../utils/authUtils';
@@ -87,7 +87,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                         setTimeout(() => reject(new Error('Cloud sync timeout')), 15000)
                     );
 
-                    const cloudData = await Promise.race([cloudLoadPromise, timeoutPromise]) as any;
+                    const cloudData = await Promise.race([cloudLoadPromise, timeoutPromise]) as CloudData | null;
 
                     if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
                         console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
@@ -193,7 +193,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         const setupSubscription = async () => {
             if (isFirebaseInitialized()) {
                 const { subscribeToCloudChanges } = await import('../services/firebaseService');
-                unsubscribe = subscribeToCloudChanges((newData: any) => {
+                unsubscribe = subscribeToCloudChanges((newData: CloudData) => {
                     if (newData) {
                         if (newData.clients) {
                             if (syncLockRef.current) {

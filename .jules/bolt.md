@@ -19,3 +19,6 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+## 2025-05-19 - Strongly type 'any' variables for Firebase responses
+**Learning:** Returning `any` from load/subscription helpers undermines Typescript's safety and necessitates `as any` casting in consumer hooks, masking potential missing properties like `users` vs `clients`.
+**Action:** Extract standard backend response formats into an explicit interface (e.g. `CloudData`) to provide intellisense and compile-time guarantees when referencing returned data.

@@ -3,7 +3,7 @@ import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
-import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus } from '../types';
+import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus, CloudData } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -454,7 +454,7 @@ export const deleteAllClientsFromCloud = async () => {
     }
 };
 
-export const loadFromCloud = async (): Promise<any | null> => {
+export const loadFromCloud = async (): Promise<CloudData | null> => {
     if (!db) return null;
 
     try {
@@ -530,7 +530,7 @@ export const loadFromCloud = async (): Promise<any | null> => {
     }
 };
 
-export const subscribeToCloudChanges = (callback: (data: any) => void) => {
+export const subscribeToCloudChanges = (callback: (data: CloudData) => void) => {
     if (!db) return () => { };
 
     // In V5, we subscribe to the collections

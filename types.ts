@@ -150,3 +150,11 @@ export interface SystemLog {
     [key: string]: unknown;
   };
 }
+
+export interface CloudData {
+  users?: AppUser[];
+  clients?: EnrichedClient[];
+  products?: Product[];
+  categories?: string[];
+  uploadedFiles?: UploadedFile[];
+}
