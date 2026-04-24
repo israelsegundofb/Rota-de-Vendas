@@ -1,8 +1,3 @@
-console.log('--- STARTUP DIAGNOSTIC ---');
-console.log('Node Version:', process.version);
-console.log('CWD:', process.cwd());
-console.log('ENV PORT:', process.env.PORT);
-
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
