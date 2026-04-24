@@ -19,3 +19,7 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+
+## 2024-05-18 - [Optimize text search filtering using pre-compiled RegExps]
+**Learning:** Calling `.toLowerCase().includes(query.toLowerCase())` repeatedly inside large iteration arrays (like filtering lists of clients and purchased products) creates significant garbage collection overhead due to constant string allocations.
+**Action:** Replace repetitious `.toLowerCase()` and `.includes()` inside loops with a pre-compiled, case-insensitive regular expression (`new RegExp(escapedQuery, 'i')`) initialized outside the loop, and use `.test()` instead. This avoids new string allocations entirely and executes much faster.
