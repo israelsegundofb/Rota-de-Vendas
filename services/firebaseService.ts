@@ -535,11 +535,11 @@ export const subscribeToCloudChanges = (callback: (data: CloudData) => void) => 
 
     // In V5, we subscribe to the collections
     const unsubUsers = onSnapshot(collection(db, 'rota-vendas-data', 'users', 'list'), (snap) => {
-        if (!snap.empty) callback({ users: snap.docs.map(d => d.data()) });
+        if (!snap.empty) callback({ users: snap.docs.map(d => d.data() as AppUser) });
     });
 
     const unsubClients = onSnapshot(collection(db, 'rota-vendas-data', 'clients', 'list'), (snap) => {
-        if (!snap.empty) callback({ clients: snap.docs.map(d => d.data()) });
+        if (!snap.empty) callback({ clients: snap.docs.map(d => d.data() as EnrichedClient) });
     });
 
     const unsubMeta = onSnapshot(doc(db, 'rota-vendas-data', 'metadata'), (doc) => {

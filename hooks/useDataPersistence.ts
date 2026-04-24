@@ -89,7 +89,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
 
                     const cloudData = await Promise.race([cloudLoadPromise, timeoutPromise]) as CloudData | null;
 
-                    if (cloudData && (cloudData.clients?.length > 0 || cloudData.products?.length > 0 || cloudData.users?.length > 0)) {
+                    if (cloudData && ((cloudData.clients?.length ?? 0) > 0 || (cloudData.products?.length ?? 0) > 0 || (cloudData.users?.length ?? 0) > 0)) {
                         console.log("Cloud data found (Populated). Using Cloud as Source of Truth.");
 
                         setLoadingMessage('Processando usuários...');
