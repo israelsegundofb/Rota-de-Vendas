@@ -3,7 +3,7 @@ import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, Firestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FirebaseConfig, getStoredFirebaseConfig } from '../firebaseConfig';
-import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus } from '../types';
+import { EnrichedClient, Product, AppUser, ChatMessage, SystemLog, UserStatus, UploadedFileMetadata } from '../types';
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -330,7 +330,7 @@ export const deleteClientsBatchFromCloud = async (clientIds: string[]) => {
  * Usado primariamente durante deleções manuais para impedir que o debounce
  * de auto-save atrase a remoção e cause arquivos zumbis no reload.
  */
-export const syncUploadedFilesMetadata = async (newUploadedFiles: any[]) => {
+export const syncUploadedFilesMetadata = async (newUploadedFiles: UploadedFileMetadata[]) => {
     if (!db) return;
     try {
         const metaRef = doc(db, 'rota-vendas-data', 'metadata');

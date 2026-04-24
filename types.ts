@@ -106,6 +106,8 @@ export interface AppUser {
   lastUpdated?: string; // ISO String for sync tracking
 }
 
+export type UploadedFileMetadata = UploadedFile;
+
 export interface UploadedFile {
   id: string;
   fileName: string;
