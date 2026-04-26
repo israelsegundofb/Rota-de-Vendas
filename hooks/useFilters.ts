@@ -111,9 +111,10 @@ export const useFilters = (
         }
         const hasDateFilter = !!(parsedStartDate || parsedEndDate);
 
-        // Optimize: Pre-calculate lowercased queries
-        const query = (debouncedSearchQuery || '').toLowerCase();
-        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+        // Optimize: Pre-compile case-insensitive Regex outside the loop
+        // to avoid O(N) string allocations from .toLowerCase().includes()
+        const queryRegex = debouncedSearchQuery ? new RegExp(debouncedSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+        const prodQueryRegex = debouncedProductQuery ? new RegExp(debouncedProductQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -132,9 +133,9 @@ export const useFilters = (
             }
 
             // Text Search
-            const matchSearch = debouncedSearchQuery === '' ||
-                (c.companyName || '').toLowerCase().includes(query) ||
-                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
+            const matchSearch = !queryRegex ||
+                queryRegex.test(c.companyName || '') ||
+                queryRegex.test(c.ownerName || '');
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
@@ -144,7 +145,7 @@ export const useFilters = (
                 (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
-            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
+            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || !!debouncedProductQuery) {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
@@ -165,13 +166,14 @@ export const useFilters = (
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
                         if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                            hasMatch = !prodQueryRegex ||
+                                prodQueryRegex.test(p.name || '') ||
+                                prodQueryRegex.test(p.sku || '') ||
+                                prodQueryRegex.test(p.brand || '') ||
+                                prodQueryRegex.test(p.category || '') ||
+                                prodQueryRegex.test(p.section || '') ||
+                                prodQueryRegex.test(p.factoryCode || '') ||
+                                prodQueryRegex.test((p.price || 0).toString());
                         }
 
                         if (!matchDate && p.purchaseDate) {
