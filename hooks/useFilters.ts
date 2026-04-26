@@ -155,7 +155,7 @@ export const useFilters = (
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = prodQuery === '';
+                    let hasMatch = !debouncedProductQuery;
                     let matchDate = !hasDateFilter;
 
                     for (let i = 0; i < c.purchasedProducts.length; i++) {
