@@ -1315,17 +1315,21 @@ const App: React.FC = () => {
           if (latestClient) {
             const taggedNewClient = { ...latestClient, sourceFileId: fileId };
 
+            // Hoist string allocations outside of the state updater and findIndex loop
+            const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+            const newClientNameNormalized = taggedNewClient.companyName.toLowerCase().trim();
+            const newClientCityNormalized = taggedNewClient.city.toLowerCase().trim();
+
             setMasterClientList(prev => {
               const list = [...prev];
-              const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
 
               const existingIdx = list.findIndex(c => {
                 const cleanCnpj = c.cnpj?.replace(/\D/g, '');
                 if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
                   return true;
                 }
-                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
-                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+                return c.companyName.toLowerCase().trim() === newClientNameNormalized &&
+                  c.city.toLowerCase().trim() === newClientCityNormalized;
               });
 
               if (existingIdx !== -1) {
