@@ -19,3 +19,7 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+
+## 2025-05-03 - [Pre-compute O(1) Maps for Nested Lookups in Hot Paths]
+**Learning:** Performing array searches (e.g., `.find()`) inside nested map iterations over potentially large data sets (like processing raw CSV purchase rows against a product catalog) results in catastrophic $O(N \times M)$ scaling. This is severely compounded when operations like `.toLowerCase().trim()` are chained directly inside the `.find()` callback, causing string allocations on every inner loop iteration.
+**Action:** Replace `$O(N)$` search array methods nested inside loops with $O(1)$ Hash Maps pre-computed once outside the loop. If the target involves string manipulation for matching (e.g., fuzzy string or case-insensitive matching), apply these normalizations once per element during map generation instead of inline during the lookup.

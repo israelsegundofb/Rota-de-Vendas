@@ -1669,6 +1669,14 @@ const App: React.FC = () => {
         }
       });
 
+      // Also pre-build Product lookup maps for O(1) retrieval
+      const productSkuMap = new Map<string, typeof products[0]>();
+      const productNameMap = new Map<string, typeof products[0]>();
+      products.forEach(p => {
+        if (p.sku) productSkuMap.set(p.sku, p);
+        if (p.name) productNameMap.set(p.name.toLowerCase().trim(), p);
+      });
+
       clientKeysInFile.forEach((key, index) => {
         setProcState(prev => ({ ...prev, current: index + 1 }));
         const clientPurchases = groupedByClient[key];
@@ -1692,7 +1700,17 @@ const App: React.FC = () => {
         }
 
         const mappedPurchases: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
-          const masterProd = products.find(p => (rec.sku && p.sku === rec.sku) || (p.name && rec.name && p.name.toLowerCase().trim() === rec.name.toLowerCase().trim()));
+          // Find via O(1) Map lookups
+          let masterProd: typeof products[0] | undefined = undefined;
+          if (rec.sku && productSkuMap.has(rec.sku)) {
+            masterProd = productSkuMap.get(rec.sku);
+          } else if (rec.name) {
+            const cleanRecName = rec.name.toLowerCase().trim();
+            if (productNameMap.has(cleanRecName)) {
+              masterProd = productNameMap.get(cleanRecName);
+            }
+          }
+
           if (masterProd) {
             return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId };
           }
