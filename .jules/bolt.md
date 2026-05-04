@@ -19,3 +19,6 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+## 2026-05-15 - [Refactor Text Search Empty States]
+**Learning:** When refactoring string comparisons to Regular Expressions in hot loops to avoid memory allocations, migrating `query === ''` to `isSearchEmpty` can introduce a bug if the original query had a fallback (e.g. `debouncedSearchQuery || ''`). A strict equality check on the variable ignores the fallback for falsy inputs.
+**Action:** When determining if a search is empty for a short-circuit bypass, always incorporate the same fallback logic (e.g., `!(debouncedProductQuery || '')`) to preserve original behavior and avoid unintended matching logic execution.
