@@ -450,12 +450,18 @@ const App: React.FC = () => {
 
                 // DUPLICATE HANDLING: If we found another client with the same CNPJ, MERGE!
                 if (existingWithCnpj) {
+                  const seenPurchases = new Set<string>();
                   const mergedClient: EnrichedClient = {
                     ...existingWithCnpj,
                     ...updatedClient,
                     id: existingWithCnpj.id, // Keep the one already in DB if it was fuller
                     purchasedProducts: [...(existingWithCnpj.purchasedProducts || []), ...(client.purchasedProducts || [])]
-                      .filter((v, i, a) => a.findIndex(t => t.sku === v.sku && t.purchaseDate === v.purchaseDate) === i)
+                      .filter(v => {
+                        const key = `${v.sku}-${v.purchaseDate}`;
+                        if (seenPurchases.has(key)) return false;
+                        seenPurchases.add(key);
+                        return true;
+                      })
                   };
 
                   // Update final list: Remove the current 'indefinido' (client.id) and update the 'existing' (existingWithCnpj.id)
