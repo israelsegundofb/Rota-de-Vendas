@@ -111,20 +111,21 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
 
   // Filter first
   const filtered = React.useMemo(() => {
-    // Optimization: Hoist the lowercased filter string out of the loop
-    const lowerFilter = filter.toLowerCase();
+    // ⚡ Bolt Optimization: Replace repetitive string allocations (.toLowerCase) and .includes
+    // with a single pre-compiled regular expression for faster O(N) evaluation.
+    const searchRegex = filter ? new RegExp(filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
     // Optimization: Replace chained .map().filter() with a single-pass reduce
     // to avoid intermediate array allocations and skip creating new objects for filtered-out items
     return localProducts.reduce((acc: (Product & { originalIndex: number })[], p, index) => {
       if (
-        !lowerFilter ||
-        (p.name || '').toLowerCase().includes(lowerFilter) ||
-        (p.sku || '').toLowerCase().includes(lowerFilter) ||
-        (p.brand || '').toLowerCase().includes(lowerFilter) ||
-        (p.category || '').toLowerCase().includes(lowerFilter) ||
-        (p.section || '').toLowerCase().includes(lowerFilter) ||
-        (p.factoryCode || '').toLowerCase().includes(lowerFilter)
+        !searchRegex ||
+        searchRegex.test(p.name || '') ||
+        searchRegex.test(p.sku || '') ||
+        searchRegex.test(p.brand || '') ||
+        searchRegex.test(p.category || '') ||
+        searchRegex.test(p.section || '') ||
+        searchRegex.test(p.factoryCode || '')
       ) {
         acc.push({ ...p, originalIndex: index } as Product & { originalIndex: number });
       }
