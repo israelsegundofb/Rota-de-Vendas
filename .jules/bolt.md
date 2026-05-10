@@ -19,3 +19,6 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+## 2024-05-10 - [O(1) Map Lookups Replacing Array.find with OR conditions]
+**Learning:** Replacing `Array.prototype.find()` using OR (`||`) conditions (e.g., matching by SKU *or* Name) with separate O(1) Map lookups dramatically improves performance (O(N*M) to O(N+M)). However, doing so strictly enforces matching precedence based on the order of Map lookups, potentially altering behavior if the original linear search prioritized the first matching array element regardless of which condition matched.
+**Action:** Always document the precedence order when replacing `.find` OR logic with sequential Map lookups. Verify that the forced precedence (e.g., SKU matches strictly prioritized over Name matches) aligns with or improves upon the intended domain logic.

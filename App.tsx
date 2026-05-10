@@ -1669,6 +1669,23 @@ const App: React.FC = () => {
         }
       });
 
+      // Optimize: Pre-build O(1) maps for product lookup to avoid O(N*M) array find within the loop
+      const productSkuMap = new Map<string, Product>();
+      const productNameMap = new Map<string, Product>();
+
+      for (let i = 0; i < products.length; i++) {
+        const p = products[i];
+        if (p.sku && !productSkuMap.has(p.sku)) {
+          productSkuMap.set(p.sku, p);
+        }
+        if (p.name) {
+          const cleanProdName = p.name.toLowerCase().trim();
+          if (!productNameMap.has(cleanProdName)) {
+            productNameMap.set(cleanProdName, p);
+          }
+        }
+      }
+
       clientKeysInFile.forEach((key, index) => {
         setProcState(prev => ({ ...prev, current: index + 1 }));
         const clientPurchases = groupedByClient[key];
@@ -1692,7 +1709,15 @@ const App: React.FC = () => {
         }
 
         const mappedPurchases: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
-          const masterProd = products.find(p => (rec.sku && p.sku === rec.sku) || (p.name && rec.name && p.name.toLowerCase().trim() === rec.name.toLowerCase().trim()));
+          // Optimize: Replace array .find() with O(1) Map lookups. Note precedence: SKU matches take priority.
+          let masterProd: Product | undefined;
+          if (rec.sku) {
+            masterProd = productSkuMap.get(rec.sku);
+          }
+          if (!masterProd && rec.name) {
+            masterProd = productNameMap.get(rec.name.toLowerCase().trim());
+          }
+
           if (masterProd) {
             return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId };
           }
