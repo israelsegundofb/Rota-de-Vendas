@@ -19,3 +19,6 @@
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+## 2025-05-18 - [Optimize duplicate item filtering in map merges]
+**Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
+**Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
