@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2026-05-15 - [Optimize header lookup in parseProductExcel]
+**Learning:** In `utils/excelParser.ts`, iterating through headers using `reduce` to find column indices inside a row loop (e.g., `dataRows.forEach`) causes massive (N 	imes M 	imes K)$ overhead. Re-evaluating header keywords for every single row is redundant and computationally expensive.
+**Action:** Pre-compute column indices outside the row loop using `findIndex`, and use (1)$ direct array index access (`row[idx]`) inside the row loop to extract values. This drops complexity to (M 	imes K + N)$.
