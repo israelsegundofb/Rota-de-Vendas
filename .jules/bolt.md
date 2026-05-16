@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-10-25 - [O(1) Map Lookups Altering OR Prioritization]
+**Learning:** When replacing an `Array.prototype.find()` call that uses `OR` (`||`) conditions (e.g., matching by SKU *or* Name) inside a `.map()` loop with separate O(1) Map lookups, the refactoring inherently alters matching precedence. The sequential Map lookups strictly prioritize whichever Map is checked first, potentially changing behavior if the original linear search prioritized the first matching array element regardless of which condition matched it.
+**Action:** Be mindful of evaluation precedence when converting `||` conditions to separate O(1) structures. Document the behavioral priority shift (e.g., "SKU strictly preferred over Name") in the PR description, and ensure business logic accepts the stricter prioritization.
