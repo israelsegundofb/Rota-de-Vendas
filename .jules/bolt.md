@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Optimize product mapping with O(1) Hash Maps]
+**Learning:** In `App.tsx`'s `handlePurchaseUpdateUpload`, `products.find()` was inside the iteration mapping new purchase histories. This creates an O(N*M) loop because `.find()` also included `.toLowerCase().trim()` checks, leading to severe slowdowns processing imports against large product catalogs.
+**Action:** Always pre-build O(1) Map lookup structures for common join keys (e.g., `productSkuMap` and `productNameMap`) *outside* of mapping and filtering functions, enabling extremely fast single-property matching.
