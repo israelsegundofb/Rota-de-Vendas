@@ -1267,13 +1267,20 @@ const App: React.FC = () => {
       // -----------------------------------------------------------------
       // DYNAMIC SALESPERSON ASSIGNMENT FROM CSV 'Vendedor Responsável'
       // -----------------------------------------------------------------
+      // Pre-compute user names to avoid repetitive string normalizations in O(N*M) lookups
+      const normalizedUsers = users.map(u => ({
+        ...u,
+        normName: u.name.trim().toLowerCase(),
+        normUsername: u.username.trim().toLowerCase()
+      }));
+
       rawData.forEach(raw => {
         if (raw.salespersonName) {
-          // Find exactly the user with that name (case insensitive)
-          const match = users.find(u =>
-            u.name.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
-            u.username.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
-            raw.salespersonName?.trim().toLowerCase().includes(u.name.trim().toLowerCase()) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
+          const rawNameClean = raw.salespersonName.trim().toLowerCase();
+          const match = normalizedUsers.find(u =>
+            u.normName === rawNameClean ||
+            u.normUsername === rawNameClean ||
+            rawNameClean.includes(u.normName) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
           );
           if (match) {
             raw.salespersonId = match.id;
@@ -1678,6 +1685,17 @@ const App: React.FC = () => {
         }
       });
 
+      // O(1) Pre-build maps for Product search to avoid O(N*M) loop performance issues
+      const productSkuMap = new Map<string, Product>();
+      const productNameMap = new Map<string, Product>();
+      products.forEach(p => {
+        if (p.sku && !productSkuMap.has(p.sku)) productSkuMap.set(p.sku, p);
+        if (p.name) {
+          const cleanProdName = p.name.toLowerCase().trim();
+          if (cleanProdName && !productNameMap.has(cleanProdName)) productNameMap.set(cleanProdName, p);
+        }
+      });
+
       clientKeysInFile.forEach((key, index) => {
         setProcState(prev => ({ ...prev, current: index + 1 }));
         const clientPurchases = groupedByClient[key];
@@ -1701,7 +1719,17 @@ const App: React.FC = () => {
         }
 
         const mappedPurchases: PurchaseRecord[] = clientPurchases.map((rec: RawClient & { sku?: string; name?: string; purchaseDate?: string; quantity?: number; totalValue?: number; price?: number }) => {
-          const masterProd = products.find(p => (rec.sku && p.sku === rec.sku) || (p.name && rec.name && p.name.toLowerCase().trim() === rec.name.toLowerCase().trim()));
+          let masterProd: Product | undefined;
+
+          if (rec.sku && productSkuMap.has(rec.sku)) {
+            masterProd = productSkuMap.get(rec.sku);
+          } else if (rec.name) {
+            const cleanRecName = rec.name.toLowerCase().trim();
+            if (productNameMap.has(cleanRecName)) {
+              masterProd = productNameMap.get(cleanRecName);
+            }
+          }
+
           if (masterProd) {
             return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId };
           }

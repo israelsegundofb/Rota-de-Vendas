@@ -22,3 +22,7 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+
+## 2024-05-18 - String Normalization in N*M Array Parsing
+**Learning:** In frontend parsing of large arrays (like CSV imports in `App.tsx` mapped to internal user/product entities), performing repeated `.toLowerCase().trim()` allocations inside `Array.prototype.find()` iterations creates a massive CPU overhead that scales O(N*M), freezing the UI.
+**Action:** When refactoring O(N*M) loop searches into O(N+M) or hoisted patterns, always pre-calculate string normalization on the outer dataset first (e.g., mapping to a new array of objects with `.normName` or building a fast `Map<string, T>`).
