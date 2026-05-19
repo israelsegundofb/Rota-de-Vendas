@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2024-05-19 - Strict Mode React State Updates and N*M Loops
+**Learning:** In `App.tsx`'s `handleClientFileDirect`, the static string normalizations (like `.replace(/\D/g, '')` and `.toLowerCase().trim()`) inside the `findIndex` nested in the React state updater loop were creating huge performance overhead, especially because React Strict Mode fires the updater twice. Pre-computing normalized representations for users and hoisting the normalize calls outside the React state updater transforms an $O(N \times M)$ overhead with excessive string allocation into $O(N)$ with no string thrashing.
+**Action:** When optimizing loop bottlenecks inside React state updaters, strictly hoist the static string normalizations outside the updater function, and use pre-computed arrays of normalized fields instead of repeatedly normalizing target values inside `.find()` and `.findIndex()` loops.
