@@ -22,3 +22,7 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+
+## 2025-05-21 - [Regex Short-circuit in Filter Loops]
+**Learning:** Found an expensive regex `.replace(/\D/g, '')` running on every iteration of a `.findIndex` loop inside an array state updater when searching for a CNPJ match. Because the condition was `cleanNewCnpj && cleanCnpj...`, the expensive operation ran on all list elements even when the search target (`cleanNewCnpj`) was missing or invalid.
+**Action:** Extract and evaluate the search target's conditions (e.g., valid CNPJ structure) outside the loop. Short-circuit the iteration logic `if (hasValidTarget && item.property)` before executing expensive data-normalization regex routines on list items.

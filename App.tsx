@@ -1326,15 +1326,21 @@ const App: React.FC = () => {
 
             setMasterClientList(prev => {
               const list = [...prev];
-              const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+              // ⚡ Bolt Optimization: Hoist static allocations and string normalizations outside the iteration block.
+              // This prevents O(N) repetitive `.toLowerCase().trim()` allocations and short-circuits expensive regex replacements.
+              const cleanNewCnpj = taggedNewClient.cnpj ? taggedNewClient.cnpj.replace(/\D/g, '') : undefined;
+              const hasValidCnpj = cleanNewCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11);
+              const normalizedNewCompanyName = taggedNewClient.companyName.toLowerCase().trim();
+              const normalizedNewCity = taggedNewClient.city.toLowerCase().trim();
 
               const existingIdx = list.findIndex(c => {
-                const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
-                  return true;
+                if (hasValidCnpj && c.cnpj) {
+                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  if (cleanNewCnpj === cleanCnpj) return true;
                 }
-                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
-                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+
+                return c.companyName.toLowerCase().trim() === normalizedNewCompanyName &&
+                  c.city.toLowerCase().trim() === normalizedNewCity;
               });
 
               if (existingIdx !== -1) {
