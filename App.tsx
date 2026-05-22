@@ -1326,15 +1326,22 @@ const App: React.FC = () => {
 
             setMasterClientList(prev => {
               const list = [...prev];
+
+              // ⚡ Bolt Optimization: Hoist normalizations and short-circuit regex execution
+              // Prevents O(N) string allocations inside the findIndex loop and reduces garbage collection pressure
               const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+              const newCompanyNameNormal = taggedNewClient.companyName.toLowerCase().trim();
+              const newCityNormal = taggedNewClient.city.toLowerCase().trim();
 
               const existingIdx = list.findIndex(c => {
-                const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
-                  return true;
+                if (cleanNewCnpj && c.cnpj) {
+                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  if (cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
+                    return true;
+                  }
                 }
-                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
-                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+                return c.companyName.toLowerCase().trim() === newCompanyNameNormal &&
+                  c.city.toLowerCase().trim() === newCityNormal;
               });
 
               if (existingIdx !== -1) {

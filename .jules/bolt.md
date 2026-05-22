@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Regex execution optimization in hot loops]
+**Learning:** Performing expensive regex operations (like `replace(/\D/g, '')`) blindly on elements inside a `findIndex` or `filter` hot loop causes massive CPU overhead and memory allocation, especially when many elements don't even meet the preconditions (e.g., missing the property entirely or matching an early return).
+**Action:** Always wrap expensive string replacements or regex executions in a loop with a conditional check. Verify the target string exists and potentially check the expected outcome length first, short-circuiting the regex on guaranteed mismatches to avoid unnecessary allocations.
