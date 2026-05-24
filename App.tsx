@@ -1324,17 +1324,25 @@ const App: React.FC = () => {
           if (latestClient) {
             const taggedNewClient = { ...latestClient, sourceFileId: fileId };
 
+            // ⚡ Bolt Optimization: Hoist allocations and regex outside the findIndex loop
+            const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+            const hasValidCnpj = !!(cleanNewCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11));
+            const newCompanyNameClean = taggedNewClient.companyName.toLowerCase().trim();
+            const newCityClean = taggedNewClient.city.toLowerCase().trim();
+
             setMasterClientList(prev => {
               const list = [...prev];
-              const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
 
               const existingIdx = list.findIndex(c => {
-                const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
-                  return true;
+                // Only run regex on existing items if the new item actually has a valid CNPJ
+                if (hasValidCnpj && c.cnpj) {
+                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  if (cleanCnpj && cleanNewCnpj === cleanCnpj) return true;
                 }
-                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
-                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+
+                // Avoid redundant lowercase allocations on the incoming item
+                return c.companyName.toLowerCase().trim() === newCompanyNameClean &&
+                  c.city.toLowerCase().trim() === newCityClean;
               });
 
               if (existingIdx !== -1) {

@@ -22,3 +22,7 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+
+## 2025-05-18 - [Hoist Allocations and Regex calls outside of inner `.findIndex` loops]
+**Learning:** Found an $O(N)$ string and Regex allocation bottleneck inside `handleClientFileDirect` in `App.tsx` where `.toLowerCase().trim()` and `.replace(/\D/g, '')` were executing on every existing element comparison for every newly imported element. Because the loop condition blindly performed regex replacement even on new elements lacking valid CNPJs, it introduced massive, redundant regex performance cost.
+**Action:** Hoist the static `taggedNewClient` normalizations out of the state updater, and pre-evaluate if the new item *has* a valid CNPJ length. Pass this `hasValidCnpj` boolean flag to short-circuit the regex replacement check on the iterated existing items entirely, maximizing throughput during file imports.
