@@ -1324,17 +1324,27 @@ const App: React.FC = () => {
           if (latestClient) {
             const taggedNewClient = { ...latestClient, sourceFileId: fileId };
 
+            // ⚡ Bolt Optimization: Hoist normalizations outside the state updater and loop
+            // Reduces O(N*M) string allocations and regex executions.
+            const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+            const hasValidCnpj = Boolean(cleanNewCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11));
+            const normalizedNewName = taggedNewClient.companyName ? taggedNewClient.companyName.toLowerCase().trim() : '';
+            const normalizedNewCity = taggedNewClient.city ? taggedNewClient.city.toLowerCase().trim() : '';
+
             setMasterClientList(prev => {
               const list = [...prev];
-              const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
 
               const existingIdx = list.findIndex(c => {
-                const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
-                  return true;
+                // Short-circuit: Only run regex on existing client if the new client actually has a valid CNPJ
+                if (hasValidCnpj && c.cnpj) {
+                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  if (cleanNewCnpj === cleanCnpj) return true;
                 }
-                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
-                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+
+                // Fallback to name+city match, using hoisted normalized strings to avoid O(N) allocations
+                if (!c.companyName || !c.city) return false;
+                return c.companyName.toLowerCase().trim() === normalizedNewName &&
+                  c.city.toLowerCase().trim() === normalizedNewCity;
               });
 
               if (existingIdx !== -1) {

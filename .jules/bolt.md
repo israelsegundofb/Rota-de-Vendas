@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-25 - [Hoist computations outside React state loop updaters]
+**Learning:** When performing large progressive updates via `setState(prev => [...prev])` inside a loop (like `handleClientFileDirect` parsing), placing string normalizations and regular expressions like `.replace(/\D/g, '')` directly inside the `.findIndex` or `.find` of the `prev` array causes severe O(N*M) memory allocations and CPU overhead, slowing down the UI thread.
+**Action:** Always hoist incoming object string normalizations (`.toLowerCase()`, `.trim()`, etc) *outside* of the state updater `setState` entirely. For operations on the `prev` state like regex replaces, use short-circuit boolean checks to ensure the expensive operation only runs when absolutely necessary.
