@@ -1267,13 +1267,22 @@ const App: React.FC = () => {
       // -----------------------------------------------------------------
       // DYNAMIC SALESPERSON ASSIGNMENT FROM CSV 'Vendedor Responsável'
       // -----------------------------------------------------------------
+      // ⚡ Bolt Optimization: Hoist user string normalization outside the loop
+      // to avoid O(M*N) string allocations during salesperson matching.
+      const normalizedUsers = users.map(u => ({
+        id: u.id,
+        normName: u.name.trim().toLowerCase(),
+        normUsername: u.username.trim().toLowerCase()
+      }));
+
       rawData.forEach(raw => {
         if (raw.salespersonName) {
+          const rawNormName = raw.salespersonName.trim().toLowerCase();
           // Find exactly the user with that name (case insensitive)
-          const match = users.find(u =>
-            u.name.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
-            u.username.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
-            raw.salespersonName?.trim().toLowerCase().includes(u.name.trim().toLowerCase()) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
+          const match = normalizedUsers.find(u =>
+            u.normName === rawNormName ||
+            u.normUsername === rawNormName ||
+            rawNormName.includes(u.normName) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
           );
           if (match) {
             raw.salespersonId = match.id;
