@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2024-05-27 - ChatPanel Render Optimization
+**Learning:** O(N) `.find()` operations inside React component rendering loops (like iterating over messages or conversations) create hidden O(N*M) performance bottlenecks on every re-render, especially as chat histories grow.
+**Action:** When replacing repetitive linear searches (`.find()`) inside React render loops with O(1) hash map lookups, wrap the map generation in `useMemo` with appropriate dependencies to prevent the dictionary from being rebuilt unnecessarily on every component render.
