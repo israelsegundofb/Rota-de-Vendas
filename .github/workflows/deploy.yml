@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -74,7 +74,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -126,4 +126,4 @@ jobs:
             --project gen-lang-client-0586123917 \
             --quiet \
             --allow-unauthenticated \
-            --update-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}",QDRANT_URL="https://1929b4d6-03dc-4acf-8da5-4a104b8a9608.us-east4-0.gcp.cloud.qdrant.io:6333",QDRANT_API_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.-YVCGa4U5tBKAeUDeCoz99ApakAbbzqRV6yjeeioAcY"
+            --update-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}",QDRANT_URL="${{ secrets.QDRANT_URL }}",QDRANT_API_KEY="${{ secrets.QDRANT_API_KEY }}"

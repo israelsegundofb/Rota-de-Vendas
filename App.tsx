@@ -1267,13 +1267,20 @@ const App: React.FC = () => {
       // -----------------------------------------------------------------
       // DYNAMIC SALESPERSON ASSIGNMENT FROM CSV 'Vendedor Responsável'
       // -----------------------------------------------------------------
+      const normalizedUsers = users.map(u => ({
+        id: u.id,
+        normName: u.name.trim().toLowerCase(),
+        normUsername: u.username.trim().toLowerCase()
+      }));
+
       rawData.forEach(raw => {
         if (raw.salespersonName) {
+          const rawNormName = raw.salespersonName.trim().toLowerCase();
           // Find exactly the user with that name (case insensitive)
-          const match = users.find(u =>
-            u.name.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
-            u.username.trim().toLowerCase() === raw.salespersonName?.trim().toLowerCase() ||
-            raw.salespersonName?.trim().toLowerCase().includes(u.name.trim().toLowerCase()) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
+          const match = normalizedUsers.find(u =>
+            u.normName === rawNormName ||
+            u.normUsername === rawNormName ||
+            rawNormName.includes(u.normName) // Partial match (e.g. 'Israel França' in 'Israel França Silva')
           );
           if (match) {
             raw.salespersonId = match.id;
@@ -1323,18 +1330,23 @@ const App: React.FC = () => {
           // -------------------------------------------------------------
           if (latestClient) {
             const taggedNewClient = { ...latestClient, sourceFileId: fileId };
+            const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
+            const hasValidNewCnpj = Boolean(cleanNewCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11));
+            const normalizedNewName = taggedNewClient.companyName ? taggedNewClient.companyName.toLowerCase().trim() : '';
+            const normalizedNewCity = taggedNewClient.city ? taggedNewClient.city.toLowerCase().trim() : '';
 
             setMasterClientList(prev => {
               const list = [...prev];
-              const cleanNewCnpj = taggedNewClient.cnpj?.replace(/\D/g, '');
 
               const existingIdx = list.findIndex(c => {
-                const cleanCnpj = c.cnpj?.replace(/\D/g, '');
-                if (cleanNewCnpj && cleanCnpj && cleanNewCnpj === cleanCnpj && (cleanNewCnpj.length === 14 || cleanNewCnpj.length === 11)) {
-                  return true;
+                if (hasValidNewCnpj && c.cnpj) {
+                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  if (cleanNewCnpj === cleanCnpj) return true;
                 }
-                return c.companyName.toLowerCase().trim() === taggedNewClient.companyName.toLowerCase().trim() &&
-                  c.city.toLowerCase().trim() === taggedNewClient.city.toLowerCase().trim();
+
+                if (!c.companyName || !c.city) return false;
+                return c.companyName.toLowerCase().trim() === normalizedNewName &&
+                  c.city.toLowerCase().trim() === normalizedNewCity;
               });
 
               if (existingIdx !== -1) {

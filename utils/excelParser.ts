@@ -257,37 +257,24 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
                 const categoryKeys = ['departamento', 'categoria', 'grupo', 'familia', 'dept', 'depto', 'secao', 'class', 'classificacao'];
                 const factoryCodeKeys = ['cod.fabrica', 'cod fabrica', 'codigo fabrica', 'codfabrica', 'factory'];
 
+                const skuIdx = headers.findIndex(h => skuKeys.some(k => h.includes(k) || h === k));
+                const nameIdx = headers.findIndex(h => nameKeys.some(k => h.includes(k) || h === k));
+                const brandIdx = headers.findIndex(h => brandKeys.some(k => h.includes(k) || h === k));
+                const priceIdx = headers.findIndex(h => priceKeys.some(k => h.includes(k) || h === k));
+                const categoryIdx = headers.findIndex(h => categoryKeys.some(k => h.includes(k) || h === k));
+                const factoryCodeIdx = headers.findIndex(h => factoryCodeKeys.some(k => h.includes(k) || h === k));
+                const marginIdx = headers.findIndex(h => h.includes('margem') || h === 'margin');
+                const discountIdx = headers.findIndex(h => h.includes('desconto') || h.includes('discount'));
+
                 dataRows.forEach((row, rowIndex) => {
-                    // Get values by column index
-                    const skuVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return skuKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
-                    }, undefined);
-
-                    const nameVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return nameKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
-                    }, undefined);
-
-                    const brandVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return brandKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
-                    }, undefined);
-
-                    const priceVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return priceKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
-                    }, undefined);
-
-                    const categoryVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return categoryKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
-                    }, undefined);
-
-                    const factoryCodeVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return factoryCodeKeys.some(k => h.includes(k) || h === k) ? row[idx] : undefined;
-                    }, undefined);
+                    const skuVal = skuIdx !== -1 ? row[skuIdx] : undefined;
+                    const nameVal = nameIdx !== -1 ? row[nameIdx] : undefined;
+                    const brandVal = brandIdx !== -1 ? row[brandIdx] : undefined;
+                    const priceVal = priceIdx !== -1 ? row[priceIdx] : undefined;
+                    const categoryVal = categoryIdx !== -1 ? row[categoryIdx] : undefined;
+                    const factoryCodeVal = factoryCodeIdx !== -1 ? row[factoryCodeIdx] : undefined;
+                    const marginVal = marginIdx !== -1 ? row[marginIdx] : undefined;
+                    const discountVal = discountIdx !== -1 ? row[discountIdx] : undefined;
 
                     const category = String(categoryVal || 'Geral');
                     const sku = String(skuVal || '');
@@ -298,17 +285,6 @@ export const parseProductExcel = (file: File): Promise<Product[]> => {
                     const price = parseMoney(priceRaw);
 
                     const factoryCode = String(factoryCodeVal || '');
-
-                    // Optional margin & discount
-                    const marginVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return (h.includes('margem') || h === 'margin') ? row[idx] : undefined;
-                    }, undefined);
-
-                    const discountVal = headers.reduce((found, h, idx) => {
-                        if (found) return found;
-                        return (h.includes('desconto') || h.includes('discount')) ? row[idx] : undefined;
-                    }, undefined);
 
                     const margin = parsePercentage(marginVal || 0);
                     const discount = parsePercentage(discountVal || 0);
