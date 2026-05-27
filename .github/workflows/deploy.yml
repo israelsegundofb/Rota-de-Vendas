@@ -126,4 +126,4 @@ jobs:
             --project gen-lang-client-0586123917 \
             --quiet \
             --allow-unauthenticated \
-            --update-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}",QDRANT_URL="${{ secrets.QDRANT_URL }}",QDRANT_API_KEY="${{ secrets.QDRANT_API_KEY }}"
+            --update-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
