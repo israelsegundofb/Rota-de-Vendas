@@ -100,6 +100,34 @@ const ClientList: React.FC<ClientListProps> = ({
     setIsProductModalOpen(true);
   }, []);
 
+  // Memoize Virtuoso styles
+  const virtuosoStyle = React.useMemo(() => ({ height: '100%' }), []);
+
+  // Memoize components object for VirtuosoGrid
+  const virtuosoGridComponents = React.useMemo(() => ({
+    List: forwardRef<HTMLDivElement, any>((props, ref) => (
+      <div
+        {...props}
+        ref={ref}
+        className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
+      />
+    )),
+    Item: (props: any) => <div {...props} className="h-full" />
+  }), []);
+
+  // Memoize item content renderer
+  const renderClientCard = useCallback((index: number, client: EnrichedClient) => (
+    <ClientCard
+      client={client}
+      onEdit={openEditModal}
+      onAssignProducts={openProductAssignmentModal}
+      style={virtuosoStyle}
+      filterSalespersonId={filterSalespersonId}
+      startDate={startDate}
+      endDate={endDate}
+    />
+  ), [openEditModal, openProductAssignmentModal, filterSalespersonId, startDate, endDate, virtuosoStyle]);
+
   if (isLoading) {
     return <ClientListSkeleton />;
   }
@@ -265,45 +293,17 @@ const ClientList: React.FC<ClientListProps> = ({
           </div>
         ) : isMobile ? (
           <Virtuoso
-            style={{ height: '100%' }}
+            style={virtuosoStyle}
             data={filteredClients}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client}
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-                filterSalespersonId={filterSalespersonId}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            )}
+            itemContent={renderClientCard}
             className="custom-scrollbar"
           />
         ) : (
           <VirtuosoGrid
-            style={{ height: '100%' }}
+            style={virtuosoStyle}
             data={filteredClients}
-            components={{
-              List: forwardRef((props, ref) => (
-                <div
-                  {...props}
-                  ref={ref}
-                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 p-2"
-                />
-              )),
-              Item: (props) => <div {...props} className="h-full" />
-            }}
-            itemContent={(index, client) => (
-              <ClientCard
-                client={client}
-                onEdit={openEditModal}
-                onAssignProducts={openProductAssignmentModal}
-                style={{ height: '100%' }}
-                filterSalespersonId={filterSalespersonId}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            )}
+            components={virtuosoGridComponents}
+            itemContent={renderClientCard}
             className="custom-scrollbar"
           />
         )}
