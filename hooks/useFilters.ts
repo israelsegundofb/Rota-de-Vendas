@@ -116,105 +116,110 @@ export const useFilters = (
         const prodQuery = (debouncedProductQuery || '').toLowerCase();
 
         return visibleClients.filter(c => {
-            // General Filters
-            const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
-            const matchState = filterState === 'Todos' || c.state === filterState;
-            const matchCity = filterCity === 'Todas' || c.city === filterCity;
-            const matchCat = filterCategory === 'Todos' || (Array.isArray(c.category) && c.category.includes(filterCategory));
+            // Early Returns (Short-circuiting) for Performance
+            // By checking simple conditions first and returning false immediately if they fail,
+            // we avoid running expensive text searches or nested product array loops.
+
+            if (filterRegion !== 'Todas' && c.region !== filterRegion) return false;
+            if (filterState !== 'Todos' && c.state !== filterState) return false;
+            if (filterCity !== 'Todas' && c.city !== filterCity) return false;
+            if (filterCategory !== 'Todos' && !(Array.isArray(c.category) && c.category.includes(filterCategory))) return false;
 
             // Sales Category Filter (Admin Only)
-            let matchSalesCat = true;
             if (currentUserRole && hasFullDataVisibility(currentUserRole) && filterSalesCategory !== 'Todos') {
                 const sellerSalesCat = sellerCategoriesMap.get(c.salespersonId) || 'Desconhecido';
-                if (sellerSalesCat !== filterSalesCategory) {
-                    matchSalesCat = false;
-                }
+                if (sellerSalesCat !== filterSalesCategory) return false;
+            }
+
+            // CNAE Filter (Matches Main or Secondary)
+            if (filterCnae !== 'Todos') {
+                const matchCnae = (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
+                    (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
+                if (!matchCnae) return false;
             }
 
             // Text Search
-            const matchSearch = debouncedSearchQuery === '' ||
-                (c.companyName || '').toLowerCase().includes(query) ||
-                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
-
-            // Product Filters (Where items were sold)
-            let matchProduct = true;
-
-            // CNAE Filter (Matches Main or Secondary)
-            const matchCnae = filterCnae === 'Todos' ||
-                (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
-                (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
-
-            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
-                // If filtering by product, client MUST have purchase history
-                if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
-                    matchProduct = false;
-                } else {
-                    // Optimize: Evaluate all product conditions in a single loop while preserving
-                    // the independent "ANY product matches X" logic of the original code.
-                    let hasCat = filterProductCategory === 'Todos';
-                    let hasSection = filterProductSection === 'Todas';
-                    let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = prodQuery === '';
-                    let matchDate = !hasDateFilter;
-
-                    for (let i = 0; i < c.purchasedProducts.length; i++) {
-                        const p = c.purchasedProducts[i];
-
-                        if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
-                        if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
-                        if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
-
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
-                        }
-
-                        if (!matchDate && p.purchaseDate) {
-                            let pDate = new Date(p.purchaseDate);
-                            if (isNaN(pDate.getTime())) {
-                                const parts = p.purchaseDate.split('/');
-                                if (parts.length === 3) {
-                                    pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                                } else {
-                                    const partsHyphen = p.purchaseDate.split('-');
-                                    if (partsHyphen.length === 3) {
-                                        pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
-                                    }
-                                }
-                            }
-                            if (!isNaN(pDate.getTime())) {
-                                pDate.setHours(0, 0, 0, 0);
-                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
-                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
-                                if (isAfterStart && isBeforeEnd) {
-                                    matchDate = true;
-                                }
-                            }
-                        }
-
-                        // Early exit if all independent conditions are satisfied
-                        if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
-                            break;
-                        }
-                    }
-
-                    matchProduct = hasCat && hasSection && hasSku && hasMatch && matchDate;
-                }
+            if (debouncedSearchQuery !== '') {
+                const matchSearch = (c.companyName || '').toLowerCase().includes(query) ||
+                    (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
+                if (!matchSearch) return false;
             }
 
             // Only with Purchases Filter: Context-aware and robust
-            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (
-                c.purchasedProducts && c.purchasedProducts.some(p =>
+            if (filterOnlyWithPurchases) {
+                const matchOnlyWithPurchases = c.purchasedProducts && c.purchasedProducts.some(p =>
                     isValidPurchase(p, filterSalespersonId, startDate, endDate)
-                )
-            );
+                );
+                if (!matchOnlyWithPurchases) return false;
+            }
 
-            return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
+            // Product Filters (Where items were sold)
+            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
+                // If filtering by product, client MUST have purchase history
+                if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
+                    return false;
+                }
+
+                // Optimize: Evaluate all product conditions in a single loop while preserving
+                // the independent "ANY product matches X" logic of the original code.
+                let hasCat = filterProductCategory === 'Todos';
+                let hasSection = filterProductSection === 'Todas';
+                let hasSku = filterProductSku === 'Todos';
+                let hasMatch = prodQuery === '';
+                let matchDate = !hasDateFilter;
+
+                for (let i = 0; i < c.purchasedProducts.length; i++) {
+                    const p = c.purchasedProducts[i];
+
+                    if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
+                    if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
+                    if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
+
+                    if (!hasMatch) {
+                        hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
+                            (p.sku || '').toLowerCase().includes(prodQuery) ||
+                            (p.brand || '').toLowerCase().includes(prodQuery) ||
+                            (p.category || '').toLowerCase().includes(prodQuery) ||
+                            (p.section || '').toLowerCase().includes(prodQuery) ||
+                            (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
+                            (p.price || 0).toString().includes(prodQuery);
+                    }
+
+                    if (!matchDate && p.purchaseDate) {
+                        let pDate = new Date(p.purchaseDate);
+                        if (isNaN(pDate.getTime())) {
+                            const parts = p.purchaseDate.split('/');
+                            if (parts.length === 3) {
+                                pDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                            } else {
+                                const partsHyphen = p.purchaseDate.split('-');
+                                if (partsHyphen.length === 3) {
+                                    pDate = new Date(parseInt(partsHyphen[2]), parseInt(partsHyphen[1]) - 1, parseInt(partsHyphen[0]));
+                                }
+                            }
+                        }
+                        if (!isNaN(pDate.getTime())) {
+                            pDate.setHours(0, 0, 0, 0);
+                            const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
+                            const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                            if (isAfterStart && isBeforeEnd) {
+                                matchDate = true;
+                            }
+                        }
+                    }
+
+                    // Early exit if all independent conditions are satisfied
+                    if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
+                        break;
+                    }
+                }
+
+                if (!(hasCat && hasSection && hasSku && hasMatch && matchDate)) {
+                    return false;
+                }
+            }
+
+            return true;
         });
     }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, filterSalespersonId, debouncedSearchQuery, filterProductCategory, filterProductSection, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
 
