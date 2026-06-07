@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-24 - [Avoid Date Instantiation Inside Render Loops]
+**Learning:** Re-instantiating `new Date()` inside nested iteration loops (e.g., `Array.filter` over clients and their purchases) creates massive memory pressure and CPU overhead in JavaScript.
+**Action:** When filtering by dates in React render/memo cycles, pre-parse the boundary dates (e.g. `startDate`, `endDate`) into numeric timestamps (`.getTime()`) outside the loop, and use numeric comparisons inside the loop to drastically improve throughput.

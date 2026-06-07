@@ -97,19 +97,21 @@ export const useFilters = (
 
     // 2. Filtered Clients (Search & Selects)
     const filteredClients = useMemo(() => {
-        // Optimize: Pre-parse filter dates outside the loop to avoid recreating Date objects for every product
-        let parsedStartDate: Date | null = null;
+        // Optimize: Pre-parse filter dates to timestamps outside the loop for fast O(1) numeric comparisons
+        let parsedStartTime = NaN;
         if (startDate) {
-            parsedStartDate = new Date(startDate);
-            parsedStartDate.setHours(0, 0, 0, 0);
+            const d = new Date(startDate);
+            d.setHours(0, 0, 0, 0);
+            parsedStartTime = d.getTime();
         }
 
-        let parsedEndDate: Date | null = null;
+        let parsedEndTime = NaN;
         if (endDate) {
-            parsedEndDate = new Date(endDate);
-            parsedEndDate.setHours(23, 59, 59, 999);
+            const d = new Date(endDate);
+            d.setHours(23, 59, 59, 999);
+            parsedEndTime = d.getTime();
         }
-        const hasDateFilter = !!(parsedStartDate || parsedEndDate);
+        const hasDateFilter = !isNaN(parsedStartTime) || !isNaN(parsedEndTime);
 
         // Optimize: Pre-calculate lowercased queries
         const query = (debouncedSearchQuery || '').toLowerCase();
@@ -187,10 +189,12 @@ export const useFilters = (
                                     }
                                 }
                             }
-                            if (!isNaN(pDate.getTime())) {
+                            const pTime = pDate.getTime();
+                            if (!isNaN(pTime)) {
                                 pDate.setHours(0, 0, 0, 0);
-                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
-                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                                const pTimeZero = pDate.getTime();
+                                const isAfterStart = isNaN(parsedStartTime) || pTimeZero >= parsedStartTime;
+                                const isBeforeEnd = isNaN(parsedEndTime) || pTimeZero <= parsedEndTime;
                                 if (isAfterStart && isBeforeEnd) {
                                     matchDate = true;
                                 }
