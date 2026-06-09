@@ -49,10 +49,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             (m.senderId === activeUserId && m.receiverId === currentUser.id);
     });
 
+    // ⚡ Bolt Optimization: Hoist lowercasing of search query outside the filter loop to prevent O(N) allocations
+    const normalizedSearchQuery = searchQuery.toLowerCase();
+
     const filteredUsers = allUsers.filter(u =>
         u.id !== currentUser.id &&
-        (u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            u.username.toLowerCase().includes(searchQuery.toLowerCase()))
+        (u.name.toLowerCase().includes(normalizedSearchQuery) ||
+            u.username.toLowerCase().includes(normalizedSearchQuery))
     );
 
     useEffect(() => {

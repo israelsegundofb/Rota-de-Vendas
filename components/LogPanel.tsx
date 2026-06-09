@@ -34,10 +34,13 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
         return () => unsubscribe();
     }, []);
 
+    // ⚡ Bolt Optimization: Hoist lowercasing of search term outside the filter loop to prevent O(N) allocations
+    const normalizedSearchTerm = searchTerm.toLowerCase();
+
     const filteredLogs = logs.filter(log => {
         const matchesSearch =
-            log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.details.toLowerCase().includes(searchTerm.toLowerCase());
+            log.userName.toLowerCase().includes(normalizedSearchTerm) ||
+            log.details.toLowerCase().includes(normalizedSearchTerm);
         const matchesCategory = filterCategory === 'ALL' || log.category === filterCategory;
         const matchesAction = filterAction === 'ALL' || log.action === filterAction;
         return matchesSearch && matchesCategory && matchesAction;
