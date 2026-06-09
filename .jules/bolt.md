@@ -22,3 +22,7 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+
+## 2024-05-18 - [Hoist string lowercasing outside filter loops]
+**Learning:** Calling `.toLowerCase()` on variables like `searchTerm` or `searchQuery` *inside* an `Array.prototype.filter` loop (like those found in `LogPanel.tsx` and `ChatPanel.tsx`) causes O(N) redundant string allocations and runtime overhead.
+**Action:** Pre-compute and hoist the normalized search terms (e.g., `const normalizedSearch = searchTerm.toLowerCase();`) outside of iteration blocks to reduce memory pressure and cpu usage.
