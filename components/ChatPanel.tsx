@@ -32,7 +32,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const [activeTab, setActiveTab] = useState<'conversations' | 'users'>('conversations');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const activeUser = allUsers.find(u => u.id === activeUserId);
+    // O(1) user lookup map for performance
+    const userMap = React.useMemo(() => {
+        const map = new Map<string, AppUser>();
+        for (const user of allUsers) {
+            if (!map.has(user.id)) map.set(user.id, user);
+        }
+        return map;
+    }, [allUsers]);
+
+    const activeUser = activeUserId ? userMap.get(activeUserId) : undefined;
     const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
     const isMonitorMode = isAdminDev && activeUserId;
 
@@ -49,11 +58,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             (m.senderId === activeUserId && m.receiverId === currentUser.id);
     });
 
-    const filteredUsers = allUsers.filter(u =>
-        u.id !== currentUser.id &&
-        (u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            u.username.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredUsers = React.useMemo(() => {
+        const query = searchQuery.toLowerCase();
+        return allUsers.filter(u =>
+            u.id !== currentUser.id &&
+            (u.name.toLowerCase().includes(query) ||
+                u.username.toLowerCase().includes(query))
+        );
+    }, [allUsers, currentUser.id, searchQuery]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -167,7 +179,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         {activeTab === 'conversations' ? (
                             conversations.length > 0 ? (
                                 conversations.map(conv => {
-                                    const user = allUsers.find(u => u.id === conv.userId);
+                                    const user = userMap.get(conv.userId);
                                     if (!user) return null;
                                     return (
                                         <button
@@ -264,7 +276,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                                 )}
                                                 {isMonitorMode && !isMe && (
                                                     <p className="text-[9px] font-black uppercase mb-1 opacity-60">
-                                                        {allUsers.find(u => u.id === msg.senderId)?.name || 'Outro'} → {allUsers.find(u => u.id === msg.receiverId)?.name || 'Outro'}
+                                                        {userMap.get(msg.senderId)?.name || 'Outro'} → {userMap.get(msg.receiverId)?.name || 'Outro'}
                                                     </p>
                                                 )}
                                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
