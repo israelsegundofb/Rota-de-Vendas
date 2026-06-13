@@ -111,9 +111,13 @@ export const useFilters = (
         }
         const hasDateFilter = !!(parsedStartDate || parsedEndDate);
 
-        // Optimize: Pre-calculate lowercased queries
+        // Optimize: Pre-calculate lowercased queries and pre-compile regular expressions
+        // Using pre-compiled regex avoids creating new string allocations from .toLowerCase()
+        // in hot loops, significantly reducing memory pressure and improving throughput.
         const query = (debouncedSearchQuery || '').toLowerCase();
         const prodQuery = (debouncedProductQuery || '').toLowerCase();
+        const searchRegex = query ? new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+        const prodRegex = prodQuery ? new RegExp(prodQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -132,9 +136,9 @@ export const useFilters = (
             }
 
             // Text Search
-            const matchSearch = debouncedSearchQuery === '' ||
-                (c.companyName || '').toLowerCase().includes(query) ||
-                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
+            const matchSearch = !searchRegex ||
+                searchRegex.test(c.companyName || '') ||
+                (!!c.ownerName && searchRegex.test(c.ownerName));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
@@ -154,7 +158,7 @@ export const useFilters = (
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = prodQuery === '';
+                    let hasMatch = !prodRegex;
                     let matchDate = !hasDateFilter;
 
                     for (let i = 0; i < c.purchasedProducts.length; i++) {
@@ -164,14 +168,16 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                        if (!hasMatch && prodRegex) {
+                            // ⚡ Bolt Optimization: Use short-circuiting OR operators with pre-compiled regex
+                            // to avoid allocating new strings via .toLowerCase() or interpolation on every field check.
+                            hasMatch = prodRegex.test(p.name || '') ||
+                                prodRegex.test(p.sku || '') ||
+                                prodRegex.test(p.brand || '') ||
+                                prodRegex.test(p.category || '') ||
+                                prodRegex.test(p.section || '') ||
+                                prodRegex.test(p.factoryCode || '') ||
+                                prodRegex.test(String(p.price || 0));
                         }
 
                         if (!matchDate && p.purchaseDate) {
