@@ -2738,14 +2738,22 @@ const App: React.FC = () => {
                       {showProductSuggestions && searchProductQuery.length >= 2 && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
                           {(() => {
-                            const suggestions = products
-                              .filter(p => {
-                                const term = searchProductQuery.toLowerCase();
-                                return (p.name || '').toLowerCase().includes(term) ||
-                                  (p.sku || '').toLowerCase().includes(term) ||
-                                  (p.brand || '').toLowerCase().includes(term);
-                              })
-                              .slice(0, 8);
+                            // Optimize: Replace .filter().slice() chain with a short-circuited loop
+                            // Hoist lowercase term to prevent O(N) redundant allocations
+                            const term = searchProductQuery.toLowerCase();
+                            const suggestions: typeof products = [];
+
+                            for (let i = 0; i < products.length; i++) {
+                              const p = products[i];
+                              if (
+                                (p.name || '').toLowerCase().includes(term) ||
+                                (p.sku || '').toLowerCase().includes(term) ||
+                                (p.brand || '').toLowerCase().includes(term)
+                              ) {
+                                suggestions.push(p);
+                                if (suggestions.length >= 8) break;
+                              }
+                            }
 
                             if (suggestions.length === 0) {
                               return (
