@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Avoid .filter().slice() chaining in autocomplete]
+**Learning:** Chaining `.filter(condition).slice(0, K)` over large lists forces JavaScript to evaluate the condition against the entire array (O(N) operations), even if the desired `K` items are found early. This causes unnecessary overhead, particularly when complex conditions like `toLowerCase().includes()` are involved inside the filter callback.
+**Action:** Replace `.filter().slice()` chains with a `for` loop, tracking the matches in an array, and breaking early when the array reaches length `K`. This effectively turns an O(N) operation into an O(K) best-case execution, significantly speeding up UI responsiveness for features like autocomplete dropdowns.
