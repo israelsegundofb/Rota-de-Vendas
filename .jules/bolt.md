@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2024-06-18 - Replacing chained array filters with short-circuiting loops
+**Learning:** Using `.filter(...).slice(0, K)` in React render loops for features like autocomplete forces full array iteration (O(N)), which degrades performance on large lists. However, replacing it with `new RegExp(query)` is dangerous if `query` is unescaped user input, as special characters (like `+`, `?`) will cause `new RegExp` to throw a `SyntaxError` and crash the application during the render cycle.
+**Action:** When refactoring chained `.filter()` calls into short-circuiting `for` loops, retain the safe `.toLowerCase().includes()` pattern if avoiding the complexity of regex escaping. Always hoist static string normalizations (like `query.toLowerCase()`) outside the loop to prevent redundant allocations.
