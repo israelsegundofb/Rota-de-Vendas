@@ -1747,8 +1747,10 @@ const App: React.FC = () => {
         if (clientIdx !== -1) {
           updatedCount++;
           const existingHistory = existingUpdatedList[clientIdx].purchasedProducts || [];
+          // Optimize: O(N*M) nested lookup replacement
+          const historySet = new Set(existingHistory.map(oldP => `${oldP.sku}|${oldP.purchaseDate}|${oldP.salespersonId}`));
           const filteredNewProducts = mappedPurchases.filter(newP =>
-            !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate && oldP.salespersonId === newP.salespersonId)
+            !historySet.has(`${newP.sku}|${newP.purchaseDate}|${newP.salespersonId}`)
           );
           if (filteredNewProducts.length > 0) {
             existingUpdatedList[clientIdx] = {
