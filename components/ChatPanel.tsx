@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { User, Send, Search, ArrowLeft, Check, CheckCheck, Clock, MessageSquare, Users, Trash2 } from 'lucide-react';
 import { AppUser, ChatMessage, ChatConversation } from '../types';
 
@@ -32,7 +32,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const [activeTab, setActiveTab] = useState<'conversations' | 'users'>('conversations');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const activeUser = allUsers.find(u => u.id === activeUserId);
+    // ⚡ Bolt: Pre-compute an O(1) Map for user lookups to avoid O(N) linear searches during render
+    const userMap = useMemo(() => {
+        const map = new Map<string, AppUser>();
+        for (let i = 0; i < allUsers.length; i++) {
+            map.set(allUsers[i].id, allUsers[i]);
+        }
+        return map;
+    }, [allUsers]);
+
+    const activeUser = activeUserId ? userMap.get(activeUserId) : undefined;
     const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
     const isMonitorMode = isAdminDev && activeUserId;
 
@@ -167,7 +176,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         {activeTab === 'conversations' ? (
                             conversations.length > 0 ? (
                                 conversations.map(conv => {
-                                    const user = allUsers.find(u => u.id === conv.userId);
+                                    const user = userMap.get(conv.userId);
                                     if (!user) return null;
                                     return (
                                         <button
@@ -264,7 +273,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                                 )}
                                                 {isMonitorMode && !isMe && (
                                                     <p className="text-[9px] font-black uppercase mb-1 opacity-60">
-                                                        {allUsers.find(u => u.id === msg.senderId)?.name || 'Outro'} → {allUsers.find(u => u.id === msg.receiverId)?.name || 'Outro'}
+                                                        {userMap.get(msg.senderId)?.name || 'Outro'} → {userMap.get(msg.receiverId)?.name || 'Outro'}
                                                     </p>
                                                 )}
                                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
