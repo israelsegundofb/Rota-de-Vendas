@@ -1747,9 +1747,19 @@ const App: React.FC = () => {
         if (clientIdx !== -1) {
           updatedCount++;
           const existingHistory = existingUpdatedList[clientIdx].purchasedProducts || [];
-          const filteredNewProducts = mappedPurchases.filter(newP =>
-            !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate && oldP.salespersonId === newP.salespersonId)
-          );
+
+          // ⚡ Bolt Optimization: Replace O(N*M) nested loop deduplication (.some inside .filter)
+          // with an O(N+M) Set-based approach. Reduces freezing when merging large purchase lists.
+          const existingKeys = new Set(existingHistory.map(oldP => `${oldP.sku}|${oldP.purchaseDate}|${oldP.salespersonId}`));
+
+          const filteredNewProducts = mappedPurchases.filter(newP => {
+            const key = `${newP.sku}|${newP.purchaseDate}|${newP.salespersonId}`;
+            if (existingKeys.has(key)) return false;
+            // Add to Set to prevent duplicates within the new mappedPurchases list itself
+            existingKeys.add(key);
+            return true;
+          });
+
           if (filteredNewProducts.length > 0) {
             existingUpdatedList[clientIdx] = {
               ...existingUpdatedList[clientIdx],

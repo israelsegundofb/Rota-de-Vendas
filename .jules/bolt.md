@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-18 - [Optimize duplicate item filtering in map merges]
+**Learning:** Using `.some` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N*M) exponential complexity loops in JavaScript and UI freezing.
+**Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N+M) single-pass iteration and is far faster for large lists.
