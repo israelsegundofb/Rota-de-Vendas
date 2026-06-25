@@ -5,6 +5,10 @@ import { isValidPurchase } from '../utils/purchaseUtils';
 import useDebounce from './useDebounce';
 import { useUrlParams } from './useUrlParams';
 
+function escapeRegExp(string: string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
 export const useFilters = (
     masterClientList: EnrichedClient[],
     users: AppUser[],
@@ -111,9 +115,10 @@ export const useFilters = (
         }
         const hasDateFilter = !!(parsedStartDate || parsedEndDate);
 
-        // Optimize: Pre-calculate lowercased queries
-        const query = (debouncedSearchQuery || '').toLowerCase();
-        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+        // Optimize: Pre-compile case-insensitive regular expressions for text searches
+        // This avoids O(N) string allocations from `.toLowerCase()` inside the filter loops.
+        const searchRegex = debouncedSearchQuery ? new RegExp(escapeRegExp(debouncedSearchQuery), 'i') : null;
+        const prodSearchRegex = debouncedProductQuery ? new RegExp(escapeRegExp(debouncedProductQuery), 'i') : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -132,9 +137,9 @@ export const useFilters = (
             }
 
             // Text Search
-            const matchSearch = debouncedSearchQuery === '' ||
-                (c.companyName || '').toLowerCase().includes(query) ||
-                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
+            const matchSearch = !searchRegex ||
+                searchRegex.test(c.companyName || '') ||
+                (c.ownerName && searchRegex.test(c.ownerName || ''));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
@@ -144,7 +149,7 @@ export const useFilters = (
                 (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
-            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
+            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || !!prodSearchRegex) {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
@@ -154,7 +159,7 @@ export const useFilters = (
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = prodQuery === '';
+                    let hasMatch = !prodSearchRegex;
                     let matchDate = !hasDateFilter;
 
                     for (let i = 0; i < c.purchasedProducts.length; i++) {
@@ -164,14 +169,14 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                        if (!hasMatch && prodSearchRegex) {
+                            hasMatch = prodSearchRegex.test(p.name || '') ||
+                                prodSearchRegex.test(p.sku || '') ||
+                                prodSearchRegex.test(p.brand || '') ||
+                                prodSearchRegex.test(p.category || '') ||
+                                prodSearchRegex.test(p.section || '') ||
+                                prodSearchRegex.test(p.factoryCode || '') ||
+                                prodSearchRegex.test(String(p.price || 0));
                         }
 
                         if (!matchDate && p.purchaseDate) {
