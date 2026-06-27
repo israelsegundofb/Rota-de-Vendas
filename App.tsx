@@ -268,6 +268,9 @@ const App: React.FC = () => {
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
 
+  // ⚡ Bolt Optimization: Cache derived strings to avoid O(N) regex and string allocations in state updaters
+  const clientCacheRef = useRef<WeakMap<EnrichedClient, { cleanCnpj: string; normName: string; normCity: string }>>(new WeakMap());
+
   // Handle View Navigation with Confirmation
   const handleViewNavigation = (newView: 'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat') => {
     if (procState.isActive && procState.status === 'processing') {
@@ -1336,20 +1339,27 @@ const App: React.FC = () => {
             const normalizedNewCity = taggedNewClient.city ? taggedNewClient.city.toLowerCase().trim() : '';
 
             setMasterClientList(prev => {
-              const list = [...prev];
-
-              const existingIdx = list.findIndex(c => {
-                if (hasValidNewCnpj && c.cnpj) {
-                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
-                  if (cleanNewCnpj === cleanCnpj) return true;
+              const existingIdx = prev.findIndex(c => {
+                let cached = clientCacheRef.current.get(c);
+                if (!cached) {
+                  cached = {
+                    cleanCnpj: c.cnpj ? c.cnpj.replace(/\D/g, '') : '',
+                    normName: c.companyName ? c.companyName.toLowerCase().trim() : '',
+                    normCity: c.city ? c.city.toLowerCase().trim() : ''
+                  };
+                  clientCacheRef.current.set(c, cached);
                 }
 
-                if (!c.companyName || !c.city) return false;
-                return c.companyName.toLowerCase().trim() === normalizedNewName &&
-                  c.city.toLowerCase().trim() === normalizedNewCity;
+                if (hasValidNewCnpj && cached.cleanCnpj) {
+                  if (cleanNewCnpj === cached.cleanCnpj) return true;
+                }
+
+                if (!cached.normName || !cached.normCity) return false;
+                return cached.normName === normalizedNewName && cached.normCity === normalizedNewCity;
               });
 
               if (existingIdx !== -1) {
+                const list = [...prev];
                 const existing = list[existingIdx];
                 list[existingIdx] = {
                   ...existing,
@@ -1367,10 +1377,10 @@ const App: React.FC = () => {
                   googleMapsUri: taggedNewClient.googleMapsUri || existing.googleMapsUri,
                   plusCode: taggedNewClient.plusCode || existing.plusCode,
                 };
+                return list;
               } else {
-                list.push(taggedNewClient);
+                return [...prev, taggedNewClient];
               }
-              return list;
             });
           }
         }
