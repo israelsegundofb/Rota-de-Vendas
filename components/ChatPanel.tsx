@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { User, Send, Search, ArrowLeft, Check, CheckCheck, Clock, MessageSquare, Users, Trash2 } from 'lucide-react';
 import { AppUser, ChatMessage, ChatConversation } from '../types';
 
@@ -36,24 +36,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
     const isMonitorMode = isAdminDev && activeUserId;
 
-    const filteredMessages = messages.filter(m => {
-        if (!activeUserId) return false;
+    // Optimization: Wrap filteredMessages in useMemo to prevent unnecessary array
+    // recreation on every render (e.g., when the user types in the input).
+    // This stops the `useEffect` below from triggering redundant DOM scrolling.
+    const filteredMessages = useMemo(() => {
+        return messages.filter(m => {
+            if (!activeUserId) return false;
 
-        // If normal user: see only messages with the other party
-        // If Admin Dev: see ALL messages where the activeUserId is involved
-        if (currentUser.role === 'admin_dev' || currentUser.role === 'admin') {
-            return m.senderId === activeUserId || m.receiverId === activeUserId;
-        }
+            // If normal user: see only messages with the other party
+            // If Admin Dev: see ALL messages where the activeUserId is involved
+            if (currentUser.role === 'admin_dev' || currentUser.role === 'admin') {
+                return m.senderId === activeUserId || m.receiverId === activeUserId;
+            }
 
-        return (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
-            (m.senderId === activeUserId && m.receiverId === currentUser.id);
-    });
+            return (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
+                (m.senderId === activeUserId && m.receiverId === currentUser.id);
+        });
+    }, [messages, activeUserId, currentUser.id, currentUser.role]);
 
-    const filteredUsers = allUsers.filter(u =>
-        u.id !== currentUser.id &&
-        (u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            u.username.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // Optimization: Wrap filteredUsers in useMemo and hoist string normalization
+    // out of the filter loop to prevent O(N) string allocations during renders.
+    const filteredUsers = useMemo(() => {
+        const lowerQuery = searchQuery.toLowerCase();
+        return allUsers.filter(u =>
+            u.id !== currentUser.id &&
+            (u.name.toLowerCase().includes(lowerQuery) ||
+                u.username.toLowerCase().includes(lowerQuery))
+        );
+    }, [allUsers, currentUser.id, searchQuery]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
