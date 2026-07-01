@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Avoid unmemoized derived state leading to DOM thrashing in Chat]
+**Learning:** Returning unmemoized arrays (`filteredMessages` and `filteredUsers`) based on props inside a React component causes the array reference to change on every render (such as when the user types in an input). This changed reference then triggers other `useEffect` hooks that depend on the array (e.g. scrolling to the bottom), creating noticeable DOM thrashing. Also string operations like `.toLowerCase()` inside a loop allocating memory on every keystroke.
+**Action:** Wrap derived arrays used as references by DOM-manipulating hooks in `useMemo` with minimal dependency arrays, and hoist allocations outside of array `.filter` iterations.
