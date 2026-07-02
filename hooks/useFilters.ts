@@ -112,8 +112,13 @@ export const useFilters = (
         const hasDateFilter = !!(parsedStartDate || parsedEndDate);
 
         // Optimize: Pre-calculate lowercased queries
-        const query = (debouncedSearchQuery || '').toLowerCase();
-        const prodQuery = (debouncedProductQuery || '').toLowerCase();
+        // ⚡ Bolt Optimization: Pre-compile Regex for O(1) matching vs O(N) string allocations inside loop
+        const searchRegex = debouncedSearchQuery
+            ? new RegExp(debouncedSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+            : null;
+        const prodRegex = debouncedProductQuery
+            ? new RegExp(debouncedProductQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+            : null;
 
         return visibleClients.filter(c => {
             // General Filters
@@ -132,9 +137,9 @@ export const useFilters = (
             }
 
             // Text Search
-            const matchSearch = debouncedSearchQuery === '' ||
-                (c.companyName || '').toLowerCase().includes(query) ||
-                (c.ownerName && (c.ownerName || '').toLowerCase().includes(query));
+            const matchSearch = !searchRegex ||
+                (c.companyName && searchRegex.test(c.companyName)) ||
+                (c.ownerName && searchRegex.test(c.ownerName));
 
             // Product Filters (Where items were sold)
             let matchProduct = true;
@@ -144,7 +149,7 @@ export const useFilters = (
                 (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
-            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || prodQuery !== '') {
+            if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || debouncedProductQuery !== '') {
                 // If filtering by product, client MUST have purchase history
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
@@ -154,7 +159,7 @@ export const useFilters = (
                     let hasCat = filterProductCategory === 'Todos';
                     let hasSection = filterProductSection === 'Todas';
                     let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = prodQuery === '';
+                    let hasMatch = !prodRegex;
                     let matchDate = !hasDateFilter;
 
                     for (let i = 0; i < c.purchasedProducts.length; i++) {
@@ -164,14 +169,14 @@ export const useFilters = (
                         if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
                         if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
 
-                        if (!hasMatch) {
-                            hasMatch = (p.name || '').toLowerCase().includes(prodQuery) ||
-                                (p.sku || '').toLowerCase().includes(prodQuery) ||
-                                (p.brand || '').toLowerCase().includes(prodQuery) ||
-                                (p.category || '').toLowerCase().includes(prodQuery) ||
-                                (p.section || '').toLowerCase().includes(prodQuery) ||
-                                (p.factoryCode || '').toLowerCase().includes(prodQuery) ||
-                                (p.price || 0).toString().includes(prodQuery);
+                        if (!hasMatch && prodRegex) {
+                            hasMatch = (p.name && prodRegex.test(p.name)) ||
+                                (p.sku && prodRegex.test(p.sku)) ||
+                                (p.brand && prodRegex.test(p.brand)) ||
+                                (p.category && prodRegex.test(p.category)) ||
+                                (p.section && prodRegex.test(p.section)) ||
+                                (p.factoryCode && prodRegex.test(p.factoryCode)) ||
+                                (p.price != null && prodRegex.test(p.price.toString()));
                         }
 
                         if (!matchDate && p.purchaseDate) {
