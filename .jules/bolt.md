@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Optimize text search loops with RegExp]
+**Learning:** Using `.toLowerCase().includes()` inside hot array loops (like `.filter()`) forces the JavaScript engine to allocate a new string in memory for every item evaluated, which creates immense Garbage Collection pressure on large datasets.
+**Action:** Replace `toLowerCase().includes()` in hot loops by pre-compiling a case-insensitive regular expression (`new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')`) *outside* the loop and using `.test()` inside. This transforms $O(N)$ memory allocations into $O(1)$ setup time, making text filtering substantially faster.
