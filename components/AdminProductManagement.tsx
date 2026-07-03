@@ -111,20 +111,23 @@ const AdminProductManagement: React.FC<AdminProductManagementProps> = ({
 
   // Filter first
   const filtered = React.useMemo(() => {
-    // Optimization: Hoist the lowercased filter string out of the loop
-    const lowerFilter = filter.toLowerCase();
+    // Optimization: Pre-compile case-insensitive regular expression for multi-property text search
+    // to avoid O(N) string allocations from `.toLowerCase()` in the tight loop.
+    const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hasFilter = !!(filter && filter.trim() !== '');
+    const filterRegex = hasFilter ? new RegExp(escapeRegExp(filter), 'i') : null;
 
     // Optimization: Replace chained .map().filter() with a single-pass reduce
     // to avoid intermediate array allocations and skip creating new objects for filtered-out items
     return localProducts.reduce((acc: (Product & { originalIndex: number })[], p, index) => {
       if (
-        !lowerFilter ||
-        (p.name || '').toLowerCase().includes(lowerFilter) ||
-        (p.sku || '').toLowerCase().includes(lowerFilter) ||
-        (p.brand || '').toLowerCase().includes(lowerFilter) ||
-        (p.category || '').toLowerCase().includes(lowerFilter) ||
-        (p.section || '').toLowerCase().includes(lowerFilter) ||
-        (p.factoryCode || '').toLowerCase().includes(lowerFilter)
+        !filterRegex ||
+        filterRegex.test(p.name || '') ||
+        filterRegex.test(p.sku || '') ||
+        filterRegex.test(p.brand || '') ||
+        filterRegex.test(p.category || '') ||
+        filterRegex.test(p.section || '') ||
+        filterRegex.test(p.factoryCode || '')
       ) {
         acc.push({ ...p, originalIndex: index } as Product & { originalIndex: number });
       }
