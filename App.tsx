@@ -268,6 +268,9 @@ const App: React.FC = () => {
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
 
+  // Performance Cache Ref for O(1) string normalizations during state updates
+  const clientCacheRef = useRef<WeakMap<EnrichedClient, { cleanCnpj?: string, normalizedName?: string, normalizedCity?: string }>>(new WeakMap());
+
   // Handle View Navigation with Confirmation
   const handleViewNavigation = (newView: 'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat') => {
     if (procState.isActive && procState.status === 'processing') {
@@ -1339,14 +1342,30 @@ const App: React.FC = () => {
               const list = [...prev];
 
               const existingIdx = list.findIndex(c => {
+                let cache = clientCacheRef.current.get(c);
+                if (!cache) {
+                  cache = {};
+                  clientCacheRef.current.set(c, cache);
+                }
+
                 if (hasValidNewCnpj && c.cnpj) {
-                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
-                  if (cleanNewCnpj === cleanCnpj) return true;
+                  if (cache.cleanCnpj === undefined) {
+                    cache.cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  }
+                  if (cleanNewCnpj === cache.cleanCnpj) return true;
                 }
 
                 if (!c.companyName || !c.city) return false;
-                return c.companyName.toLowerCase().trim() === normalizedNewName &&
-                  c.city.toLowerCase().trim() === normalizedNewCity;
+
+                if (cache.normalizedName === undefined) {
+                  cache.normalizedName = c.companyName.toLowerCase().trim();
+                }
+                if (cache.normalizedCity === undefined) {
+                  cache.normalizedCity = c.city.toLowerCase().trim();
+                }
+
+                return cache.normalizedName === normalizedNewName &&
+                  cache.normalizedCity === normalizedNewCity;
               });
 
               if (existingIdx !== -1) {

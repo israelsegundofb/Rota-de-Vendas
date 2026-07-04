@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Avoid redundant regex and string allocation in deduplication loops]
+**Learning:** During large batch inserts or array concatenations (e.g., `handleClientFileDirect`), iterating over an existing array with `.findIndex()` and performing `.replace(/\D/g, '')` or `.toLowerCase().trim()` inside the callback causes an O(N*M) explosion of memory allocation and regex evaluations. React state updaters (like `setMasterClientList(prev => ... )`) that process new items progressively are especially vulnerable.
+**Action:** Use a `WeakMap` cached via `useRef` outside the loop to store the derived normalization strings per object reference. The `WeakMap` provides O(1) lookups and doesn't break in React Strict Mode since it doesn't mutate a standard Map or Set during dual-invoked updaters.
