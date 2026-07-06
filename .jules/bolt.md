@@ -22,3 +22,6 @@
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
+## 2025-05-19 - [Avoid unmemoized derived state as useEffect dependencies]
+**Learning:** When a derived array (like `filteredMessages`) is used directly as a dependency in a `useEffect` (e.g., to trigger an auto-scroll), it must be wrapped in `useMemo`. Otherwise, typing in unrelated inputs (like a chat textbox) triggers a re-render, creating a new array reference in memory, which fires the `useEffect` on every keystroke, causing severe UI lag (DOM thrashing).
+**Action:** Always wrap derived arrays or objects in `useMemo` when they are passed into the dependency array of a `useEffect` to ensure reference stability across renders.
