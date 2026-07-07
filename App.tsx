@@ -2738,14 +2738,26 @@ const App: React.FC = () => {
                       {showProductSuggestions && searchProductQuery.length >= 2 && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
                           {(() => {
-                            const suggestions = products
-                              .filter(p => {
-                                const term = searchProductQuery.toLowerCase();
-                                return (p.name || '').toLowerCase().includes(term) ||
-                                  (p.sku || '').toLowerCase().includes(term) ||
-                                  (p.brand || '').toLowerCase().includes(term);
-                              })
-                              .slice(0, 8);
+                            // Optimization: Hoist search term string conversion
+                            const term = searchProductQuery.toLowerCase();
+                            const suggestions = [];
+
+                            // Optimization: Replace .filter(...).slice(0, 8) with an early-exit loop
+                            // This stops iterating over the product list once we find enough matches,
+                            // preventing O(N) traversal on large product lists.
+                            for (let i = 0; i < products.length; i++) {
+                              const p = products[i];
+                              if (
+                                (p.name || '').toLowerCase().includes(term) ||
+                                (p.sku || '').toLowerCase().includes(term) ||
+                                (p.brand || '').toLowerCase().includes(term)
+                              ) {
+                                suggestions.push(p);
+                                if (suggestions.length >= 8) {
+                                  break;
+                                }
+                              }
+                            }
 
                             if (suggestions.length === 0) {
                               return (
