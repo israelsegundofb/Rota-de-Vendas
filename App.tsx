@@ -268,6 +268,10 @@ const App: React.FC = () => {
   // Ref for cancellation
   const isUploadCancelled = useRef(false);
 
+  // ⚡ Bolt Optimization: WeakMap to cache parsed strings (CNPJ, name, city) per client object reference
+  // This prevents O(N*M) redundant Regex allocations and string normalizations inside React state updaters.
+  const clientCacheRef = useRef<WeakMap<EnrichedClient, { cleanCnpj?: string; normalizedName?: string; normalizedCity?: string }>>(new WeakMap());
+
   // Handle View Navigation with Confirmation
   const handleViewNavigation = (newView: 'map' | 'table' | 'dashboard' | 'admin_users' | 'admin_categories' | 'admin_products' | 'admin_files' | 'history' | 'chat') => {
     if (procState.isActive && procState.status === 'processing') {
@@ -1339,14 +1343,30 @@ const App: React.FC = () => {
               const list = [...prev];
 
               const existingIdx = list.findIndex(c => {
+                let cached = clientCacheRef.current.get(c);
+                if (!cached) {
+                  cached = {};
+                  clientCacheRef.current.set(c, cached);
+                }
+
                 if (hasValidNewCnpj && c.cnpj) {
-                  const cleanCnpj = c.cnpj.replace(/\D/g, '');
-                  if (cleanNewCnpj === cleanCnpj) return true;
+                  if (cached.cleanCnpj === undefined) {
+                    cached.cleanCnpj = c.cnpj.replace(/\D/g, '');
+                  }
+                  if (cleanNewCnpj === cached.cleanCnpj) return true;
                 }
 
                 if (!c.companyName || !c.city) return false;
-                return c.companyName.toLowerCase().trim() === normalizedNewName &&
-                  c.city.toLowerCase().trim() === normalizedNewCity;
+
+                if (cached.normalizedName === undefined) {
+                  cached.normalizedName = c.companyName.toLowerCase().trim();
+                }
+                if (cached.normalizedCity === undefined) {
+                  cached.normalizedCity = c.city.toLowerCase().trim();
+                }
+
+                return cached.normalizedName === normalizedNewName &&
+                  cached.normalizedCity === normalizedNewCity;
               });
 
               if (existingIdx !== -1) {
