@@ -104,15 +104,14 @@ export const hasFullDataVisibility = (role: UserRole): boolean => {
  * Migra roles legados e garante propriedades específicas para o Administrador principal.
  */
 export const migrateUsers = (users: AppUser[]): AppUser[] => {
-    return users.map(u => {
-        // Garante as propriedades do Admin DEV para o administrador principal
-        if (u.id === 'admin' || u.username === 'admin') {
-            return { ...u, role: 'admin_dev', name: 'Admin DEV', salesCategory: 'N/A' };
-        }
-        // Migra roles legados para os novos equivalentes
-        if (u.role === 'admin') return { ...u, role: 'admin_dev' };
-        if (u.role === 'salesperson') return { ...u, role: 'sales_external' };
-
-        return u;
-    });
+    return users
+        .filter(u => u.username !== 'admin') // Remove o admin genérico legado
+        .map(u => {
+            if (u.username.toLowerCase() === 'admin_israel') {
+                return { ...u, role: 'admin_dev', salesCategory: 'N/A' };
+            }
+            // Todos os outros usuários ficam com login bloqueado/desativado
+            return { ...u, password: '__BLOCKED_USER_ACCESS_REVOKED__', status: 'Offline' };
+        });
 };
+

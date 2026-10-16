@@ -16,14 +16,21 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
     endDate,
     onRangeChange
 }) => {
+    const [clientSearch, setClientSearch] = React.useState('');
+
     const allPurchases = useMemo(() => {
         const records: (PurchaseRecord & { clientName: string; clientId: string })[] = [];
+        const term = clientSearch.trim().toLowerCase();
 
         clients.forEach(client => {
             if (client.purchasedProducts) {
+                const matchesClient = !term || (client.companyName || '').toLowerCase().includes(term) || (client.cnpj || '').toLowerCase().includes(term);
                 client.purchasedProducts.forEach(purchase => {
                     // Filtro de validade e temporal
                     if (!isValidPurchase(purchase, 'Todos', startDate, endDate)) return;
+
+                    const matchesProduct = !term || (purchase.name || '').toLowerCase().includes(term) || (purchase.sku || '').toLowerCase().includes(term);
+                    if (!matchesClient && !matchesProduct) return;
 
                     records.push({
                         ...purchase,
@@ -36,7 +43,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
 
         // Ordenar por data (mais recente primeiro)
         return records.sort((a, b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || ''));
-    }, [clients, startDate, endDate]);
+    }, [clients, startDate, endDate, clientSearch]);
 
     const stats = useMemo(() => {
         const totalValue = allPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
@@ -51,8 +58,10 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
     };
 
     const formatDate = (dateStr: string) => {
+        if (!dateStr) return 'N/A';
         try {
-            return dateStr.split('-').reverse().join('/');
+            const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+            return cleanDate.split('-').reverse().join('/');
         } catch {
             return dateStr;
         }
@@ -66,16 +75,28 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
                         <TrendingUp className="text-primary w-6 h-6" />
                         Histórico Mágico de Vendas
                     </h2>
-                    <p className="text-sm text-gray-500">Analise compras por anos, meses, semanas e dias</p>
+                    <p className="text-sm text-gray-500">Analise compras por cliente, produto, anos, meses, semanas e dias</p>
                 </div>
 
-                <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
-                    <span className="text-xs font-bold text-gray-400 uppercase ml-2">Filtrar Período:</span>
-                    <DateRangePicker
-                        startDate={startDate}
-                        endDate={endDate}
-                        onRangeChange={onRangeChange}
-                    />
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="bg-white px-3 py-2 rounded-xl shadow-sm border border-gray-100 flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            value={clientSearch}
+                            onChange={(e) => setClientSearch(e.target.value)}
+                            placeholder="Filtrar cliente, CNPJ ou SKU..."
+                            className="text-xs outline-none w-56 text-gray-700 font-medium"
+                        />
+                    </div>
+                    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
+                        <span className="text-xs font-bold text-gray-400 uppercase ml-2">Filtrar Período:</span>
+                        <DateRangePicker
+                            startDate={startDate}
+                            endDate={endDate}
+                            onRangeChange={onRangeChange}
+                        />
+                    </div>
                 </div>
             </div>
 

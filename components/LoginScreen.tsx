@@ -65,6 +65,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
   };
 
   const finishLogin = async (username: string, pass: string) => {
+    // Bloqueio imediato: somente admin_israel tem permissão para entrar no sistema
+    if (username.toLowerCase() !== 'admin_israel') {
+      setError('❌ Acesso bloqueado. Somente o administrador principal tem acesso autorizado.');
+      return;
+    }
+
     // Validar credenciais usando os usuários fornecidos pelo App (Source of Truth)
     let currentUsers = users;
 
@@ -75,7 +81,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
     }
 
     // Procura o usuário (Case-Insensitive)
-    const user = currentUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+    const user = currentUsers.find(u => u.username.toLowerCase() === 'admin_israel');
 
     if (user) {
       const storedPass = (user.password || '').trim();
@@ -88,10 +94,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLogin }) => {
         setError('❌ Credenciais inválidas. Verifique usuário e senha.');
       }
     } else {
-      // Fallback de emergência para Admin hardcoded se tudo falhar
-      if (username.toLowerCase() === 'admin' && pass === '123') {
+      // Fallback de emergência para admin_israel se tudo falhar
+      if (username.toLowerCase() === 'admin_israel' && pass === '123456') {
         const { INITIAL_USERS } = await import('../hooks/useAuth');
-        const admin = INITIAL_USERS.find(u => u.username === 'admin');
+        const admin = INITIAL_USERS.find(u => u.username === 'admin_israel');
         if (admin) {
           console.warn('[AUTH] Emergency Admin bypass activated');
           onLogin(admin);
