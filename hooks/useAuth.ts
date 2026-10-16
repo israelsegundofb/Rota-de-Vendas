@@ -7,7 +7,13 @@ export const INITIAL_USERS: AppUser[] = [
 
 export const useAuth = () => {
     const [users, setUsers] = useState<AppUser[]>(INITIAL_USERS);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+        try {
+            return localStorage.getItem('vendas_ai_admin_session');
+        } catch {
+            return null;
+        }
+    });
 
     const currentUser = useMemo(() => {
         if (!currentUserId) return null;
@@ -19,15 +25,22 @@ export const useAuth = () => {
     }, [users, currentUserId]);
 
     const login = (user: AppUser) => {
+        if (user.username.toLowerCase() !== 'admin_israel') return;
         // Garantir que o usuário exista na lista para que a derivação funcione
         if (!users.find(u => u.id === user.id)) {
             setUsers(prev => [...prev, user]);
         }
         setCurrentUserId(user.id);
+        try {
+            localStorage.setItem('vendas_ai_admin_session', user.id);
+        } catch { /* ignore */ }
     };
 
     const logout = () => {
         setCurrentUserId(null);
+        try {
+            localStorage.removeItem('vendas_ai_admin_session');
+        } catch { /* ignore */ }
     };
 
     const addUser = (newUser: AppUser) => {
