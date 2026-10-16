@@ -2758,14 +2758,22 @@ const App: React.FC = () => {
                       {showProductSuggestions && searchProductQuery.length >= 2 && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
                           {(() => {
-                            const suggestions = products
-                              .filter(p => {
-                                const term = searchProductQuery.toLowerCase();
-                                return (p.name || '').toLowerCase().includes(term) ||
-                                  (p.sku || '').toLowerCase().includes(term) ||
-                                  (p.brand || '').toLowerCase().includes(term);
-                              })
-                              .slice(0, 8);
+                            // ⚡ Bolt: Performance Optimization
+                            // Replaced .filter(...).slice(0, 8) with a for-loop and early break
+                            // to avoid O(N) full-array iteration. String normalization is hoisted.
+                            const term = searchProductQuery.toLowerCase();
+                            const suggestions = [];
+                            for (let i = 0; i < products.length; i++) {
+                              const p = products[i];
+                              if (
+                                (p.name || '').toLowerCase().includes(term) ||
+                                (p.sku || '').toLowerCase().includes(term) ||
+                                (p.brand || '').toLowerCase().includes(term)
+                              ) {
+                                suggestions.push(p);
+                                if (suggestions.length === 8) break;
+                              }
+                            }
 
                             if (suggestions.length === 0) {
                               return (
