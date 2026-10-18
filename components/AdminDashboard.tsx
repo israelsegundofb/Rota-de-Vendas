@@ -56,13 +56,16 @@ interface AdminDashboardProps {
 
 const COLORS = ['#0061A4', '#006A60', '#6B5778', '#BA1A1A', '#535F70', '#56605B', '#49454F', '#000000'];
 
-const KPICard: React.FC<{ title: string; value: string | number; icon: React.ElementType; trend: number; color: string }> = ({ title, value, icon: Icon, trend, color }) => (
+const KPICard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ElementType; trend: number; color: string }> = ({ title, value, subtitle, icon: Icon, trend, color }) => (
     <div className="bg-surface p-6 rounded-3xl shadow-elevation-1 border border-outline-variant/30 hover:shadow-elevation-2 transition-all group overflow-hidden relative">
         <div className={`absolute top-0 right-0 w-32 h-32 ${color} opacity-[0.03] -mr-16 -mt-16 rounded-full group-hover:scale-110 transition-transform`} />
         <div className="flex justify-between items-start relative z-10">
             <div>
                 <p className="text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 opacity-60">{title}</p>
                 <p className="text-2xl font-black text-on-surface tracking-tight">{value}</p>
+                {subtitle && (
+                    <p className="text-[10px] font-bold text-on-surface-variant/60 mt-0.5">{subtitle}</p>
+                )}
             </div>
             <div className={`p-3 rounded-2xl ${color}/10 ${color.replace('bg-', 'text-')}`}>
                 <Icon size={24} />
@@ -71,9 +74,9 @@ const KPICard: React.FC<{ title: string; value: string | number; icon: React.Ele
         <div className="mt-4 flex items-center gap-2 relative z-10">
             <span className={`flex items-center text-xs font-black px-2 py-0.5 rounded-full ${trend >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 {trend >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                {Math.abs(trend)}%
+                {Math.abs(trend).toFixed(1)}%
             </span>
-            <span className="text-[10px] text-on-surface-variant opacity-40 font-bold uppercase tracking-wider">vs mês anterior</span>
+            <span className="text-[10px] text-on-surface-variant opacity-40 font-bold uppercase tracking-wider">vs período anterior</span>
         </div>
     </div>
 );
@@ -107,11 +110,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const regionalSales: Record<string, number> = {};
         const dailySales: Record<string, number> = {};
         const sellerSales: Record<string, { name: string; revenue: number }> = {};
+        const distinctOrdersSet = new Set<string>();
         let totalRevenue = 0;
         let totalSalesCount = 0;
+        let buyingClientsCount = 0;
 
-        // DEBUG: Log initial clients count
-        console.log('[DASHBOARD] Calculating stats for', clients.length, 'clients');
+        // Eventos datados para cálculo real de tendência (últimos 30 dias vs 30 dias anteriores da base)
+        const datedPurchases: { timestamp: number; val: number; clientId: string; sku: string }[] = [];
+        let maxTimestamp = 0;
 
         // Optimize: Pre-parse filter dates outside the loop to avoid O(N) Date instantiations
         let parsedStartDate: Date | null = null;
@@ -126,13 +132,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             if (parsedEndDate) parsedEndDate.setHours(23, 59, 59, 999);
         }
 
-        // Optimize: Pre-compute a Map of users to avoid O(N) lookup inside the loop,
-        // transforming an O(N*M) operation into an O(N+M) operation.
+        // Optimize: Pre-compute a Map of users to avoid O(N) lookup inside the loop
         const userMap = new Map(users.map(u => [u.id, u]));
 
         clients.forEach(client => {
-            // Filtrar as compras pelo range de data atual usando helper otimizado
+            // Filtrar as compras pelo intervalo de datas, categoria de produto ativa e vendedor selecionado
             const clientPurchases = (client.purchasedProducts || []).filter(p => {
+                if (activeProductCategory && activeProductCategory !== 'Todos') {
+                    const pCat = p.category || '';
+                    const pSec = p.section || '';
+                    const pBrand = p.brand || '';
+                    if (pCat !== activeProductCategory && pSec !== activeProductCategory && pBrand !== activeProductCategory) {
+                        return false;
+                    }
+                }
+
+                if (filterSalespersonId && filterSalespersonId !== 'Todos') {
+                    const effectiveSellerId = p.salespersonId || client.salespersonId;
+                    if (effectiveSellerId !== filterSalespersonId) {
+                        return false;
+                    }
+                }
+
                 if (!startDate && !endDate) return true;
                 const pDate = parseDateSafe(p.purchaseDate);
                 if (!pDate) return false;
@@ -140,41 +161,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 return isDateWithinBounds(pDate, parsedStartDate, parsedEndDate);
             });
 
-            const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue || (p.price * (p.quantity || 1))), 0);
+            const clientTotal = clientPurchases.reduce((sum, p) => sum + (p.totalValue ?? (p.price * (p.quantity ?? 1))), 0);
 
-            if (clientTotal > 0) {
+            if (clientPurchases.length > 0 && clientTotal > 0) {
+                buyingClientsCount++;
                 totalRevenue += clientTotal;
                 totalSalesCount += clientPurchases.length;
 
                 // Region
                 const region = client.region || 'Outras';
                 regionalSales[region] = (regionalSales[region] || 0) + clientTotal;
-
-                // Seller
-                const sellerObj = userMap.get(client.salespersonId);
-                const sellerName = sellerObj?.name || 'Não Atribuído';
-                if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
-                sellerSales[sellerName].revenue += clientTotal;
             }
 
             clientPurchases.forEach(p => {
-                const pVal = p.totalValue || (p.price * (p.quantity || 1));
+                const pVal = p.totalValue ?? (p.price * (p.quantity ?? 1));
+                const pQty = p.quantity ?? 1;
+
+                // Autoria histórica da venda: prioriza o vendedor gravado na transação (p.salespersonId)
+                const saleSellerId = p.salespersonId || client.salespersonId;
+                const sellerObj = userMap.get(saleSellerId);
+                const sellerName = sellerObj?.name || 'Não Atribuído';
+                if (!sellerSales[sellerName]) sellerSales[sellerName] = { name: sellerName, revenue: 0 };
+                sellerSales[sellerName].revenue += pVal;
 
                 // Product count and revenue
                 const sku = p.sku || 'UNKNOWN';
                 if (!productSales[sku]) productSales[sku] = { name: p.name || 'Produto Desconhecido', revenue: 0, count: 0 };
                 productSales[sku].revenue += pVal;
-                productSales[sku].count += (p.quantity || 1);
+                productSales[sku].count += pQty;
 
                 // Category
                 const cat = p.category || 'Outros';
                 categorySales[cat] = (categorySales[cat] || 0) + pVal;
 
-                // Daily trend
+                // Daily trend & distinct orders
+                let dateKey = '';
                 if (p.purchaseDate) {
-                    let dateKey = '';
-                    // ⚡ Bolt Performance Optimization: Replace .split() with .indexOf() and .substring()
-                    // to avoid O(N) array allocation overhead within this hot nested loop (~1M iterations).
                     const slashIdx = p.purchaseDate.indexOf('/');
                     if (slashIdx !== -1) {
                         const secondSlash = p.purchaseDate.indexOf('/', slashIdx + 1);
@@ -193,18 +215,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     if (dateKey) {
                         dailySales[dateKey] = (dailySales[dateKey] || 0) + pVal;
+                        const pDateObj = parseDateSafe(p.purchaseDate);
+                        if (pDateObj) {
+                            const ts = pDateObj.getTime();
+                            if (ts > maxTimestamp) maxTimestamp = ts;
+                            datedPurchases.push({ timestamp: ts, val: pVal, clientId: client.id, sku });
+                        }
                     }
                 }
+                distinctOrdersSet.add(`${client.id}|${dateKey || 'sem-data'}|${saleSellerId}`);
             });
         });
 
-        console.log('[DASHBOARD] Stats calculated:', { totalRevenue, totalSalesCount });
+        // Cálculo de variação percentual real (janela de 30 dias mais recente vs 30 dias anteriores)
+        const calcPercentChange = (curr: number, prev: number) => {
+            if (prev <= 0) return 0;
+            return Number((((curr - prev) / prev) * 100).toFixed(1));
+        };
+
+        let revenueTrend = 0;
+        let clientsTrend = 0;
+        let productsTrend = 0;
+        let salesCountTrend = 0;
+
+        if (maxTimestamp > 0 && datedPurchases.length > 0) {
+            const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+            const currentWindowStart = maxTimestamp - thirtyDaysMs;
+            const prevWindowStart = currentWindowStart - thirtyDaysMs;
+
+            let currRev = 0, prevRev = 0;
+            let currCount = 0, prevCount = 0;
+            const currClients = new Set<string>(), prevClients = new Set<string>();
+            const currSkus = new Set<string>(), prevSkus = new Set<string>();
+
+            for (let i = 0; i < datedPurchases.length; i++) {
+                const dp = datedPurchases[i];
+                if (dp.timestamp > currentWindowStart && dp.timestamp <= maxTimestamp) {
+                    currRev += dp.val;
+                    currCount++;
+                    currClients.add(dp.clientId);
+                    currSkus.add(dp.sku);
+                } else if (dp.timestamp > prevWindowStart && dp.timestamp <= currentWindowStart) {
+                    prevRev += dp.val;
+                    prevCount++;
+                    prevClients.add(dp.clientId);
+                    prevSkus.add(dp.sku);
+                }
+            }
+
+            revenueTrend = calcPercentChange(currRev, prevRev);
+            clientsTrend = calcPercentChange(currClients.size, prevClients.size);
+            productsTrend = calcPercentChange(currSkus.size, prevSkus.size);
+            salesCountTrend = calcPercentChange(currCount, prevCount);
+        }
 
         return {
             totalRevenue,
             totalSalesCount,
+            distinctOrdersCount: distinctOrdersSet.size,
+            buyingClientsCount,
+            distinctSkusSold: Object.keys(productSales).length,
             totalClients: clients.length,
             totalProducts: products.length,
+            revenueTrend,
+            clientsTrend,
+            productsTrend,
+            salesCountTrend,
             topProductsData: Object.values(productSales)
                 .sort((a, b) => productSortOrder === 'desc' ? b.count - a.count : a.count - b.count)
                 .slice(0, 5),
@@ -228,7 +304,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             regionalSalesData: Object.entries(regionalSales).map(([name, value]) => ({ name, value })),
             salesTrendData: Object.entries(dailySales).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date))
         };
-    }, [clients, products, productSortOrder, users, startDate, endDate]);
+    }, [clients, products, productSortOrder, users, startDate, endDate, activeProductCategory, filterSalespersonId]);
 
     return (
         <div className="flex flex-col h-full bg-background overflow-hidden animate-in fade-in duration-500">
@@ -445,10 +521,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex-1 overflow-y-auto p-8 space-y-10 bg-surface-container-lowest/30 custom-scrollbar">
                 {/* 4. KPI Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <KPICard title="Faturamento Total" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={DollarSign} trend={12.5} color="bg-primary" />
-                    <KPICard title="Carteira Filtrada" value={stats.totalClients} icon={Users} trend={5.2} color="bg-secondary" />
-                    <KPICard title="Mix de Produtos" value={stats.totalProducts} icon={Package} trend={-2.4} color="bg-tertiary" />
-                    <KPICard title="Vendas Registradas" value={stats.totalSalesCount} icon={Activity} trend={8.1} color="bg-primary" />
+                    <KPICard
+                        title="Faturamento Total"
+                        value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        subtitle={`${stats.distinctOrdersCount} pedidos • ${stats.buyingClientsCount} compradores`}
+                        icon={DollarSign}
+                        trend={stats.revenueTrend}
+                        color="bg-primary"
+                    />
+                    <KPICard
+                        title="Carteira Filtrada"
+                        value={stats.totalClients}
+                        subtitle={`${stats.buyingClientsCount} com compras no filtro`}
+                        icon={Users}
+                        trend={stats.clientsTrend}
+                        color="bg-secondary"
+                    />
+                    <KPICard
+                        title="Mix de Produtos"
+                        value={stats.totalProducts}
+                        subtitle={`${stats.distinctSkusSold} SKUs vendidos no filtro`}
+                        icon={Package}
+                        trend={stats.productsTrend}
+                        color="bg-tertiary"
+                    />
+                    <KPICard
+                        title="Vendas Registradas"
+                        value={stats.totalSalesCount}
+                        subtitle={`${stats.distinctOrdersCount} pedidos • ${stats.totalSalesCount} linhas de itens`}
+                        icon={Activity}
+                        trend={stats.salesCountTrend}
+                        color="bg-primary"
+                    />
                 </div>
 
                 {/* 5. Main Charts Row */}

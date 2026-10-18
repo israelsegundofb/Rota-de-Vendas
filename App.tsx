@@ -1755,21 +1755,75 @@ const App: React.FC = () => {
             }
           }
 
+          const hasValidQty = rec.quantity !== undefined && rec.quantity !== null && !Number.isNaN(Number(rec.quantity));
+          const resolvedQuantity = hasValidQty ? Number(rec.quantity) : 1;
+
+          const hasValidPrice = rec.price !== undefined && rec.price !== null && !Number.isNaN(Number(rec.price)) && Number(rec.price) > 0;
+          const hasValidTotal = rec.totalValue !== undefined && rec.totalValue !== null && !Number.isNaN(Number(rec.totalValue));
+
+          const resolvedPrice = hasValidPrice
+            ? Number(rec.price)
+            : (hasValidTotal && resolvedQuantity > 0
+                ? Number(rec.totalValue) / resolvedQuantity
+                : (masterProd?.price ?? 0));
+
+          const resolvedTotal = hasValidTotal
+            ? Number(rec.totalValue)
+            : resolvedPrice * resolvedQuantity;
+
+          const resolvedDate = rec.purchaseDate && String(rec.purchaseDate).trim() !== ''
+            ? String(rec.purchaseDate).trim()
+            : '';
+
+          const resolvedSellerId = rec.salespersonId || targetUserId;
+
           if (masterProd) {
-            return { ...masterProd, purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId };
+            return {
+              ...masterProd,
+              price: resolvedPrice,
+              purchaseDate: resolvedDate,
+              quantity: resolvedQuantity,
+              totalValue: resolvedTotal,
+              sourceFileId: fileId,
+              salespersonId: resolvedSellerId
+            };
           }
           return {
-            sku: rec.sku || 'N/A', name: rec.name || 'Produto Desconhecido', brand: 'Desconhecido', category: 'Manual', price: rec.price || 0, factoryCode: '',
-            purchaseDate: rec.purchaseDate || new Date().toISOString(), quantity: rec.quantity || 1, totalValue: rec.totalValue || 0, sourceFileId: fileId, salespersonId: targetUserId
+            sku: rec.sku || 'N/A',
+            name: rec.name || 'Produto Desconhecido',
+            brand: 'Desconhecido',
+            category: 'Manual',
+            price: resolvedPrice,
+            factoryCode: '',
+            purchaseDate: resolvedDate,
+            quantity: resolvedQuantity,
+            totalValue: resolvedTotal,
+            sourceFileId: fileId,
+            salespersonId: resolvedSellerId
           };
         });
 
         if (clientIdx !== -1) {
           updatedCount++;
           const existingHistory = existingUpdatedList[clientIdx].purchasedProducts || [];
-          const filteredNewProducts = mappedPurchases.filter(newP =>
-            !existingHistory.some(oldP => oldP.sku === newP.sku && oldP.purchaseDate === newP.purchaseDate && oldP.salespersonId === newP.salespersonId)
-          );
+          const buildPurchaseSignature = (p: PurchaseRecord) =>
+            `${p.sku || ''}|${p.purchaseDate || ''}|${p.salespersonId || ''}|${p.quantity ?? 1}|${Number(p.totalValue ?? 0).toFixed(2)}`;
+
+          const existingSignatureCounts = new Map<string, number>();
+          existingHistory.forEach(oldP => {
+            const sig = buildPurchaseSignature(oldP);
+            existingSignatureCounts.set(sig, (existingSignatureCounts.get(sig) || 0) + 1);
+          });
+
+          const newSignatureSeen = new Map<string, number>();
+          const filteredNewProducts = mappedPurchases.filter(newP => {
+            const sig = buildPurchaseSignature(newP);
+            const seenInBatch = (newSignatureSeen.get(sig) || 0) + 1;
+            newSignatureSeen.set(sig, seenInBatch);
+            const alreadyInHistory = existingSignatureCounts.get(sig) || 0;
+            return seenInBatch > alreadyInHistory;
+          });
+
           if (filteredNewProducts.length > 0) {
             existingUpdatedList[clientIdx] = {
               ...existingUpdatedList[clientIdx],
@@ -2344,9 +2398,13 @@ const App: React.FC = () => {
             <CloudConfigModal
               isOpen={isCloudConfigOpen}
               onClose={() => setIsCloudConfigOpen(false)}
-              onSaveToCloud={() => {
-                saveToCloud(masterClientList, products, categories, users);
-                alert('✅ Dados salvos na nuvem com sucesso!');
+              onSaveToCloud={async () => {
+                const ok = await saveToCloud(masterClientList, products, categories, users, uploadedFiles, true);
+                if (ok) {
+                  alert('✅ Dados salvos na nuvem com sucesso!');
+                } else {
+                  alert('❌ Falha ao salvar na nuvem. Verifique sua conexão e tente novamente.');
+                }
               }}
               onClearDatabase={handleClearAllClients}
               isFirebaseConnected={isFirebaseConnected}

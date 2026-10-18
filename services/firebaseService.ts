@@ -168,19 +168,19 @@ export const saveToCloud = async (
     users: AppUser[],
     uploadedFiles: any[] = [],
     isDeepSync: boolean = false
-) => {
-    if (!db) return;
+): Promise<boolean> => {
+    if (!db) return false;
 
     if (users.length === 0) {
         console.warn('[FIREBASE] Blocked save attempt with 0 users. This prevents accidental data wipes.');
-        return;
+        return false;
     }
 
     // Protection: Do not save if we are in the middle of a systemic cleanup (handled via syncLock externally)
     // or if the data looks suspiciously empty while we know we should have users.
     if (!users.some(u => u.role === 'admin_dev' || u.role === 'admin')) {
         console.warn('[FIREBASE] Blocked save attempt: No admin users found in list. Safety first.');
-        return;
+        return false;
     }
 
     try {
@@ -248,6 +248,7 @@ export const saveToCloud = async (
         await metaBatch.commit();
 
         console.log('✅ V5.1: All data segments synchronized granullarly to cloud');
+        return true;
     } catch (e) {
         console.error("Error saving to cloud (V5.1):", e);
         throw e;

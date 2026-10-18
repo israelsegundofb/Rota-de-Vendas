@@ -237,7 +237,10 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         return () => { if (unsubscribe) unsubscribe(); };
     }, [isFirebaseConnected]);
 
-    // Auto-Save Effect
+    const [cloudSaveStatus, setCloudSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'pending' | 'error'>('idle');
+    const [retryTrigger, setRetryTrigger] = useState(0);
+
+    // Auto-Save Effect (Confirmação estrita pós-gravação com retentativa em caso de falha)
     useEffect(() => {
         const shouldSave = isFirebaseConnected && isDataLoaded && users.length > 0;
 
@@ -254,18 +257,35 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
                 currentFilesHash !== lastFilesHash.current;
 
             if (hasChanges) {
-                const timeout = setTimeout(() => {
-                    lastClientsHash.current = currentClientsHash;
-                    lastUsersHash.current = currentUsersHash;
-                    lastProductsHash.current = currentProductsHash;
-                    lastFilesHash.current = currentFilesHash;
-                    saveToCloud(masterClientList, products, categories, users, uploadedFiles, false)
-                        .catch(err => console.error("Auto-save failed", err));
+                setCloudSaveStatus('pending');
+                let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+                const timeout = setTimeout(async () => {
+                    setCloudSaveStatus('saving');
+                    try {
+                        const savedOk = await saveToCloud(masterClientList, products, categories, users, uploadedFiles, false);
+                        if (savedOk) {
+                            lastClientsHash.current = currentClientsHash;
+                            lastUsersHash.current = currentUsersHash;
+                            lastProductsHash.current = currentProductsHash;
+                            lastFilesHash.current = currentFilesHash;
+                            setCloudSaveStatus('saved');
+                        } else {
+                            setCloudSaveStatus('error');
+                            retryTimeout = setTimeout(() => setRetryTrigger(prev => prev + 1), 10000);
+                        }
+                    } catch (err) {
+                        console.error("Auto-save failed", err);
+                        setCloudSaveStatus('error');
+                        retryTimeout = setTimeout(() => setRetryTrigger(prev => prev + 1), 10000);
+                    }
                 }, 3000);
-                return () => clearTimeout(timeout);
+                return () => {
+                    clearTimeout(timeout);
+                    if (retryTimeout) clearTimeout(retryTimeout);
+                };
             }
         }
-    }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded]);
+    }, [masterClientList, products, categories, users, uploadedFiles, isFirebaseConnected, isDataLoaded, retryTrigger]);
 
     // PERSISTÊNCIA REMOVIDA: Dados agora vivem apenas na memória RAM para segurança total.
 
@@ -300,6 +320,7 @@ export const useDataPersistence = (users: AppUser[], setUsers: (users: AppUser[]
         loadingProgress,
         loadingMessage,
         syncLockRef,
-        lastClientsHash
+        lastClientsHash,
+        cloudSaveStatus
     };
 };

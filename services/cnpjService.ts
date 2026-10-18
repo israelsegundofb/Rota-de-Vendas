@@ -51,6 +51,34 @@ const getApiKey = () => {
 };
 
 const BASE_URL = 'https://api.cnpja.com';
+const CNPJ_CACHE_KEY = 'vendas_ai_cnpj_cache_v1';
+const MAX_COMMERCIAL_CALLS_PER_SESSION = 200;
+let sessionCommercialCalls = 0;
+const memoryCnpjCache = new Map<string, CNPJResponse>();
+
+const getCachedCNPJ = (cleanCNPJ: string): CNPJResponse | null => {
+    if (memoryCnpjCache.has(cleanCNPJ)) return memoryCnpjCache.get(cleanCNPJ)!;
+    try {
+        const raw = localStorage.getItem(CNPJ_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed[cleanCNPJ]) {
+            memoryCnpjCache.set(cleanCNPJ, parsed[cleanCNPJ]);
+            return parsed[cleanCNPJ];
+        }
+    } catch { /* ignore */ }
+    return null;
+};
+
+const setCachedCNPJ = (cleanCNPJ: string, data: CNPJResponse) => {
+    memoryCnpjCache.set(cleanCNPJ, data);
+    try {
+        const raw = localStorage.getItem(CNPJ_CACHE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        parsed[cleanCNPJ] = data;
+        localStorage.setItem(CNPJ_CACHE_KEY, JSON.stringify(parsed));
+    } catch { /* ignore quota errors */ }
+};
 
 const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs: number = 8000) => {
     const controller = new AbortController();
@@ -69,7 +97,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutM
 };
 
 /**
- * Consulta um CNPJ específico usando a API Comercial
+ * Consulta um CNPJ específico usando a API Comercial (com cache e limite de segurança)
  */
 export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> => {
     const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
@@ -78,11 +106,29 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
         throw new Error('CNPJ deve ter 14 dígitos.');
     }
 
+    const cached = getCachedCNPJ(cleanCNPJ);
+    if (cached) return cached;
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        const pubResult = await fallbackMinhaReceita(cleanCNPJ) || await fallbackBrasilAPI(cleanCNPJ);
+        if (pubResult) setCachedCNPJ(cleanCNPJ, pubResult);
+        return pubResult;
+    }
+
+    if (sessionCommercialCalls >= MAX_COMMERCIAL_CALLS_PER_SESSION) {
+        console.warn('Limite de segurança de consultas comerciais por sessão atingido. Usando fallback público.');
+        const pubResult = await fallbackMinhaReceita(cleanCNPJ) || await fallbackBrasilAPI(cleanCNPJ);
+        if (pubResult) setCachedCNPJ(cleanCNPJ, pubResult);
+        return pubResult;
+    }
+
     try {
+        sessionCommercialCalls++;
         // Na API Comercial, o endpoint é /office/:taxId
         // Adicionamos geocoding=true para obter lat/lng nativamente
         const response = await fetchWithTimeout(`${BASE_URL}/office/${cleanCNPJ}?geocoding=true`, {
-            headers: { 'Authorization': getApiKey() }
+            headers: { 'Authorization': apiKey }
         }, 10000); // 10s timeout maximum
 
         if (!response.ok) {
@@ -111,7 +157,7 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
             }
         }
 
-        return {
+        const mappedResult: CNPJResponse = {
             cnpj: data.taxId,
             razao_social: data.company.name,
             nome_fantasia: data.alias || data.company.name,
@@ -136,6 +182,8 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
             longitude: data.address.coordinates?.longitude || data.longitude,
             fonte: 'CNPJa'
         };
+        setCachedCNPJ(cleanCNPJ, mappedResult);
+        return mappedResult;
     } catch (error) {
         console.error("Erro na consulta CNPJa Comercial:", error);
         // Fallback progressivo: CNPJa -> Minha Receita -> BrasilAPI
@@ -150,6 +198,7 @@ export const consultarCNPJ = async (cnpj: string): Promise<CNPJResponse | null> 
             }
         }
         
+        if (result) setCachedCNPJ(cleanCNPJ, result);
         return result;
     }
 };

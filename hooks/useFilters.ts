@@ -151,36 +151,28 @@ export const useFilters = (
                 (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
 
             if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || hasProdQuery) {
-                // If filtering by product, client MUST have purchase history
+                // Se houver filtro de produto ativo, o cliente precisa ter ao menos uma compra que atenda simultaneamente a todos os critérios de produto e data
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
                     matchProduct = false;
                 } else {
-                    // Optimize: Evaluate all product conditions in a single loop while preserving
-                    // the independent "ANY product matches X" logic of the original code.
-                    let hasCat = filterProductCategory === 'Todos';
-                    let hasSection = filterProductSection === 'Todas';
-                    let hasSku = filterProductSku === 'Todos';
-                    let hasMatch = !hasProdQuery;
-                    let matchDate = !hasDateFilter;
+                    matchProduct = c.purchasedProducts.some(p => {
+                        if (filterProductCategory !== 'Todos' && (p.category || '') !== filterProductCategory) return false;
+                        if (filterProductSection !== 'Todas' && (p.section || '') !== filterProductSection) return false;
+                        if (filterProductSku !== 'Todos' && (p.sku || '') !== filterProductSku) return false;
 
-                    for (let i = 0; i < c.purchasedProducts.length; i++) {
-                        const p = c.purchasedProducts[i];
-
-                        if (!hasCat && (p.category || '') === filterProductCategory) hasCat = true;
-                        if (!hasSection && (p.section || '') === filterProductSection) hasSection = true;
-                        if (!hasSku && (p.sku || '') === filterProductSku) hasSku = true;
-
-                        if (!hasMatch && prodQueryRegex) {
-                            hasMatch = prodQueryRegex.test(p.name || '') ||
+                        if (prodQueryRegex) {
+                            const matchesText = prodQueryRegex.test(p.name || '') ||
                                 prodQueryRegex.test(p.sku || '') ||
                                 prodQueryRegex.test(p.brand || '') ||
                                 prodQueryRegex.test(p.category || '') ||
                                 prodQueryRegex.test(p.section || '') ||
                                 prodQueryRegex.test(p.factoryCode || '') ||
                                 prodQueryRegex.test((p.price || 0).toString());
+                            if (!matchesText) return false;
                         }
 
-                        if (!matchDate && p.purchaseDate) {
+                        if (hasDateFilter) {
+                            if (!p.purchaseDate) return false;
                             let pDate = new Date(p.purchaseDate);
                             if (isNaN(pDate.getTime())) {
                                 const parts = p.purchaseDate.split('/');
@@ -193,23 +185,15 @@ export const useFilters = (
                                     }
                                 }
                             }
-                            if (!isNaN(pDate.getTime())) {
-                                pDate.setHours(0, 0, 0, 0);
-                                const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
-                                const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
-                                if (isAfterStart && isBeforeEnd) {
-                                    matchDate = true;
-                                }
-                            }
+                            if (isNaN(pDate.getTime())) return false;
+                            pDate.setHours(0, 0, 0, 0);
+                            const isAfterStart = !parsedStartDate || pDate >= parsedStartDate;
+                            const isBeforeEnd = !parsedEndDate || pDate <= parsedEndDate;
+                            if (!isAfterStart || !isBeforeEnd) return false;
                         }
 
-                        // Early exit if all independent conditions are satisfied
-                        if (hasCat && hasSection && hasSku && hasMatch && matchDate) {
-                            break;
-                        }
-                    }
-
-                    matchProduct = hasCat && hasSection && hasSku && hasMatch && matchDate;
+                        return true;
+                    });
                 }
             }
 
