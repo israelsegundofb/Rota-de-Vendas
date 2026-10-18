@@ -39,28 +39,30 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const isAdminDev = currentUser.role === 'admin_dev' || currentUser.role === 'admin';
     const isMonitorMode = isAdminDev && activeUserId;
 
-    const filteredMessages = messages.filter(m => {
-        if (!activeUserId) return false;
+    const filteredMessages = useMemo(() => {
+        return messages.filter(m => {
+            if (!activeUserId) return false;
 
-        // If normal user: see only messages with the other party
-        // If Admin Dev: see ALL messages where the activeUserId is involved
-        if (currentUser.role === 'admin_dev' || currentUser.role === 'admin') {
-            return m.senderId === activeUserId || m.receiverId === activeUserId;
-        }
+            // If normal user: see only messages with the other party
+            // If Admin Dev: see ALL messages where the activeUserId is involved
+            if (currentUser.role === 'admin_dev' || currentUser.role === 'admin') {
+                return m.senderId === activeUserId || m.receiverId === activeUserId;
+            }
 
-        return (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
-            (m.senderId === activeUserId && m.receiverId === currentUser.id);
-    });
+            return (m.senderId === currentUser.id && m.receiverId === activeUserId) ||
+                (m.senderId === activeUserId && m.receiverId === currentUser.id);
+        });
+    }, [messages, activeUserId, currentUser.id, currentUser.role]);
 
-    // Hoist static string normalizations outside the render loop
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-
-    const filteredUsers = allUsers.filter(u =>
-        u.id !== currentUser.id &&
-        (!normalizedQuery ||
-         u.name.toLowerCase().includes(normalizedQuery) ||
-         u.username.toLowerCase().includes(normalizedQuery))
-    );
+    const filteredUsers = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+        return allUsers.filter(u =>
+            u.id !== currentUser.id &&
+            (!normalizedQuery ||
+             u.name.toLowerCase().includes(normalizedQuery) ||
+             u.username.toLowerCase().includes(normalizedQuery))
+        );
+    }, [allUsers, currentUser.id, searchQuery]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
