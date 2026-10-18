@@ -36,6 +36,10 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
     onReassignSalesperson,
     procState = { isActive: false, status: 'completed', errorMessage: '', current: 0, total: 0 }
 }) => {
+    // Optimization: Memoize the filtered list of sales team users to prevent
+    // redundant array allocations and filtering operations on every render cycle.
+    const salesTeamUsers = React.useMemo(() => users.filter(u => isSalesTeam(u.role)), [users]);
+
     const [activeTab, setActiveTab] = useState<'clients' | 'products' | 'purchases'>('clients');
     const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]); // Staging area
@@ -186,7 +190,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                         >
                                             <option value="" disabled>Selecione um vendedor...</option>
                                             <option value="smart">🌟 Automático (Via Planilha)</option>
-                                            {users.filter(u => isSalesTeam(u.role)).map(u => (
+                                            {salesTeamUsers.map(u => (
                                                 <option key={u.id} value={u.id}>{u.name}</option>
                                             ))}
                                         </select>
@@ -224,7 +228,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                     >
                                                         <option value="" disabled>Vendedor...</option>
                                                         <option value="smart">Automático</option>
-                                                        {users.filter(u => isSalesTeam(u.role)).map(u => (
+                                                        {salesTeamUsers.map(u => (
                                                             <option key={u.id} value={u.id}>{u.name}</option>
                                                         ))}
                                                     </select>
@@ -296,7 +300,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                             onChange={(e) => setTargetUploadUserId(e.target.value)}
                                         >
                                             <option value="" disabled>Selecione um vendedor...</option>
-                                            {users.filter(u => isSalesTeam(u.role)).map(u => (
+                                            {salesTeamUsers.map(u => (
                                                 <option key={u.id} value={u.id}>{u.name}</option>
                                             ))}
                                         </select>
@@ -442,7 +446,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                                     disabled={file.status === 'processing'}
                                                 >
                                                     <option value="" className="bg-surface text-on-surface">None</option>
-                                                    {users.filter(u => isSalesTeam(u.role)).map(u => (
+                                                    {salesTeamUsers.map(u => (
                                                         <option key={u.id} value={u.id} className="bg-surface text-on-surface">
                                                             {u.name}
                                                         </option>

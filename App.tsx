@@ -84,6 +84,10 @@ const App: React.FC = () => {
 
   const { toast } = useToast();
 
+  // Optimization: Memoize the filtered list of sales team users to prevent
+  // redundant array allocations and filtering operations on every render cycle.
+  const salesTeamUsers = React.useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
+
   const {
     masterClientList, setMasterClientList,
     products, setProducts,
@@ -2649,7 +2653,7 @@ const App: React.FC = () => {
                           {canViewAllData && <option value="Todos">Todos Vendedores</option>}
                           {/* Show all salespersons for Admin/Managers to choose. For User, show THEMSELVES even if not in 'users' list yet (fallback) */}
                           {canViewAllData
-                            ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                            ? salesTeamUsers.map(u => (
                               <option key={u.id} value={u.id}>{u.name}</option>
                             ))
                             : <option value={currentUser?.id}>{currentUser?.name}</option>
@@ -3022,7 +3026,7 @@ const App: React.FC = () => {
                                         >
                                           {canViewAllData && <option value="Todos">Todos Vendedores</option>}
                                           {canViewAllData
-                                            ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                            ? salesTeamUsers.map(u => (
                                               <option key={u.id} value={u.id}>{u.name}</option>
                                             ))
                                             : <option value={currentUser?.id}>{currentUser?.name}</option>
