@@ -2048,6 +2048,9 @@ const App: React.FC = () => {
   const canViewAllData = hasFullDataVisibility(currentUser.role);
   const isProductFilterActive = filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || searchProductQuery !== '';
 
+  // ⚡ Bolt: Cache filtered users to prevent O(N) array allocation on every render
+  const salesPersonUsers = React.useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
+
   return (
     <GoogleReCaptchaProvider
       reCaptchaKey={recaptchaKey}
@@ -2649,7 +2652,7 @@ const App: React.FC = () => {
                           {canViewAllData && <option value="Todos">Todos Vendedores</option>}
                           {/* Show all salespersons for Admin/Managers to choose. For User, show THEMSELVES even if not in 'users' list yet (fallback) */}
                           {canViewAllData
-                            ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                            ? salesPersonUsers.map(u => (
                               <option key={u.id} value={u.id}>{u.name}</option>
                             ))
                             : <option value={currentUser?.id}>{currentUser?.name}</option>
@@ -3022,7 +3025,7 @@ const App: React.FC = () => {
                                         >
                                           {canViewAllData && <option value="Todos">Todos Vendedores</option>}
                                           {canViewAllData
-                                            ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                            ? salesPersonUsers.map(u => (
                                               <option key={u.id} value={u.id}>{u.name}</option>
                                             ))
                                             : <option value={currentUser?.id}>{currentUser?.name}</option>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { EnrichedClient, AppUser } from '../types';
 import { REGIONS, CATEGORIES, getRegionByUF } from '../utils/constants';
 import { X, Save, MapPin, Store, AlertCircle, Globe, User, Search, Loader2, Briefcase, Building2, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -19,6 +19,9 @@ interface AddClientModalProps {
 const AddClientModal: React.FC<AddClientModalProps> = ({
     isOpen, onClose, onAdd, salespersonId, ownerName, users = [], onCNPJAuthError
 }) => {
+    // ⚡ Bolt: Cache filtered users to prevent O(N) array allocation on every render
+    const salesPersonUsers = useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
+
     const [selectedSalespersonId, setSelectedSalespersonId] = useState(salespersonId);
     // State for form
     const [formData, setFormData] = useState({
@@ -490,7 +493,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                                         className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none"
                                         title="Vendedor Responsável"
                                     >
-                                        {users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                        {salesPersonUsers.map(u => (
                                             <option key={u.id} value={u.id}>{u.name}{u.salesCategory ? ` (${u.salesCategory})` : ''}</option>
                                         ))}
                                     </select>
