@@ -84,6 +84,9 @@ const App: React.FC = () => {
 
   const { toast } = useToast();
 
+  // ⚡ Bolt: Cache filtered users to prevent O(N) array allocation on every render
+  const salesPersonUsers = React.useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
+
   const {
     masterClientList, setMasterClientList,
     products, setProducts,
@@ -2047,9 +2050,6 @@ const App: React.FC = () => {
   const isAdminUser = isAdmin(currentUser.role);
   const canViewAllData = hasFullDataVisibility(currentUser.role);
   const isProductFilterActive = filterProductCategory !== 'Todos' || filterProductSku !== 'Todos' || searchProductQuery !== '';
-
-  // ⚡ Bolt: Cache filtered users to prevent O(N) array allocation on every render
-  const salesPersonUsers = React.useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
 
   return (
     <GoogleReCaptchaProvider
