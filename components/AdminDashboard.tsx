@@ -103,6 +103,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const [lastUpdate] = useState(new Date());
     const [productSortOrder, setProductSortOrder] = useState<'desc' | 'asc'>('desc');
 
+    // Optimization: Memoize the filtered list of sales team users to prevent
+    // redundant array allocations and filtering operations on every render cycle.
+    const salesTeamUsers = React.useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
+
     // 1. Data Processing with Memoization
     const stats = useMemo(() => {
         const productSales: Record<string, { name: string; revenue: number; count: number }> = {};
@@ -394,7 +398,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 >
                                     {canViewAllData && <option value="Todos">Todos Vendedores</option>}
                                     {canViewAllData
-                                        ? users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                        ? salesTeamUsers.map(u => (
                                             <option key={u.id} value={u.id}>{u.name}</option>
                                         ))
                                         : <option value={currentUser?.id}>{currentUser?.name}</option>

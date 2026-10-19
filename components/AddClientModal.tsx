@@ -19,6 +19,10 @@ interface AddClientModalProps {
 const AddClientModal: React.FC<AddClientModalProps> = ({
     isOpen, onClose, onAdd, salespersonId, ownerName, users = [], onCNPJAuthError
 }) => {
+    // Optimization: Memoize the filtered lists to prevent redundant array allocations and filtering operations on every render cycle.
+    const salesTeamUsers = React.useMemo(() => users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal'), [users]);
+    const validCategories = React.useMemo(() => CATEGORIES.filter(c => c !== 'Todos'), []);
+
     const [selectedSalespersonId, setSelectedSalespersonId] = useState(salespersonId);
     // State for form
     const [formData, setFormData] = useState({
@@ -490,7 +494,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                                         className="w-full bg-surface-container-highest border-b border-outline-variant rounded-t-lg px-4 py-2.5 text-on-surface focus:border-primary focus:bg-surface-container-highest outline-none appearance-none"
                                         title="Vendedor Responsável"
                                     >
-                                        {users.filter(u => u.role === 'salesperson' || u.role === 'sales_external' || u.role === 'sales_internal').map(u => (
+                                        {salesTeamUsers.map(u => (
                                             <option key={u.id} value={u.id}>{u.name}{u.salesCategory ? ` (${u.salesCategory})` : ''}</option>
                                         ))}
                                     </select>
@@ -519,7 +523,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
                                     Segmento(s)
                                 </label>
                                 <div className="flex flex-wrap gap-2 p-3 border border-outline-variant rounded-xl bg-surface-container-low max-h-32 overflow-y-auto custom-scrollbar">
-                                    {CATEGORIES.filter(c => c !== 'Todos').map(cat => {
+                                    {validCategories.map(cat => {
                                         const isSelected = formData.category.includes(cat);
                                         return (
                                             <button

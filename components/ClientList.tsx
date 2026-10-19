@@ -76,6 +76,8 @@ const ClientList: React.FC<ClientListProps> = ({
   startDate,
   endDate
 }) => {
+  // Optimization: Memoize the filtered lists to prevent redundant array allocations and filtering operations on every render cycle.
+  const validCategories = React.useMemo(() => CATEGORIES.filter(c => c !== 'Todos'), []);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -226,7 +228,7 @@ const ClientList: React.FC<ClientListProps> = ({
             title="Filtrar por Categoria"
           >
             <option value="Todos">Todos Segmentos</option>
-            {CATEGORIES.filter(c => c !== 'Todos').map(c => <option key={c} value={c}>{c}</option>)}
+            {validCategories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
           <label className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest border-none rounded-lg text-xs font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer whitespace-nowrap overflow-hidden">

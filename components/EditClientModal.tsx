@@ -21,6 +21,9 @@ interface EditClientModalProps {
 }
 
 const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClose, onSave, users = [], uploadedFiles = [], onCNPJAuthError, allClients = [], onMergeClients }) => {
+    // Optimization: Memoize the filtered lists to prevent redundant array allocations and filtering operations on every render cycle.
+    const validCategories = React.useMemo(() => CATEGORIES.filter(c => c !== 'Todos'), []);
+
     const [formData, setFormData] = useState<EnrichedClient>(() => ({
         ...client,
         cnpj: client.cnpj || '',
@@ -648,7 +651,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ client, isOpen, onClo
                                 Segmento(s)
                             </label>
                             <div className="flex flex-wrap gap-2 p-3 border border-outline-variant rounded-xl bg-surface-container-low max-h-32 overflow-y-auto custom-scrollbar">
-                                {CATEGORIES.filter(c => c !== 'Todos').map(cat => {
+                                {validCategories.map(cat => {
                                     const isSelected = formData.category.includes(cat);
                                     return (
                                         <button
