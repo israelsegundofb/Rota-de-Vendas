@@ -127,6 +127,16 @@ const App: React.FC = () => {
     isFiltering
   } = useFilters(masterClientList, users, currentUser, products);
 
+  // Optimization: Memoize the filtered and sorted product list for dropdowns
+  // to avoid O(N) array allocations and sorting on every render cycle.
+  const filteredProductsOptions = React.useMemo(() => {
+    return products
+      .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
+      .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [products, filterProductCategory, filterProductSection]);
+
+
   // Helper function to distribute products to clients (moved up to fix hoisting)
   // REMOVED: distributeProductsToClients function
 
@@ -2790,10 +2800,7 @@ const App: React.FC = () => {
                         title="Filtrar por produto específico"
                       >
                         <option value="Todos">Todos Produtos</option>
-                        {products
-                          .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                          .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
-                          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                        {filteredProductsOptions
                           .map(p => (
                             <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
                           ))
@@ -3162,10 +3169,7 @@ const App: React.FC = () => {
                                         title="Filtrar por SKU do produto"
                                       >
                                         <option value="Todos">Todos Produtos</option>
-                                        {products
-                                          .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                                          .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
-                                          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                                        {filteredProductsOptions
                                           .map(p => (
                                             <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
                                           ))
