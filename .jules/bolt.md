@@ -9,6 +9,7 @@
 ## 2024-04-01 - [High-Volume Array Loop Optimizations in Admin Dashboard]
 **Learning:** In heavily nested loops over large datasets (e.g., iterating through `clientPurchases` for every product and date within `AdminDashboard.tsx`), typical string manipulation methods like `.split('-')` to parse dates introduce significant O(N) memory allocations and subsequent garbage collection overhead.
 **Action:** Replace chaining operations and memory-allocating string parsing (`.split()`) with zero-allocation `.indexOf()` and `.substring()` when parsing millions of date string parts within high-throughput loops. This pattern provides an 8x throughput boost by dodging constant array initialization.
+
 ## 2025-03-08 - O(1) Lookups in React Hot Loops
 **Learning:** Found an O(N*M) nested loop inside `handlePurchaseUpdateUpload` in `App.tsx` doing `.findIndex()` with string replacements `replace(/\D/g, '')` for every single upload record against every single existing client.
 **Action:** Replaced `.findIndex` inside loops with O(1) Map lookups pre-built outside the loop (`cnpjMap` and `nameMap`), changing time complexity from O(N*M) to O(N+M) and reducing heavy regex allocations.
@@ -16,13 +17,18 @@
 ## 2025-04-19 - [Avoid Chained Array Operations in React Render Loops]
 **Learning:** Chaining array methods like `.filter().map().filter(Boolean)` to generate derived unique sets (e.g., extracting distinct available states or cities from large `visibleClients` lists inside a `useMemo` in `useFilters.ts`) causes O(N) intermediate array allocations per step. This leads to heavy garbage collection pressure and significant UI stuttering when filtering large datasets during normal React render cycles.
 **Action:** Replace multiple chained array manipulations used to build sets with a single-pass `for` loop directly pushing valid matches into a `Set()`. This bypasses intermediate allocations entirely, significantly reducing iteration latency (e.g., dropping execution time from ~800ms to ~150ms over 10k items with 1000 runs).
+
 ## 2026-04-20 - [Avoid chained array allocations in React renders]
 **Learning:** Chained array methods like `.map().filter()` on potentially large arrays within React components cause unnecessary intermediate allocations. When creating new objects inside `.map` that are immediately thrown away by a subsequent `.filter`, memory usage spikes and GC is triggered, hurting render performance.
 **Action:** Replace `.map().filter()` chains with a single-pass `.reduce()` that builds the final array directly, skipping the creation of intermediate objects entirely.
+
 ## 2025-05-18 - [Optimize duplicate item filtering in map merges]
 **Learning:** Using `.findIndex` inside a `.filter` callback, specifically to deduplicate arrays during large data merges, causes severe O(N^2) exponential complexity loops in JavaScript and UI freezing.
 **Action:** Replace nested array lookups in filters with an external `Set` and track composite string keys. This ensures an O(N) single-pass iteration and is far faster for large lists.
-## 2025-06-25 - [Optimize redundant regex inside React state updaters]\n**Learning:** In React Strict Mode, mutating standard Maps/Sets inside a state updater function (e.g. `setState(prev => ...)`) will corrupt them because the updater runs twice. Furthermore, executing regex and string methods inside high-frequency nested loops (like `.findIndex`) causes O(N*M) thrashing.\n**Action:** Use a `useRef(new WeakMap())` keyed by the immutable state objects (like `EnrichedClient`) to safely cache computed strings (e.g., regex-cleaned CNPJs) without violating Strict Mode purity, reducing O(N*M) allocations to O(1) lookups.
+
+## 2025-06-25 - [Optimize redundant regex inside React state updaters]
+**Learning:** In React Strict Mode, mutating standard Maps/Sets inside a state updater function (e.g. `setState(prev => ...)`) will corrupt them because the updater runs twice. Furthermore, executing regex and string methods inside high-frequency nested loops (like `.findIndex`) causes O(N*M) thrashing.
+**Action:** Use a `useRef(new WeakMap())` keyed by the immutable state objects (like `EnrichedClient`) to safely cache computed strings (e.g., regex-cleaned CNPJs) without violating Strict Mode purity, reducing O(N*M) allocations to O(1) lookups.
 
 ## 2023-10-16 - [Performance pattern] Early breaking in React render loop iterations
 **Learning:** React state updaters and render blocks frequently contain complex array iteration chains, such as `.filter(...).slice(0, K)`. For large data arrays (e.g., product lists), this requires an O(N) full-array iteration for filtering *before* any slice limitation is applied. Furthermore, any `.toLowerCase()` calls executed within the iteration lambda forces redundant string allocation.
