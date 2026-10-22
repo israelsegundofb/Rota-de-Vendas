@@ -122,40 +122,39 @@ export const useFilters = (
         const prodQueryRegex = hasProdQuery ? new RegExp(escapeRegExp(debouncedProductQuery), 'i') : null;
 
         return visibleClients.filter(c => {
+            // Optimize: Early returns for simple equality checks to short-circuit expensive regex/nested loops
             // General Filters
-            const matchRegion = filterRegion === 'Todas' || c.region === filterRegion;
-            const matchState = filterState === 'Todos' || c.state === filterState;
-            const matchCity = filterCity === 'Todas' || c.city === filterCity;
-            const matchCat = filterCategory === 'Todos' || (Array.isArray(c.category) && c.category.includes(filterCategory));
+            if (filterRegion !== 'Todas' && c.region !== filterRegion) return false;
+            if (filterState !== 'Todos' && c.state !== filterState) return false;
+            if (filterCity !== 'Todas' && c.city !== filterCity) return false;
+            if (filterCategory !== 'Todos' && (!Array.isArray(c.category) || !c.category.includes(filterCategory))) return false;
 
             // Sales Category Filter (Admin Only)
-            let matchSalesCat = true;
             if (currentUserRole && hasFullDataVisibility(currentUserRole) && filterSalesCategory !== 'Todos') {
                 const sellerSalesCat = sellerCategoriesMap.get(c.salespersonId) || 'Desconhecido';
-                if (sellerSalesCat !== filterSalesCategory) {
-                    matchSalesCat = false;
-                }
+                if (sellerSalesCat !== filterSalesCategory) return false;
+            }
+
+            // CNAE Filter (Matches Main or Secondary)
+            if (filterCnae !== 'Todos') {
+                const matchCnae = (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
+                                  (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
+                if (!matchCnae) return false;
             }
 
             // Text Search
-            const matchSearch = !queryRegex ||
-                queryRegex.test(c.companyName || '') ||
-                (c.ownerName && queryRegex.test(c.ownerName || ''));
+            if (queryRegex) {
+                const matchSearch = queryRegex.test(c.companyName || '') || (c.ownerName && queryRegex.test(c.ownerName || ''));
+                if (!matchSearch) return false;
+            }
 
             // Product Filters (Where items were sold)
-            let matchProduct = true;
-
-            // CNAE Filter (Matches Main or Secondary)
-            const matchCnae = filterCnae === 'Todos' ||
-                (c.mainCnae && c.mainCnae.includes(filterCnae)) ||
-                (c.secondaryCnaes && c.secondaryCnaes.some(s => s.includes(filterCnae)));
-
             if (filterProductCategory !== 'Todos' || filterProductSection !== 'Todas' || filterProductSku !== 'Todos' || hasProdQuery) {
                 // Se houver filtro de produto ativo, o cliente precisa ter ao menos uma compra que atenda simultaneamente a todos os critérios de produto e data
                 if (!c.purchasedProducts || c.purchasedProducts.length === 0) {
-                    matchProduct = false;
+                    return false;
                 } else {
-                    matchProduct = c.purchasedProducts.some(p => {
+                    const matchProduct = c.purchasedProducts.some(p => {
                         if (filterProductCategory !== 'Todos' && (p.category || '') !== filterProductCategory) return false;
                         if (filterProductSection !== 'Todas' && (p.section || '') !== filterProductSection) return false;
                         if (filterProductSku !== 'Todos' && (p.sku || '') !== filterProductSku) return false;
@@ -194,17 +193,19 @@ export const useFilters = (
 
                         return true;
                     });
+                    if (!matchProduct) return false;
                 }
             }
 
             // Only with Purchases Filter: Context-aware and robust
-            const matchOnlyWithPurchases = !filterOnlyWithPurchases || (
-                c.purchasedProducts && c.purchasedProducts.some(p =>
+            if (filterOnlyWithPurchases) {
+                const matchOnlyWithPurchases = c.purchasedProducts && c.purchasedProducts.some(p =>
                     isValidPurchase(p, filterSalespersonId, startDate, endDate)
-                )
-            );
+                );
+                if (!matchOnlyWithPurchases) return false;
+            }
 
-            return matchRegion && matchState && matchCity && matchCat && matchSearch && matchProduct && matchSalesCat && matchOnlyWithPurchases && matchCnae;
+            return true;
         });
     }, [visibleClients, filterRegion, filterState, filterCity, filterCategory, filterCnae, filterSalespersonId, debouncedSearchQuery, filterProductCategory, filterProductSection, filterProductSku, debouncedProductQuery, filterSalesCategory, filterOnlyWithPurchases, sellerCategoriesMap, currentUserRole, startDate, endDate]);
 
