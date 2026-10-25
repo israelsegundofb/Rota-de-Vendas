@@ -20,16 +20,29 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({
 
     const allPurchases = useMemo(() => {
         const records: (PurchaseRecord & { clientName: string; clientId: string })[] = [];
-        const term = clientSearch.trim().toLowerCase();
+
+        // ⚡ Bolt: Performance Optimization
+        // Replace O(N*M) redundant string allocations via `.toLowerCase().includes()`
+        // inside the loop with a hoisted case-insensitive regular expression.
+        const rawTerm = clientSearch.trim();
+        const hasTerm = rawTerm.length > 0;
+        const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchRegex = hasTerm ? new RegExp(escapeRegExp(rawTerm), 'i') : null;
 
         clients.forEach(client => {
             if (client.purchasedProducts) {
-                const matchesClient = !term || (client.companyName || '').toLowerCase().includes(term) || (client.cnpj || '').toLowerCase().includes(term);
+                const matchesClient = !searchRegex ||
+                    searchRegex.test(client.companyName || '') ||
+                    searchRegex.test(client.cnpj || '');
+
                 client.purchasedProducts.forEach(purchase => {
                     // Filtro de validade e temporal
                     if (!isValidPurchase(purchase, 'Todos', startDate, endDate)) return;
 
-                    const matchesProduct = !term || (purchase.name || '').toLowerCase().includes(term) || (purchase.sku || '').toLowerCase().includes(term);
+                    const matchesProduct = !searchRegex ||
+                        searchRegex.test(purchase.name || '') ||
+                        searchRegex.test(purchase.sku || '');
+
                     if (!matchesClient && !matchesProduct) return;
 
                     records.push({
