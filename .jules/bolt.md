@@ -31,3 +31,7 @@
 ## 2026-10-18 - [Optimize array derivations in React render cycle]
 **Learning:** Filtering arrays inline within a React component's render function before mapping (e.g., `users.filter(..).map(..)` in select options) creates new array references and causes redundant O(N) operations on every single render. Additionally, placing `useMemo` hooks arbitrarily above block scope declarations can lead to fatal ReferenceErrors if they access variables before initialization.
 **Action:** Use `React.useMemo` to safely cache derived lists (e.g., filtered users or categories) at the top level of the component scope, properly evaluating dependency arrays. Use this memoized array in the render function to avoid unnecessary computations and GC overhead while preserving application stability.
+
+## 2023-10-25 - [Optimize text search filtering inside nested array loops]
+**Learning:** Re-evaluating text search predicates such as `searchTerm.toLowerCase().includes(value)` on every iteration of a deeply nested loop (e.g., inside `.filter().map()` over clients and their purchases) creates significant performance bottlenecks due to constant runtime string allocations and garbage collection overhead ($O(N \times M)$ complexity).
+**Action:** Replace inline `.toLowerCase().includes()` inside high-volume loops with a hoisted case-insensitive regular expression (`new RegExp(escapedTerm, 'i')`) compiled once outside the loop. Use `.test()` on the regex inside the loops to achieve the same substring matching logic while entirely eliminating the inner-loop string allocations.
