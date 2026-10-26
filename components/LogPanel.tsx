@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Activity,
     Search,
@@ -34,14 +34,21 @@ const LogPanel: React.FC<LogPanelProps> = ({ currentUser, onClose }) => {
         return () => unsubscribe();
     }, []);
 
-    const filteredLogs = logs.filter(log => {
-        const matchesSearch =
-            log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.details.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = filterCategory === 'ALL' || log.category === filterCategory;
-        const matchesAction = filterAction === 'ALL' || log.action === filterAction;
-        return matchesSearch && matchesCategory && matchesAction;
-    });
+    const filteredLogs = useMemo(() => {
+        // Optimization: Hoist the normalized search term to avoid O(N) string allocations inside the filter loop.
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+
+        return logs.filter(log => {
+            // Early return to avoid expensive string operations if simple conditions fail
+            if (filterCategory !== 'ALL' && log.category !== filterCategory) return false;
+            if (filterAction !== 'ALL' && log.action !== filterAction) return false;
+
+            if (!normalizedSearch) return true;
+
+            return log.userName.toLowerCase().includes(normalizedSearch) ||
+                   log.details.toLowerCase().includes(normalizedSearch);
+        });
+    }, [logs, searchTerm, filterCategory, filterAction]);
 
     const getActionColor = (action: string) => {
         switch (action) {
