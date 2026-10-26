@@ -31,3 +31,9 @@
 ## 2026-10-18 - [Optimize array derivations in React render cycle]
 **Learning:** Filtering arrays inline within a React component's render function before mapping (e.g., `users.filter(..).map(..)` in select options) creates new array references and causes redundant O(N) operations on every single render. Additionally, placing `useMemo` hooks arbitrarily above block scope declarations can lead to fatal ReferenceErrors if they access variables before initialization.
 **Action:** Use `React.useMemo` to safely cache derived lists (e.g., filtered users or categories) at the top level of the component scope, properly evaluating dependency arrays. Use this memoized array in the render function to avoid unnecessary computations and GC overhead while preserving application stability.
+## 2026-10-26 - [Optimize Search Filtering by Hoisting  in Components]
+**Learning:** In components like `LogPanel`, running `.toLowerCase()` inside array filtering iterations (e.g., `logs.filter(...)`) executes the string operation twice for every single item on every keypress, creating massive O(N) memory allocations and slowing down React rendering.
+**Action:** Pre-compute the search query normalizations (e.g., `searchTerm.trim().toLowerCase()`) outside of the loops and apply early return condition checks before executing expensive operations.
+## 2023-10-26 - [Optimize Search Filtering by Hoisting `.toLowerCase()` in Components]
+**Learning:** In components like `LogPanel`, running `.toLowerCase()` inside array filtering iterations (e.g., `logs.filter(...)`) executes the string operation twice for every single item on every keypress, creating massive O(N) memory allocations and slowing down React rendering.
+**Action:** Pre-compute the search query normalizations (e.g., `searchTerm.trim().toLowerCase()`) outside of the loops and apply early return condition checks before executing expensive string operations on lists.
