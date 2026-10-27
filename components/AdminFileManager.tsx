@@ -40,6 +40,9 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
     // redundant array allocations and filtering operations on every render cycle.
     const salesTeamUsers = React.useMemo(() => users.filter(u => isSalesTeam(u.role)), [users]);
 
+    // ⚡ Bolt Optimization: Replace O(N*M) nested loop deductions (.find inside .map) with an O(1) Map lookup
+    const userMap = React.useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
+
     const [activeTab, setActiveTab] = useState<'clients' | 'products' | 'purchases'>('clients');
     const [targetUploadUserId, setTargetUploadUserId] = useState<string>('');
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]); // Staging area
@@ -434,7 +437,7 @@ const AdminFileManager: React.FC<AdminFileManagerProps> = ({
                                         <div className="flex items-center gap-3 sm:border-l sm:border-r border-outline-variant/30 sm:px-4 sm:w-56 shrink-0">
                                             <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary shrink-0">
                                                 {(() => {
-                                                    const user = users.find(u => u.id === file.salespersonId);
+                                                    const user = userMap.get(file.salespersonId || '');
                                                     return user?.name?.charAt(0) || '?';
                                                 })()}
                                             </div>

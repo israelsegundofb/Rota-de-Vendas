@@ -31,3 +31,7 @@
 ## 2026-10-18 - [Optimize array derivations in React render cycle]
 **Learning:** Filtering arrays inline within a React component's render function before mapping (e.g., `users.filter(..).map(..)` in select options) creates new array references and causes redundant O(N) operations on every single render. Additionally, placing `useMemo` hooks arbitrarily above block scope declarations can lead to fatal ReferenceErrors if they access variables before initialization.
 **Action:** Use `React.useMemo` to safely cache derived lists (e.g., filtered users or categories) at the top level of the component scope, properly evaluating dependency arrays. Use this memoized array in the render function to avoid unnecessary computations and GC overhead while preserving application stability.
+
+## 2026-10-19 - [Optimize array derivations in map renders]
+**Learning:** Performing `O(N)` lookups via `.find()` inside of a React list `.map()` iteration (such as rendering mapped `filteredFiles` and searching for matching `users`) causes O(N*M) runtime complexity which slows down UI rendering significantly with large lists.
+**Action:** Extract list lookups into pre-computed `React.useMemo` Maps (e.g. `const userMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users])`) and perform `O(1)` `.get()` calls inside the render loop instead of `.find()`.
