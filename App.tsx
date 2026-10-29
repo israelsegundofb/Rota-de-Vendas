@@ -119,6 +119,7 @@ const App: React.FC = () => {
     availableCnaes,
     productCategories,
     productSections,
+    availableFilteredProducts,
     filterOnlyWithPurchases,
     setFilterOnlyWithPurchases,
     startDate, setStartDate,
@@ -2790,14 +2791,9 @@ const App: React.FC = () => {
                         title="Filtrar por produto específico"
                       >
                         <option value="Todos">Todos Produtos</option>
-                        {products
-                          .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                          .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
-                          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                          .map(p => (
-                            <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
-                          ))
-                        }
+                        {availableFilteredProducts.map(p => (
+                          <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
+                        ))}
                       </select>
                     </div>
 
@@ -3162,14 +3158,9 @@ const App: React.FC = () => {
                                         title="Filtrar por SKU do produto"
                                       >
                                         <option value="Todos">Todos Produtos</option>
-                                        {products
-                                          .filter(p => filterProductCategory === 'Todos' || p.category === filterProductCategory)
-                                          .filter(p => filterProductSection === 'Todas' || p.section === filterProductSection)
-                                          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                                          .map(p => (
-                                            <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
-                                          ))
-                                        }
+                                        {availableFilteredProducts.map(p => (
+                                          <option key={p.sku} value={p.sku}>{p.name.substring(0, 30)}... ({p.sku})</option>
+                                        ))}
                                       </select>
                                     </div>
 
