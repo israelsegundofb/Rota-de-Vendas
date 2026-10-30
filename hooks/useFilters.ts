@@ -275,6 +275,20 @@ export const useFilters = (
         return Array.from(cnaes).sort();
     }, [visibleClients]);
 
+    const filteredAndSortedProducts = useMemo(() => {
+        // Optimize: Replaced chained .filter().filter().sort() with a single-pass loop
+        // Avoids multiple intermediate array allocations and reduces GC overhead.
+        const filtered = [];
+        for (let i = 0; i < products.length; i++) {
+            const p = products[i];
+            if ((filterProductCategory === 'Todos' || p.category === filterProductCategory) &&
+                (filterProductSection === 'Todas' || p.section === filterProductSection)) {
+                filtered.push(p);
+            }
+        }
+        return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }, [products, filterProductCategory, filterProductSection]);
+
     const resetFilters = () => {
         clearParams();
         setSearchQueryState('');
@@ -321,6 +335,7 @@ export const useFilters = (
         availableCnaes,
         productCategories,
         productSections,
+        filteredAndSortedProducts,
 
         // Actions
         resetFilters
